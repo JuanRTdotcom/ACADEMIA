@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Sumaq System (local)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "sumaq_system",
+      "Username": "academia",
+      "SSLMode": "prefer"
+    }
+  }
+}

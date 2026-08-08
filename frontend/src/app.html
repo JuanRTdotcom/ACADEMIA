@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="%lang%">
+  <head>
+    <meta charset="utf-8" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="%sveltekit.assets%/favicon-32.png" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="512x512"
+      href="%sveltekit.assets%/favicon-512.png" />
+    <link
+      rel="apple-touch-icon"
+      href="%sveltekit.assets%/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#5645d4" />
+    <script>
+      // No-flash theme init: runs before first paint.
+      (function () {
+        try {
+          // La cookie concreta es la misma fuente que usa el SSR. Si todavía no
+          // existe (primera visita), ambos usan light para evitar un cambio durante
+          // la hidratación. El modo "system" se resuelve después de que el usuario
+          // lo elige y deja también esta cookie concreta sincronizada.
+          var modeMatch = document.cookie.match(
+            /(?:^|;\s*)sumaq-theme-mode=(light|dark|system)(?:;|$)/,
+          );
+          var mode = modeMatch ? modeMatch[1] : null;
+          var match = document.cookie.match(
+            /(?:^|;\s*)sumaq-theme=(light|dark)(?:;|$)/,
+          );
+          var t;
+          if (mode === "light" || mode === "dark") t = mode;
+          else t = match ? match[1] : "light";
+          document.documentElement.dataset.theme = t;
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-reload data-sveltekit-preload-data="false">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

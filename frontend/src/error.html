@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>%sveltekit.status% · Sumaq System</title>
+    <style>
+      :root {
+        --canvas: #ffffff;
+        --ink: #1b2233;
+        --muted: #5b6577;
+        --stone: #8a94a6;
+        --hairline: #e6e9ef;
+        --brand: #2b59ff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --canvas: #0f1420;
+          --ink: #eef1f8;
+          --muted: #9aa4b8;
+          --stone: #6b7488;
+          --hairline: #1e2636;
+          --brand: #6b8cff;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        display: flex;
+        min-height: 100dvh;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 16px;
+        padding: 24px 24px 40px;
+      }
+      .logo { display: block; height: 84px; width: auto; margin-bottom: 8px; }
+      .status { margin: 0; font-size: clamp(64px, 12vw, 120px); font-weight: 700; line-height: 1; letter-spacing: -.03em; color: var(--ink); }
+      h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.12; letter-spacing: -.02em; }
+      p { margin: 0; max-width: 460px; font-size: 16px; line-height: 1.6; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img class="logo" src="/logo-mark.png" alt="Sumaq System" width="87" height="128" />
+      <p class="status">%sveltekit.status%</p>
+      <h1 id="title">Something went wrong</h1>
+      <p id="body">We couldn't load this page. Please try again later.</p>
+    </main>
+
+    <script>
+      // Sin framework en esta shell: elegimos idioma por el navegador y el texto por el status.
+      // 404 → organización no encontrada; 5xx → servicio no disponible; resto → genérico.
+      (function () {
+        var es = (navigator.language || "en").toLowerCase().indexOf("es") === 0;
+        document.documentElement.lang = es ? "es" : "en";
+        var status = Number("%sveltekit.status%");
+        var kind = status === 404 ? "notFound" : status >= 500 ? "serverDown" : "generic";
+        var copy = {
+          notFound: {
+            en: ["Organization not found", "The link you used doesn't match any registered organization. Please check the address with your institution."],
+            es: ["Organización no encontrada", "El enlace que usaste no corresponde a ninguna organización registrada. Verifica la dirección con tu institución."],
+          },
+          serverDown: {
+            en: ["Service unavailable", "We can't reach the server right now. Please try again in a few minutes."],
+            es: ["Servicio no disponible", "No podemos conectar con el servidor en este momento. Vuelve a intentarlo en unos minutos."],
+          },
+          generic: {
+            en: ["Something went wrong", "We couldn't load this page. Please try again later."],
+            es: ["Algo salió mal", "No pudimos cargar esta página. Vuelve a intentarlo más tarde."],
+          },
+        };
+        var pick = copy[kind][es ? "es" : "en"];
+        document.getElementById("title").textContent = pick[0];
+        document.getElementById("body").textContent = pick[1];
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,47 @@
+/* ==========================================================================
+   shadcn-svelte semantic tokens → mapeados a la paleta Academia (tokens.css).
+   Hace que los componentes de shadcn hereden el look Notion "daylight" y cambien
+   solos con [data-theme='dark']. Aditivo: NO modifica los tokens existentes; solo
+   añade los nombres semánticos que shadcn espera y que aún no existían.
+   ('primary' ya está mapeado en app.css → sus botones ya usan tu azul).
+   ========================================================================== */
+@theme inline {
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
+
+  --color-card: var(--canvas);
+  --color-card-foreground: var(--ink);
+
+  --color-popover: var(--canvas);
+  --color-popover-foreground: var(--ink);
+
+  --color-primary-foreground: var(--on-primary);
+
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--charcoal);
+
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--steel);
+
+  --color-accent: var(--surface-soft);
+  --color-accent-foreground: var(--ink);
+
+  --color-destructive: var(--error);
+  --color-destructive-foreground: var(--on-primary);
+
+  --color-border: var(--hairline);
+  --color-input: var(--hairline);
+  --color-ring: var(--primary);
+}
+
+/* Preset shadcn-svelte: Mira + radius small (base oficial: 0.45rem).
+   Se limita a elementos shadcn mediante data-slot para no rediseñar el template. */
+[data-slot] {
+  /* app.css conecta las utilidades rounded-* con --r-*; sobrescribimos esos
+     tokens dentro del componente para que el preset sí llegue al CSS final. */
+  --r-xs: calc(var(--shadcn-radius) - 6px);
+  --r-sm: calc(var(--shadcn-radius) - 4px);
+  --r-md: calc(var(--shadcn-radius) - 2px);
+  --r-lg: var(--shadcn-radius);
+  --r-xl: calc(var(--shadcn-radius) + 4px);
+}

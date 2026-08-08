@@ -1,0 +1,5 @@
+allowBuilds:
+  '@firebase/util': set this to true or false
+  protobufjs: set this to true or false
+minimumReleaseAgeExclude:
+  - '@internationalized/date@3.12.3'

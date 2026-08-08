@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.svelte-kit/
+build/
+# .env
+*.log
+
+# Prisma generated client
+prisma/generated/
+
+# Archivos subidos en ejecución (el directorio sí queda documentado).
+uploads/**/*
+!uploads/avatars/
+!uploads/avatars/.gitkeep

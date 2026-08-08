@@ -1,0 +1,17 @@
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/backend/README.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/database/README.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/database/docker-compose.yml
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/DESIGN.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/DESIGN2.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/README.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/frontend.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/src/app.html
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/static/robots.txt
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/graphify-out/converted/Cotizacion_Academia_Serumista_0ca100f4.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/graphify-out/converted/Propuesta_Academia_Serumista_3d84f32a.md
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/src/lib/assets/favicon.svg
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/static/apple-touch-icon.png
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/static/favicon-32.png
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/static/favicon-512.png
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/static/logo-mark.png
+/Users/juanruiz/Documents/proyectos-personales/ACADEMIA/frontend/static/logo.png

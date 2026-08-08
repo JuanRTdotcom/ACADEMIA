@@ -1,0 +1,35 @@
+// Reusable component barrel — import from '$lib'
+export { default as Button } from "./components/Button.svelte";
+export { default as Card } from "./components/Card.svelte";
+export { default as Badge } from "./components/Badge.svelte";
+export { default as Breadcrumb } from "./components/Breadcrumb.svelte";
+export { default as Input } from "./components/Input.svelte";
+export { default as Select } from "./components/Select.svelte";
+export { default as Switch } from "./components/Switch.svelte";
+export { default as Icon } from "./components/Icon.svelte";
+export { default as Logo } from "./components/Logo.svelte";
+export { default as Avatar } from "./components/Avatar.svelte";
+export { default as ThemeToggle } from "./components/ThemeToggle.svelte";
+export { default as LanguageSwitcher } from "./components/LanguageSwitcher.svelte";
+export { default as ConfirmationDialog } from "./components/ConfirmationDialog.svelte";
+export { default as ProfileCollectionShell } from "./components/ProfileCollectionShell.svelte";
+export { default as CompanySectionCard } from "./components/CompanySectionCard.svelte";
+export { default as CompanyMediaUploader } from "./components/CompanyMediaUploader.svelte";
+export { default as CompanyBrandMediaGroup } from "./components/CompanyBrandMediaGroup.svelte";
+export { default as CompanyCoverGallery } from "./components/CompanyCoverGallery.svelte";
+export { default as BenefitIconSelect } from "./components/BenefitIconSelect.svelte";
+export { default as RoleIconSelect } from "./components/RoleIconSelect.svelte";
+export { default as AdministrativeLocation } from "./components/AdministrativeLocation.svelte";
+export type { ConfirmationVariant } from "./components/ConfirmationDialog.svelte";
+export { default as StatCard } from "./components/StatCard.svelte";
+export { default as Header } from "./components/layout/Header.svelte";
+export { default as Sidebar } from "./components/layout/Sidebar.svelte";
+
+export { theme } from "./stores/theme.svelte";
+export { navGroups } from "./config/nav";
+export { i18n } from "./i18n/index.svelte";
+export { parameterLabel } from "./parameter-label";
+export type { TranslatedParameter } from "./parameter-label";
+export { tienePermiso } from "./permissions-client";
+export { formatLocalDate, formatLocalDateTime } from "./date-utils";
+

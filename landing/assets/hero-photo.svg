@@ -1,0 +1,9 @@
+<svg viewBox="0 0 600 700" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="700" rx="24" fill="#E8EDF3"/>
+  <rect x="180" y="220" width="240" height="200" rx="16" fill="#C5D0E0" />
+  <circle cx="260" cy="290" r="24" fill="#A0B0C8"/>
+  <polygon points="200,400 340,310 420,400" fill="#A0B0C8" opacity="0.7"/>
+  <polygon points="260,400 380,350 400,400" fill="#8FA0B8" opacity="0.6"/>
+  <text x="300" y="480" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="600" fill="#6B7B8F">Reemplaza con tu foto</text>
+  <text x="300" y="510" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" fill="#8899AA">hero-photo.svg o .jpg / .png</text>
+</svg>
