@@ -35,6 +35,13 @@ export class ControladorEmpresaUsuarios {
     private readonly prisma: PrismaService,
   ) {}
 
+  private async validarRolesAsignables(roles: string[]): Promise<void> {
+    const restringidos = await this.prisma.roles.count({
+      where: { id_roles: { in: roles }, asignable_por_empresa: false },
+    });
+    if (restringidos > 0) throw new BadRequestException("users.invalidRoles");
+  }
+
   @Get()
   @Permisos(
     "administrator.users.read",
@@ -57,8 +64,8 @@ export class ControladorEmpresaUsuarios {
     "administrator.users.update",
   )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  opciones() {
-    return this.usuarios.opcionesDeEmpresa();
+  opciones(@UsuarioActual() actor: UsuarioAutenticado) {
+    return this.usuarios.opcionesDeEmpresa(actor.fid_organizaciones);
   }
 
   @Get(":id")
@@ -86,13 +93,7 @@ export class ControladorEmpresaUsuarios {
   ) {
     dto.fid_organizaciones = actor.fid_organizaciones;
 
-    // Validar que no se intente asignar SUPERADMIN
-    const superadminRole = await this.prisma.roles.findFirst({
-      where: { codigo: "SUPERADMIN" },
-    });
-    if (superadminRole && dto.fid_roles.includes(superadminRole.id_roles)) {
-      throw new BadRequestException("users.invalidRoles");
-    }
+    await this.validarRolesAsignables(dto.fid_roles);
 
     if (dto.contrasenia_temporal !== dto.confirmacion_contrasenia) {
       throw new BadRequestException("users.passwordMismatch");
@@ -121,13 +122,7 @@ export class ControladorEmpresaUsuarios {
 
     dto.fid_organizaciones = actor.fid_organizaciones;
 
-    // Validar que no se intente asignar SUPERADMIN
-    const superadminRole = await this.prisma.roles.findFirst({
-      where: { codigo: "SUPERADMIN" },
-    });
-    if (superadminRole && dto.fid_roles.includes(superadminRole.id_roles)) {
-      throw new BadRequestException("users.invalidRoles");
-    }
+    await this.validarRolesAsignables(dto.fid_roles);
 
     await this.usuarios.actualizar(
       id,

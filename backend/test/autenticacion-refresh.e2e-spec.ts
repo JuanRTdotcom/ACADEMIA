@@ -51,7 +51,7 @@ describe("POST /auth/refresh (e2e)", () => {
   const slug = exigirEntorno("OWNER_ORG_SLUG");
   const sufijoUsuario = randomUUID();
   const usuarioIngreso =
-    `R${sufijoUsuario.replaceAll("-", "").slice(0, 19)}`.toUpperCase();
+    `R${sufijoUsuario.replaceAll("-", "").slice(0, 9)}`.toUpperCase();
   const contrasenia = "Refresh1!Pass";
 
   beforeAll(async () => {
@@ -180,6 +180,26 @@ describe("POST /auth/refresh (e2e)", () => {
       .set("user-agent", AGENTE_PRUEBA)
       .set("cookie", cookie);
   }
+
+  function payloadDe(cookie: string): Record<string, unknown> {
+    const token = cookie.slice(cookie.indexOf("=") + 1);
+    const payload = jwt.decode<Record<string, unknown>>(token);
+    if (!payload)
+      throw new Error("El access token no contiene un payload válido");
+    return payload;
+  }
+
+  it("mantiene los permisos fuera del access token", async () => {
+    const uid = nuevaUid();
+    const sesion = await ingresar(uid, "198.51.100.10");
+
+    expect(payloadDe(sesion.access)).not.toHaveProperty("permisos");
+
+    const respuesta = await refrescar(sesion.refresh, "198.51.100.10");
+    expect(respuesta.status).toBe(200);
+    const accessRotado = cookiePorNombre(cookiesDe(respuesta), "access_token");
+    expect(payloadDe(accessRotado)).not.toHaveProperty("permisos");
+  });
 
   it("rota en sitio dentro de una transacción y guarda el nuevo HMAC", async () => {
     const uid = nuevaUid();

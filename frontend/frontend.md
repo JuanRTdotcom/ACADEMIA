@@ -66,6 +66,10 @@ Temas **light + dark**: el store escribe `data-theme` en `<html>`. Los tokens se
 en `[data-theme="dark"]`, así que las utilidades Tailwind cambian solas — casi no se usa
 `dark:`. Init sin parpadeo en un `<script>` inline dentro de `app.html`.
 
+Medios con transparencia (logos, escudos e imagotipos) deben usar `bg-canvas` y
+`object-contain`: se ven blancos en tema claro y adoptan la superficie correcta en oscuro.
+Nunca usar `bg-white` ni otro color fijo como fondo de un medio de la interfaz.
+
 ---
 
 ## 4. Cómo funciona el theming (importante)
@@ -163,6 +167,8 @@ Empresas ya tiene pantalla real: lista las organizaciones activas mediante SSR y
 
 `/recursos` integra el catálogo oficial Lucide Svelte: **1.756 iconos** de trazo uniforme. Incluye búsqueda, contador, carga progresiva de 160 elementos y copia del nombre. Para usar uno, importar `LucideIcon` directamente desde `$lib/components/LucideIcon.svelte` y escribir `<LucideIcon name="Building2" />`. No se exporta desde el barrel `$lib`: así Dashboard y las demás rutas no descargan el catálogo completo.
 
+Lucide es la única fuente permitida para iconografía visible. No se crean SVG, `path`, emojis, formas CSS ni nombres de iconos propios. Los usos nuevos importan el componente oficial de `@lucide/svelte` o emplean `LucideIcon` con un nombre verificado; si no existe un icono exacto, se elige el equivalente oficial más cercano o se usa texto.
+
 ---
 
 ## 7. Decisiones de producto abiertas (contexto)
@@ -215,6 +221,7 @@ Para agregar texto: crear la misma clave en `en.json` y `es.json`, luego usar `i
 2. Seguí **DESIGN2.md** (no DESIGN.md). Azul = acciones; colores = solo decoración.
 3. Componentes lo más **reutilizables** posible; si creás uno, mostralo en `/recursos`.
 4. Mantené **light + dark** funcionando (usá tokens semánticos, no colores hardcodeados).
+   En particular, logos e imágenes transparentes usan `bg-canvas`, nunca `bg-white`.
 5. Responsive desde el inicio.
 6. Corré `npx svelte-check` antes de dar algo por terminado (0 errores).
 7. No hardcodear textos visibles: usar claves presentes en ambos diccionarios i18n.

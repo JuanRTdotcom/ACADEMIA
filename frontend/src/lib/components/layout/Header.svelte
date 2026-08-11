@@ -14,11 +14,12 @@
 		onToggleSidebar?: () => void;
 		title?: string;
 		usuario: UsuarioCabecera;
+		organizacionNombre: string;
 		lightColor?: string | null;
 		darkColor?: string | null;
 		hideBottomBorder?: boolean;
 	}
-	let { onToggleSidebar, title = '', usuario, lightColor = null, darkColor = null, hideBottomBorder = false }: Props = $props();
+	let { onToggleSidebar, title = '', usuario, organizacionNombre, lightColor = null, darkColor = null, hideBottomBorder = false }: Props = $props();
 	let probandoNotificaciones = $state(false);
 	let confirmacionAbierta = $state(false);
 
@@ -104,7 +105,7 @@
 		</button>
 		<LanguageSwitcher {tone} />
 		<ThemeToggle {tone} />
-		<UserMenu {usuario} {tone} />
+		<UserMenu {usuario} {organizacionNombre} {tone} />
 	</div>
 </header>
 

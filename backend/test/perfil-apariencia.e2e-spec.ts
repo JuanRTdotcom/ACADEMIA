@@ -647,7 +647,7 @@ describe("PATCH /profile/appearance (e2e)", () => {
       .post("/profile/avatar")
       .set("Cookie", cookies)
       .set("x-sumaq-csrf", "1")
-      .attach("avatar", Buffer.alloc(2 * 1024 * 1024 + 1, 0xff), {
+      .attach("avatar", Buffer.alloc(3 * 1024 * 1024 + 1, 0xff), {
         filename: "avatar.jpg",
         contentType: "image/jpeg",
       });
@@ -699,8 +699,8 @@ describe("PATCH /profile/appearance (e2e)", () => {
     expect(descarga.status).toBe(200);
     expect(descarga.headers["content-type"]).toContain("image/jpeg");
     const metadatos = await sharp(descarga.body as Buffer).metadata();
-    expect(metadatos).toMatchObject({ width: 80, height: 80, format: "jpeg" });
-    expect((descarga.body as Buffer).length).toBeLessThanOrEqual(5 * 1024);
+    expect(metadatos).toMatchObject({ width: 100, height: 100, format: "jpeg" });
+    expect((descarga.body as Buffer).length).toBeLessThanOrEqual(10 * 1024);
 
     const eventoActualizado = await prisma.eventos.findFirst({
       where: {

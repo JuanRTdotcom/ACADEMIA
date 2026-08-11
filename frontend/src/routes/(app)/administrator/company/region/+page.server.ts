@@ -9,14 +9,16 @@ import {
 	saveCompanySection
 } from '$lib/server/companies';
 
-interface Region { idioma_por_defecto: string; zona_horaria_por_defecto: string; }
-interface Catalogs { zonas_horarias: { id_zonas_horarias: string; nombre_iana: string; desfase_utc: string }[]; }
+interface Region { fid_parametros_idioma: string; fid_zonas_horarias: string; fid_parametros_moneda: string; }
+interface CatalogItem { id_parametros: string; codigo: string; etiqueta: string }
+interface Catalogs { zonas_horarias: { id_zonas_horarias: string; nombre_iana: string }[]; idiomas: CatalogItem[]; monedas: CatalogItem[]; }
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const load: PageServerLoad = async (event) => {
 	await event.parent();
 	const [section, response] = await Promise.all([
 		loadCompanySection<Region>(event, 'region'),
-		companyRequest(event, '/system/catalogs/appearance')
+		companyRequest(event, '/company/current/location-catalogs')
 	]);
 	if (!response.ok) error(response.status, await companyMessage(response, 'companies.loadError'));
 	return { section, catalogos: (await response.json()) as Catalogs };
@@ -26,10 +28,11 @@ export const actions: Actions = {
 	default: async (event) => {
 		const form = await event.request.formData();
 		const body = {
-			idioma_por_defecto: formText(form, 'idioma_por_defecto'),
-			zona_horaria_por_defecto: formText(form, 'zona_horaria_por_defecto')
-		};
-		if (!['es', 'en'].includes(body.idioma_por_defecto) || !/^[A-Za-z0-9_+\-/]{1,100}$/.test(body.zona_horaria_por_defecto)) return fail(400, { companyMessage: 'companies.invalidData' });
+			fid_parametros_idioma: formText(form, 'fid_parametros_idioma'),
+			fid_zonas_horarias: formText(form, 'fid_zonas_horarias'),
+			fid_parametros_moneda: formText(form, 'fid_parametros_moneda')
+	};
+	if (!Object.values(body).every((value) => UUID_V4.test(value))) return fail(400, { companyMessage: 'companies.invalidData' });
 		return saveCompanySection(event, 'region', body);
 	}
 };

@@ -12,7 +12,7 @@
 	};
 	type Nivel1 = { id_admin_level_1: string; fid_admin_level_0: string; codigo: string; nombre: string };
 	type Nivel2 = { id_admin_level_2: string; fid_admin_level_1: string; codigo: string; nombre: string };
-	type Nivel3 = { fid_admin_level_1: string; fid_admin_level_2: string | null; codigo: string; nombre: string };
+	type Nivel3 = { id_admin_level_3?: string; fid_admin_level_1: string; fid_admin_level_2: string | null; codigo: string; nombre: string };
 
 	let {
 		idPrefix,
@@ -26,6 +26,7 @@
 		level3 = $bindable(),
 		countryError,
 		level3Error
+		, level3Value = 'code', required = false
 	}: {
 		idPrefix: string;
 		countryName: string;
@@ -38,13 +39,16 @@
 		level3: string;
 		countryError?: string;
 		level3Error?: string;
+		level3Value?: 'code' | 'id';
+		required?: boolean;
 	} = $props();
+	const valorNivel3 = (item: Nivel3) => level3Value === 'id' ? (item.id_admin_level_3 ?? '') : item.codigo;
 
 	const nivel3Inicial = untrack(() => {
 		const idsNivel1Pais = new Set(
 			levels1.filter((item) => item.fid_admin_level_0 === country).map((item) => item.id_admin_level_1)
 		);
-		return levels3.find((item) => item.codigo === level3 && idsNivel1Pais.has(item.fid_admin_level_1));
+		return levels3.find((item) => valorNivel3(item) === level3 && idsNivel1Pais.has(item.fid_admin_level_1));
 	});
 	let level1 = $state(nivel3Inicial?.fid_admin_level_1 ?? '');
 	let level2 = $state(nivel3Inicial?.fid_admin_level_2 ?? '');
@@ -76,20 +80,18 @@
 	}
 </script>
 
-<div class="col-span-12 flex flex-col gap-4">
-	<div class="grid grid-cols-12 gap-4">
-		<div class="col-span-4 max-[760px]:col-span-6 max-[560px]:col-span-12">
-			<Select id={`${idPrefix}-country`} name={countryName} label="País" value={country} onchange={changeCountry} error={countryError} icon="globe">
+<div class="col-span-12">
+	<div class="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3">
+		<div class="min-w-0">
+			<Select id={`${idPrefix}-country`} name={countryName} label="País" value={country} onchange={changeCountry} error={countryError} icon="globe" {required}>
 				<option value="">Selecciona un país</option>
 				{#each countries as item (item.id_admin_level_0)}
 					<option value={item.id_admin_level_0}>{item.nombre}</option>
 				{/each}
 			</Select>
 		</div>
-	</div>
-	<div class="grid grid-cols-12 gap-4">
-		<div class="col-span-4 max-[760px]:col-span-6 max-[560px]:col-span-12">
-			<Select id={`${idPrefix}-level-1`} label={config?.etiqueta_admin_level_1 ?? 'División principal'} value={level1} onchange={changeLevel1} icon="map-pin" disabled={!country}>
+		<div class="min-w-0">
+			<Select id={`${idPrefix}-level-1`} label={config?.etiqueta_admin_level_1 ?? 'División principal'} value={level1} onchange={changeLevel1} icon="map-pin" disabled={!country} {required}>
 				<option value="">Selecciona una opción</option>
 				{#each options1 as item (item.id_admin_level_1)}
 					<option value={item.id_admin_level_1}>{item.nombre}</option>
@@ -97,8 +99,8 @@
 			</Select>
 		</div>
 		{#if config?.etiqueta_admin_level_2}
-			<div class="col-span-4 max-[760px]:col-span-6 max-[560px]:col-span-12">
-				<Select id={`${idPrefix}-level-2`} label={config.etiqueta_admin_level_2} value={level2} onchange={changeLevel2} icon="map-pin" disabled={!level1}>
+			<div class="min-w-0">
+				<Select id={`${idPrefix}-level-2`} label={config.etiqueta_admin_level_2} value={level2} onchange={changeLevel2} icon="map-pin" disabled={!level1} {required}>
 					<option value="">Selecciona una opción</option>
 					{#each options2 as item (item.id_admin_level_2)}
 						<option value={item.id_admin_level_2}>{item.nombre}</option>
@@ -106,11 +108,11 @@
 				</Select>
 			</div>
 		{/if}
-		<div class="col-span-4 max-[760px]:col-span-6 max-[560px]:col-span-12">
-			<Select id={`${idPrefix}-level-3`} name={level3Name} label={config?.etiqueta_admin_level_3 ?? 'División local'} bind:value={level3} error={level3Error} icon="map-pin" disabled={!level1 || Boolean(config?.etiqueta_admin_level_2 && !level2)}>
+		<div class="min-w-0">
+			<Select id={`${idPrefix}-level-3`} name={level3Name} label={config?.etiqueta_admin_level_3 ?? 'División local'} bind:value={level3} error={level3Error} icon="map-pin" disabled={!level1 || Boolean(config?.etiqueta_admin_level_2 && !level2)} {required}>
 				<option value="">Selecciona una opción</option>
-				{#each options3 as item (`${item.fid_admin_level_1}-${item.codigo}`)}
-					<option value={item.codigo}>{item.nombre}</option>
+				{#each options3 as item (`${item.fid_admin_level_1}-${item.id_admin_level_3 ?? item.codigo}`)}
+					<option value={valorNivel3(item)}>{item.nombre}</option>
 				{/each}
 			</Select>
 		</div>

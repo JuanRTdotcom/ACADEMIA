@@ -10,7 +10,7 @@ describe("AlmacenAvatarR2", () => {
   const leer = { ejecutar: jest.fn() };
   const eliminar = { ejecutar: jest.fn() };
   const almacen = new AlmacenAvatarR2(
-    new ConfigService({ AVATAR_MAX_BYTES: 2 * 1024 * 1024 }),
+    new ConfigService({ AVATAR_MAX_BYTES: 3 * 1024 * 1024 }),
     guardar as unknown as CasoUsoGuardarObjeto,
     leer as unknown as CasoUsoLeerObjeto,
     eliminar as unknown as CasoUsoEliminarObjeto,
@@ -18,7 +18,7 @@ describe("AlmacenAvatarR2", () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it("recodifica a JPEG 80x80, elimina metadatos y organiza por tenant/usuario", async () => {
+  it("recodifica a JPEG 100x100, elimina metadatos y organiza por tenant/usuario", async () => {
     const original = await sharp({
       create: {
         width: 200,
@@ -43,8 +43,8 @@ describe("AlmacenAvatarR2", () => {
     );
     const solicitud = guardar.ejecutar.mock.calls[0][0];
     const metadatos = await sharp(solicitud.contenido).metadata();
-    expect(metadatos).toMatchObject({ format: "jpeg", width: 80, height: 80 });
-    expect(solicitud.contenido.byteLength).toBeLessThanOrEqual(5 * 1024);
+    expect(metadatos).toMatchObject({ format: "jpeg", width: 100, height: 100 });
+    expect(solicitud.contenido.byteLength).toBeLessThanOrEqual(10 * 1024);
     expect(solicitud.tipoContenido).toBe("image/jpeg");
     expect(solicitud.checksumSha256Base64).toMatch(/^[A-Za-z0-9+/]{43}=$/);
   });

@@ -351,7 +351,6 @@ export class FuenteDatosAutenticacionPrisma {
       fid_organizaciones: contexto.fid_organizaciones,
       usuario: contexto.usuario,
       roles: contexto.roles.map((rol) => rol.codigo),
-      permisos: contexto.permisos,
       // Idioma del usuario; si no tiene, cae al default (inglés). Va al token.
       idioma: normalizarIdioma(contexto.preferencias.idioma),
     };
@@ -491,7 +490,6 @@ export class FuenteDatosAutenticacionPrisma {
           fid_organizaciones: usuario.fid_organizaciones,
           usuario: usuario.usuario,
           roles: usuario.roles,
-          permisos: usuario.permisos,
           idioma: usuario.idioma, // respaldo; Accept-Language tiene prioridad
           iat,
           exp: this.epoch(tiempos.expira_acceso),
@@ -637,7 +635,6 @@ export class FuenteDatosAutenticacionPrisma {
           fid_organizaciones: usuario.fid_organizaciones,
           usuario: usuario.usuario,
           roles: usuario.roles,
-          permisos: usuario.permisos,
           idioma: usuario.idioma,
           iat,
           exp: this.epoch(tiempos.expira_acceso),
@@ -885,7 +882,6 @@ export class FuenteDatosAutenticacionPrisma {
           fid_organizaciones: contexto.fid_organizaciones,
           usuario: contexto.usuario,
           roles: contexto.roles.map((rol) => rol.codigo),
-          permisos: contexto.permisos,
           idioma: normalizarIdioma(contexto.preferencias.idioma),
         },
         id_sesiones, // MISMO sid: la sesión persiste, solo rota su token

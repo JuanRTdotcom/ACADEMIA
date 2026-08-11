@@ -23,7 +23,7 @@ describe("empresas: alcance global y tenant actual (e2e)", () => {
   let replacementRoleId = "";
   let superCookies: string[] = [];
   let adminCookies: string[] = [];
-  const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
+  const suffix = randomUUID().replaceAll("-", "").slice(0, 11);
   const slug = `tenant-${suffix}`;
   const csrf = "1";
 
@@ -54,9 +54,14 @@ describe("empresas: alcance global y tenant actual (e2e)", () => {
     ownerId = owner.id_organizaciones;
     const role = await prisma.roles.findFirstOrThrow({
       where: {
-        fid_organizaciones: ownerId,
         codigo: "SUPERADMIN",
         estado: 1,
+      },
+      include: {
+        roles_permisos: {
+          where: { estado: 1 },
+          select: { fid_permisos: true },
+        },
       },
     });
     const person = await prisma.personas.create({
@@ -79,6 +84,11 @@ describe("empresas: alcance global y tenant actual (e2e)", () => {
           },
         },
         usuarios_roles: { create: { fid_roles: role.id_roles } },
+        usuarios_permisos: {
+          create: role.roles_permisos.map(({ fid_permisos }) => ({
+            fid_permisos,
+          })),
+        },
       },
     });
     superUserId = user.id_usuarios;

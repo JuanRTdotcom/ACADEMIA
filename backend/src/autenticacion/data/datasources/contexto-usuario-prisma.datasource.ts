@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "../../../../prisma/generated/client/client";
 import { PrismaService } from "../../../comun/prisma.service";
-import { permisosDeRoles } from "../../domain/entities/permisos";
+import { permisosEfectivos } from "../../domain/entities/permisos";
 import type { ContextoUsuario } from "../../domain/entities/tipos";
 
 /** Selección única compartida por login, refresh y validación de cada petición. */
@@ -42,7 +42,7 @@ const SELECCION_USUARIO = {
       eliminado_en: true,
       suscripcion_inicia_en: true,
       suscripcion_expira_en: true,
-      perfil: { select: { fid_admin_level_0: true, zona_horaria_por_defecto: true } },
+      perfil: { select: { fid_admin_level_0: true, zona_horaria: { select: { nombre_iana: true } } } },
       plan: {
         select: {
           codigo: true,
@@ -51,7 +51,7 @@ const SELECCION_USUARIO = {
             where: { estado: 1, modulo: { estado: 1 } },
             select: { 
               fid_modulos: true,
-              modulo: { select: { codigo: true } }
+              modulo: { select: { id_modulos: true, codigo: true, nombre: true, icono: true, ruta: true } }
             }
           }
         }
@@ -92,18 +92,20 @@ const SELECCION_USUARIO = {
           codigo: true,
           nombre: true,
           roles_permisos: {
-            where: { estado: 1, permiso: { estado: 1 } },
+            where: { estado: 1, permiso: { estado: 1, modulo: { estado: 1 } } },
             select: {
-              permiso: {
-                select: {
-                  codigo: true,
-                  fid_modulos: true
-                }
-              }
+              permiso: { select: { codigo: true, fid_modulos: true } },
             },
           },
         },
       },
+    },
+  },
+  usuarios_permisos: {
+    where: { estado: 1, permiso: { estado: 1, modulo: { estado: 1 } } },
+    select: {
+      efecto: true,
+      permiso: { select: { codigo: true, fid_modulos: true } },
     },
   },
 } satisfies Prisma.usuariosSelect;
@@ -113,35 +115,6 @@ type UsuarioSeleccionado = Prisma.usuariosGetPayload<{
 }>;
 
 type ClientePrisma = PrismaService | Prisma.TransactionClient;
-
-function permisosDeRolesConModulos(
-  usuarios_roles: {
-    rol: {
-      roles_permisos: {
-        permiso: { codigo: string; fid_modulos: string };
-      }[];
-    };
-  }[],
-): { codigo: string; fid_modulos: string }[] {
-  const map = new Map<string, { codigo: string; fid_modulos: string }>();
-  for (const usuarioRol of usuarios_roles) {
-    for (const rolPermiso of usuarioRol.rol.roles_permisos) {
-      map.set(rolPermiso.permiso.codigo, rolPermiso.permiso);
-    }
-  }
-  return [...map.values()];
-}
-
-function filtrarPermisosPorPlan(
-  permisos: { codigo: string; fid_modulos: string }[],
-  modulosPlanIds: string[],
-  esSuperadmin: boolean,
-): string[] {
-  if (esSuperadmin) return permisos.map((p) => p.codigo);
-  return permisos
-    .filter((p) => modulosPlanIds.includes(p.fid_modulos))
-    .map((p) => p.codigo);
-}
 
 @Injectable()
 export class FuenteDatosContextoUsuarioPrisma {
@@ -161,15 +134,12 @@ export class FuenteDatosContextoUsuarioPrisma {
       return null;
     }
 
-    const esSuperadmin = usuario.usuarios_roles.some(({ rol }) => rol.codigo === "SUPERADMIN");
-    if (!esSuperadmin) {
-      if (!usuario.organizacion.suscripcion_expira_en) {
-        throw new ForbiddenException("auth.subscriptionExpired");
-      }
-      const expira = new Date(usuario.organizacion.suscripcion_expira_en);
-      if (new Date() > expira) {
-        throw new ForbiddenException("auth.subscriptionExpired");
-      }
+    if (!usuario.organizacion.suscripcion_expira_en) {
+      throw new ForbiddenException("auth.subscriptionExpired");
+    }
+    const expira = new Date(usuario.organizacion.suscripcion_expira_en);
+    if (new Date() > expira) {
+      throw new ForbiddenException("auth.subscriptionExpired");
     }
 
     const preferencias =
@@ -181,6 +151,15 @@ export class FuenteDatosContextoUsuarioPrisma {
       const seccion = accion.accion_maestro.seccion;
       accionesPorSeccion[seccion] = (accionesPorSeccion[seccion] ?? 0) + 1;
     }
+    const permisosCalculados = permisosEfectivos(
+      usuario.usuarios_roles,
+      usuario.usuarios_permisos,
+      usuario.organizacion.plan?.planes_modulos.map(({ fid_modulos }) => fid_modulos) ?? [],
+    );
+    const permisos = permisosCalculados.map(({ codigo }) => codigo);
+    const permisosPorModulo = new Set(
+      permisosCalculados.map(({ fid_modulos }) => fid_modulos),
+    );
     return {
       id_usuarios: usuario.id_usuarios,
       fid_organizaciones: usuario.fid_organizaciones,
@@ -212,18 +191,17 @@ export class FuenteDatosContextoUsuarioPrisma {
         codigo: rol.codigo,
         nombre: rol.nombre,
       })),
-      permisos: filtrarPermisosPorPlan(
-        permisosDeRolesConModulos(usuario.usuarios_roles),
-        usuario.organizacion.plan?.planes_modulos.map((pm) => pm.fid_modulos) ?? [],
-        usuario.usuarios_roles.some(({ rol }) => rol.codigo === "SUPERADMIN")
-      ),
+      permisos,
+      modulos: (usuario.organizacion.plan?.planes_modulos ?? [])
+        .filter((planModulo) => permisosPorModulo.has(planModulo.fid_modulos))
+        .map((planModulo) => planModulo.modulo),
       preferencias: {
         tema: preferencias?.tema ?? null,
         idioma: preferencias?.idioma ?? "es",
         menu_colapsado: preferencias?.menu_colapsado ?? false,
         fid_admin_level_0: preferencias?.fid_admin_level_0 ?? usuario.organizacion.perfil?.fid_admin_level_0 ?? null,
         fid_zonas_horarias: preferencias?.fid_zonas_horarias ?? null,
-        zona_horaria: preferencias?.zona_horaria?.nombre_iana ?? usuario.organizacion.perfil?.zona_horaria_por_defecto ?? "America/Lima",
+        zona_horaria: preferencias?.zona_horaria?.nombre_iana ?? usuario.organizacion.perfil?.zona_horaria.nombre_iana ?? "America/Lima",
       },
       seguridad: {
         segundo_factor_habilitado: usuario.usuario_mfa[0]?.habilitado ?? false,

@@ -28,6 +28,15 @@ import { ModuloRoles } from "./roles/roles.module";
 import { ModuloUsuarios } from "./usuarios/usuarios.module";
 import { ModuloPaises } from "./paises/paises.module";
 import { PlanesModule } from "./planes/planes.module";
+import { ModuloServiciosVeterinaria } from "./servicios-veterinaria/servicios-veterinaria.module";
+import { ModuloPropietarios } from "./propietarios/propietarios.module";
+import { ModuloMascotas } from "./mascotas/mascotas.module";
+import { ModuloAtenciones } from "./atenciones/atenciones.module";
+import { ModuloMotivosConsulta } from "./motivos-consulta/motivos-consulta.module";
+import { ModuloVacunas } from "./vacunas/vacunas.module";
+import { ModuloTiposHospitalizacion } from "./tipos-hospitalizacion/tipos-hospitalizacion.module";
+import { ModuloProcedimientosVeterinarios } from "./procedimientos-veterinarios/procedimientos-veterinarios.module";
+import { ModuloPruebasLaboratorio } from "./pruebas-laboratorio/pruebas-laboratorio.module";
 
 @Module({
   imports: [
@@ -60,6 +69,15 @@ import { PlanesModule } from "./planes/planes.module";
     ModuloUsuarios,
     ModuloPaises,
     PlanesModule,
+    ModuloServiciosVeterinaria,
+    ModuloPropietarios,
+    ModuloMascotas,
+    ModuloAtenciones,
+    ModuloMotivosConsulta,
+    ModuloVacunas,
+    ModuloTiposHospitalizacion,
+    ModuloProcedimientosVeterinarios,
+    ModuloPruebasLaboratorio,
   ],
   providers: [
     // Filtro global: traduce el mensaje de toda excepción al idioma de la petición.

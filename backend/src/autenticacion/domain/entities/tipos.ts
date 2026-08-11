@@ -24,9 +24,19 @@ export interface ContextoUsuario {
     apellido_materno: string | null;
   };
   avatar: { disponible: boolean; version: string | null };
-  organizacion: { slug: string; nombre: string; plan: { codigo: string; nombre: string } };
+  organizacion: {
+    slug: string;
+    nombre: string;
+    plan: { codigo: string; nombre: string };
+  };
   roles: { codigo: string; nombre: string }[];
   permisos: string[];
+  modulos: {
+    codigo: string;
+    nombre: string;
+    icono: string | null;
+    ruta: string | null;
+  }[];
   preferencias: PreferenciasUsuarioSeguras;
   seguridad: { segundo_factor_habilitado: boolean };
   acciones_requeridas: {
@@ -43,7 +53,6 @@ export interface PayloadAcceso {
   fid_organizaciones: string;
   usuario: string;
   roles: string[]; // códigos de rol (ej. "SUPERADMIN", "PROFESOR")
-  permisos: string[]; // códigos de permiso (desde DB) — base de la autorización
   idioma: string; // idioma preferido del usuario ("en"/"es") — usado por el i18n en sesión
   iat: number; // emitido desde CURRENT_TIMESTAMP de PostgreSQL
   exp: number; // expiración calculada desde el reloj de PostgreSQL
@@ -51,6 +60,7 @@ export interface PayloadAcceso {
 
 /** req.user después de validar sesión y reconstruir el contexto actual desde DB. */
 export interface UsuarioAutenticado extends PayloadAcceso {
+  permisos: string[]; // autorización vigente reconstruida desde PostgreSQL
   contexto: ContextoUsuario;
 }
 

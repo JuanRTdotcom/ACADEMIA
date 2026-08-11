@@ -1,0 +1,122 @@
+import { error, fail, type Actions, type RequestEvent } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
+import { tienePermiso } from "$lib/permissions-client";
+import {
+  companyMessage,
+  companyRequest,
+  formText,
+  UUID,
+} from "$lib/server/companies";
+import { parseUserContext } from "$lib/server/user-context";
+
+export const load: PageServerLoad = async (event) => {
+  const { usuario } = await event.parent();
+  const response = await companyRequest(event, "/company/hospitalization-types");
+  if (!response.ok)
+    error(
+      response.status,
+      await companyMessage(response, "hospitalizationTypes.loadError"),
+    );
+  return { ...(await response.json()), usuario };
+};
+
+async function mutate(
+  event: RequestEvent,
+  permission: string,
+  path: string,
+  method: string,
+  body?: object,
+) {
+  const auth = await companyRequest(event, "/auth/me");
+  if (
+    !auth.ok ||
+    !tienePermiso(parseUserContext(await auth.json()).permisos, permission)
+  )
+    return fail(403, {
+      hospitalizationTypeMessage: "hospitalizationTypes.permissionDenied",
+    });
+  const response = await companyRequest(event, path, {
+    method,
+    ...(body
+      ? {
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      : {}),
+  });
+  if (!response.ok)
+    return fail(response.status, {
+      hospitalizationTypeMessage: await companyMessage(
+        response,
+        "hospitalizationTypes.saveError",
+      ),
+    });
+  return { hospitalizationTypeMessage: "hospitalizationTypes.saved" };
+}
+
+function payload(form: FormData) {
+  const nombre = formText(form, "nombre");
+  return nombre.length >= 2 && nombre.length <= 120 ? { nombre } : null;
+}
+
+export const actions: Actions = {
+  create: async (event) => {
+    const data = payload(await event.request.formData());
+    return data
+      ? mutate(
+          event,
+          "administrator.hospitalization_types.create",
+          "/company/hospitalization-types",
+          "POST",
+          data,
+        )
+      : fail(400, {
+          hospitalizationTypeMessage: "hospitalizationTypes.invalidData",
+        });
+  },
+  update: async (event) => {
+    const form = await event.request.formData();
+    const id = formText(form, "id");
+    const data = payload(form);
+    return UUID.test(id) && data
+      ? mutate(
+          event,
+          "administrator.hospitalization_types.update",
+          `/company/hospitalization-types/${id}`,
+          "PATCH",
+          data,
+        )
+      : fail(400, {
+          hospitalizationTypeMessage: "hospitalizationTypes.invalidData",
+        });
+  },
+  status: async (event) => {
+    const form = await event.request.formData();
+    const id = formText(form, "id");
+    const activo = formText(form, "activo");
+    return UUID.test(id) && ["true", "false"].includes(activo)
+      ? mutate(
+          event,
+          "administrator.hospitalization_types.update",
+          `/company/hospitalization-types/${id}/status`,
+          "PATCH",
+          { activo: activo === "true" },
+        )
+      : fail(400, {
+          hospitalizationTypeMessage: "hospitalizationTypes.invalidData",
+        });
+  },
+  delete: async (event) => {
+    const id = formText(await event.request.formData(), "id");
+    return UUID.test(id)
+      ? mutate(
+          event,
+          "administrator.hospitalization_types.delete",
+          `/company/hospitalization-types/${id}`,
+          "DELETE",
+        )
+      : fail(400, {
+          hospitalizationTypeMessage: "hospitalizationTypes.invalidData",
+        });
+  },
+};

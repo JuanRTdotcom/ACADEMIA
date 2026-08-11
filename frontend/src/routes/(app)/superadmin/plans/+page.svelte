@@ -9,7 +9,7 @@
 
   let { data }: PageProps = $props();
   type Plan = (typeof data.planes)[number];
-  let form = $state({ codigo: '', nombre: '', descripcion: '' });
+  let form = $state({ codigo: '', nombre: '', descripcion: '', almacenamiento_gb: '' });
   let target = $state<Plan | null>(null);
   let createOpen = $state(false);
   let editOpen = $state(false);
@@ -37,12 +37,14 @@
     const codigo = form.codigo.trim().toUpperCase();
     const nombre = form.nombre.trim().replace(/\s+/g, ' ');
     const txtDescripcion = form.descripcion.trim().replace(/\s+/g, ' ');
+    const almacenamiento = String(form.almacenamiento_gb ?? '').trim();
 
     if (!codigo) errors.codigo = 'plans.validation.requiredCode';
     else if (!/^[A-Z0-9_]{2,40}$/.test(codigo)) errors.codigo = 'plans.validation.code';
     if (!nombre) errors.nombre = 'plans.validation.requiredName';
     else if (nombre.length < 2 || nombre.length > 100) errors.nombre = 'plans.validation.name';
     if (txtDescripcion.length > 250) errors.descripcion = 'plans.validation.description';
+    if (almacenamiento && (!/^\d+$/.test(almacenamiento) || Number(almacenamiento) < 1 || Number(almacenamiento) > 8_388_607)) errors.almacenamiento_gb = 'plans.validation.storage';
     return errors;
   });
 
@@ -58,7 +60,7 @@
   }
 
   function reset() {
-    form = { codigo: '', nombre: '', descripcion: '' };
+    form = { codigo: '', nombre: '', descripcion: '', almacenamiento_gb: '' };
     clearValidation();
   }
 
@@ -100,7 +102,8 @@
     form = {
       codigo: plan.codigo,
       nombre: plan.nombre,
-      descripcion: plan.descripcion ?? ''
+      descripcion: plan.descripcion ?? '',
+      almacenamiento_gb: plan.almacenamiento_max_bytes === null ? '' : String(Math.round(plan.almacenamiento_max_bytes / 1024 ** 3))
     };
     editBaseline = JSON.stringify(form);
     editOpen = true;
@@ -193,14 +196,15 @@
       <div class="flex flex-col items-center px-4 py-16 text-center"><Icon name="package" size={32} class="mb-4 text-stone" /><h2 class="text-lg text-ink">{i18n.t('plans.emptyTitle')}</h2><p class="mt-1 text-sm text-steel">{i18n.t('plans.emptyDescription')}</p></div>
     {:else}
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[1000px] border-collapse text-left">
-          <thead class="bg-surface/70"><tr class="border-b border-hairline text-[11px] font-semibold uppercase tracking-[0.05em] text-stone"><th class="px-5 py-3.5">{i18n.t('plans.field.name')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.code')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.description')}</th><th class="px-4 py-3.5 text-center">{i18n.t('plans.field.status')}</th><th class="px-5 py-3.5 text-right">{i18n.t('plans.actions')}</th></tr></thead>
+        <table class="w-full min-w-[1100px] border-collapse text-left">
+          <thead class="bg-surface/70"><tr class="border-b border-hairline text-[11px] font-semibold uppercase tracking-[0.05em] text-stone"><th class="px-5 py-3.5">{i18n.t('plans.field.name')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.code')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.description')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.storage')}</th><th class="px-4 py-3.5 text-center">{i18n.t('plans.field.status')}</th><th class="px-5 py-3.5 text-right">{i18n.t('plans.actions')}</th></tr></thead>
           <tbody class="divide-y divide-hairline">
             {#each data.planes as plan (plan.id_planes)}
               <tr class="transition-colors hover:bg-surface/55">
                 <td class="px-5 py-4"><strong class="text-sm font-medium text-ink">{plan.nombre}</strong></td>
                 <td class="px-4 py-4"><code class="rounded bg-surface px-2 py-1 text-xs font-semibold text-slate">{plan.codigo}</code></td>
                 <td class="px-4 py-4 text-sm text-slate">{plan.descripcion || '—'}</td>
+                <td class="px-4 py-4 text-sm font-medium text-ink">{plan.almacenamiento_max_bytes === null ? i18n.t('plans.unlimited') : `${Math.round(plan.almacenamiento_max_bytes / 1024 ** 3)} GB`}</td>
                 <td class="px-4 py-4 text-center"><Switch checked={plan.estado === 1} disabled={processing} label={`${i18n.t('plans.field.status')}: ${plan.nombre}`} onchange={(active) => changeStatus(plan, active)} /></td>
                 <td class="px-5 py-4">
                   <div class="flex justify-end">
@@ -255,6 +259,7 @@
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.name')} icon="package" bind:value={form.nombre} error={fieldError('nombre')} maxlength={100} disabled={processing} required /></div>
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.code')} icon="hash" bind:value={form.codigo} error={fieldError('codigo')} oninput={() => (form.codigo = form.codigo.toUpperCase())} maxlength={40} disabled={processing} required /></div>
     <div class="col-span-12"><Input label={i18n.t('plans.field.description')} icon="file-text" bind:value={form.descripcion} error={fieldError('descripcion')} maxlength={250} disabled={processing} /></div>
+    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.storage')} bind:value={form.almacenamiento_gb} error={fieldError('almacenamiento_gb')} min="1" max="8388607" step="1" disabled={processing} /></div>
   </div>
 </ConfirmationDialog>
 
@@ -264,6 +269,7 @@
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.name')} icon="package" bind:value={form.nombre} error={fieldError('nombre')} maxlength={100} disabled={processing} required /></div>
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.code')} icon="hash" bind:value={form.codigo} error={fieldError('codigo')} oninput={() => (form.codigo = form.codigo.toUpperCase())} maxlength={40} disabled={processing} required /></div>
     <div class="col-span-12"><Input label={i18n.t('plans.field.description')} icon="file-text" bind:value={form.descripcion} error={fieldError('descripcion')} maxlength={250} disabled={processing} /></div>
+    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.storage')} bind:value={form.almacenamiento_gb} error={fieldError('almacenamiento_gb')} min="1" max="8388607" step="1" disabled={processing} /></div>
   </div>
 </ConfirmationDialog>
 
@@ -275,6 +281,7 @@
   <input name="codigo" value={form.codigo} />
   <input name="nombre" value={form.nombre} />
   <input name="descripcion" value={form.descripcion} />
+  <input name="almacenamiento_gb" value={form.almacenamiento_gb} />
 </form>
 
 <form bind:this={editForm} method="POST" action="?/edit" use:enhance={edit} class="hidden">
@@ -282,6 +289,7 @@
   <input name="codigo" value={form.codigo} />
   <input name="nombre" value={form.nombre} />
   <input name="descripcion" value={form.descripcion} />
+  <input name="almacenamiento_gb" value={form.almacenamiento_gb} />
 </form>
 
 <form bind:this={statusForm} method="POST" action="?/status" use:enhance={status} class="hidden">

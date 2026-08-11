@@ -330,6 +330,70 @@ export class FuenteDatosPerfilPrisma {
     return { ok: true };
   }
 
+  async cerrarOtrasSesiones(
+    id_usuarios: string,
+    fid_organizaciones: string,
+    id_sesion_actual: string,
+    peticion: ContextoSolicitud,
+  ): Promise<{ ok: true; cerradas: number }> {
+    let countCerradas = 0;
+    await this.prisma.$transaction(async (tx) => {
+      await this.bloquearPersona(tx, id_usuarios, fid_organizaciones);
+      const ahora = await this.reloj.ahora(tx);
+      const sesiones = await tx.sesiones.findMany({
+        where: {
+          id_sesiones: { not: id_sesion_actual },
+          estado: 1,
+          revocada_en: null,
+          expira_en: { gt: ahora },
+          expira_inactividad_en: { gt: ahora },
+          expira_absoluta_en: { gt: ahora },
+          dispositivo: {
+            fid_usuarios: id_usuarios,
+            estado: 1,
+            usuario: {
+              fid_organizaciones,
+              estado: 1,
+              estado_cuenta: "activo",
+              organizacion: { estado: 1, eliminado_en: null },
+            },
+          },
+        },
+        select: { id_sesiones: true, fid_dispositivos: true },
+      });
+
+      for (const s of sesiones) {
+        await tx.sesiones.updateMany({
+          where: { id_sesiones: s.id_sesiones, revocada_en: null },
+          data: { revocada_en: ahora, updated_by: id_usuarios },
+        });
+        await tx.dispositivos.update({
+          where: { id_dispositivos: s.fid_dispositivos },
+          data: { firebase_token_fcm: null, updated_by: id_usuarios },
+        });
+        await this.auditoria.registrarConEvento(
+          {
+            accion: EVENTOS_FUNCIONALES.AUTENTICACION_CIERRE_EXITO.codigo,
+            entidad: "sesiones",
+            id_entidad: s.id_sesiones,
+            fid_organizaciones,
+            fid_usuarios: id_usuarios,
+            peticion,
+            metadatos: { motivo: "cierre_remoto" },
+          },
+          tx,
+        );
+        this.eventosSesion.emitir({
+          fid_usuarios: id_usuarios,
+          tipo: "session_revoked",
+          sid: s.id_sesiones,
+        });
+        countCerradas++;
+      }
+    });
+    return { ok: true, cerradas: countCerradas };
+  }
+
   private async listarCorreosPersona(
     tx: Prisma.TransactionClient,
     idPersonas: string,

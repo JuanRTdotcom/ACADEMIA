@@ -1,5 +1,5 @@
 import { error, redirect } from "@sveltejs/kit";
-import { requiredPermission } from "$lib/config/access";
+import { canAccessRoute, requiredPermission } from "$lib/config/access";
 import {
   requestBackend,
   copyAuthCookieValues,
@@ -53,9 +53,15 @@ export const load: LayoutServerLoad = async (event) => {
   if (!event.locals.isAuthenticated) redirect(303, "/login");
 
   const usuario = await loadCurrentUser(event);
+  const permitidoPorModulo = canAccessRoute(event.url.pathname, usuario.modulos);
   const requerido = requiredPermission(event.url.pathname);
-  if (requerido === undefined) error(403, "auth.noPermission");
-  if (requerido !== null && !usuario.permisos.includes(requerido)) {
+  if (!permitidoPorModulo && requerido === undefined) error(403, "auth.noPermission");
+  if (
+    !permitidoPorModulo &&
+    requerido !== undefined &&
+    requerido !== null &&
+    !usuario.permisos.includes(requerido)
+  ) {
     error(403, "auth.noPermission");
   }
 

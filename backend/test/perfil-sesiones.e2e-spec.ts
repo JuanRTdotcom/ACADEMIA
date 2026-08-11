@@ -86,7 +86,7 @@ describe("GET/DELETE /profile/sessions (e2e)", () => {
     ]);
     idOrganizacion = organizacion.id_organizaciones;
     usuario =
-      `E2E${randomUUID().replaceAll("-", "").slice(0, 12)}`.toUpperCase();
+      `E2E${randomUUID().replaceAll("-", "").slice(0, 9)}`.toUpperCase();
     const persona = await prisma.personas.create({
       data: {
         fid_organizaciones: idOrganizacion,

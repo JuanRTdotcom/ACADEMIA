@@ -53,6 +53,13 @@
   - EN: «This item no longer exists. Reload the page to see the updated list.»
 - Se conserva una key `notFound` por módulo (`profile.<modulo>.notFound`) en `comun/i18n/{es,en}.json` del backend y en `lib/i18n/{es,en}.json` del frontend, todas con el mismo texto. El backend envía la key; el frontend la traduce y la muestra en un toast de error.
 
+## Orden obligatorio de listados
+
+- Toda tabla o colección operativa nueva se devuelve desde backend con el registro creado más recientemente primero: `created_at DESC`.
+- El orden debe ser determinista. Después de `created_at DESC` se agrega la PK UUID de la tabla también en `DESC` como desempate.
+- La UI conserva el orden recibido; no debe reordenar por nombre, estado ni fecha en memoria salvo que exista una opción explícita de orden elegida por el usuario.
+- Los catálogos jerárquicos o maestros con un campo funcional `orden` son la excepción: respetan ese orden cuando su finalidad es alimentar selects o navegación, no mostrar un historial operativo.
+
 ## Límite máximo por colección
 
 - Toda colección del perfil (elementos que el usuario agrega/edita/elimina) define un máximo de registros activos. Antes de crear, dentro de la misma transacción y tras `bloquearPersona`, se cuenta `count({ fid_personas, estado: 1 })` y se lanza `BadRequestException("profile.<modulo>.limit")` si alcanza el tope. Solo cuentan los activos; los de baja lógica no suman, por lo que eliminar libera cupo.
@@ -67,6 +74,8 @@
 - Tras la carga directa, el backend inspecciona tamaño, MIME, checksum y existencia antes de confirmar los metadatos en PostgreSQL. Si la confirmación falla, el objeto se elimina o queda en cuarentena para limpieza.
 - El bucket permanece privado. Descargas y cargas usan URLs temporales; `STORAGE_SIGNED_URL_TTL_SECONDS` es obligatorio y no puede superar 3600 segundos.
 - Una transacción PostgreSQL no puede abarcar atómicamente R2. Se usa compensación: el registro queda pendiente, se confirma tras verificar R2 y cualquier binario huérfano se elimina mediante una tarea idempotente.
+- Todo objeto nuevo bajo `tenants/<id_organizacion>/...` reserva y confirma sus bytes en `nucleo.archivos_organizacion` desde la capa común de almacenamiento. El estado `2` significa carga pendiente, `1` objeto confirmado y `0` objeto retirado. Guardar y eliminar actualizan este ledger; leer un archivo no recalcula consumo ni consulta una cuota. Ningún módulo consumidor mantiene un contador paralelo.
+- `configuracion.planes.almacenamiento_max_bytes` contiene la cuota común del plan. `NULL` significa sin límite. Antes de cargar, la capa común bloquea la organización, suma estados pendientes/confirmados y rechaza una reserva que supere la cuota; no implementar límites independientes por feature.
 - Toda imagen cacheable usa una clave inmutable con UUID. Una sustitución crea un objeto y una URL nuevos; nunca se sobrescribe una clave existente. Avatares y medios administrativos usan caché privada; escudo y portadas del login pueden usar caché pública porque son visibles antes de autenticar. Solo una respuesta de imagen 200 cuya versión coincida exactamente con PostgreSQL puede recibir `max-age=31536000, immutable`. Ausencia, versión antigua, error o contenido inesperado siempre usan `no-store`.
 - La caché de imágenes nunca se hereda a datos. HTML SSR, respuestas `__data.json`, JSON del API, sesión, permisos, preferencias, mutaciones y errores usan `Cache-Control: private, no-store`. En Cloudflare no se debe habilitar una regla global `Cache Everything`; cualquier regla de caché debe limitarse a assets estáticos o rutas versionadas `/media/.../<uuid>.<formato>`.
 - Escudo e imagotipo aceptan únicamente PNG, tanto para su variante de fondo claro como para la de fondo oscuro; las portadas aceptan JPG/PNG/WebP. El límite de entrada común es `COMPANY_MEDIA_MAX_BYTES=3145728` (3 MB), obligatorio y sin fallback. Backend comprueba MIME, extensión, firma y formato decodificado; después genera una clave UUID nueva y guarda escudos/imagotipos como PNG y portadas como WebP.
@@ -132,6 +141,9 @@ updated_by String?
 - PK y FK internas usan UUID nativo: `String @id @default(uuid()) @db.Uuid` y `String @db.Uuid`.
 - No crear nuevas PK `Int autoincrement()` ni UUID almacenados como `TEXT` sin una decisión arquitectónica documentada.
 - Identificadores externos (`uid_dispositivo`, `id_credencial_webauthn`, códigos y slugs) siguen como `String` cuando no son claves internas.
+- Un dato administrable de catálogo se guarda mediante `fid_*` UUID hacia su maestro; nunca mediante su código o etiqueta textual en la tabla de negocio. El `codigo` permanece único y estable en el maestro como identificador funcional.
+- La UI muestra la etiqueta del maestro, pero envía su UUID. El backend valida dentro de la transacción que el UUID exista, esté activo y pertenezca al grupo esperado.
+- Toda FK nueva crea su índice en la misma migración. Las selecciones múltiples usan una tabla puente con UUID, FKs, unicidad de la pareja, estado y campos de auditoría; no arreglos de códigos.
 
 ## Estado y eliminación lógica de organizaciones
 

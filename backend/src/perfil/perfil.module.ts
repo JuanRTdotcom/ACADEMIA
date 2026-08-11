@@ -26,6 +26,7 @@ import { CasoUsoEliminarCorreo } from "./domain/usecases/eliminar-correo";
 import { FuenteDatosCatalogoTerritorialPrisma } from "./data/datasources/catalogo-territorial-prisma.datasource";
 import { CasoUsoListarSesiones } from "./domain/usecases/listar-sesiones";
 import { CasoUsoCerrarOtraSesion } from "./domain/usecases/cerrar-otra-sesion";
+import { CasoUsoCerrarOtrasSesiones } from "./domain/usecases/cerrar-otras-sesiones";
 import { CasoUsoActualizarSegundoFactor } from "./domain/usecases/actualizar-segundo-factor";
 import { FuenteDatosNacionalidadesPrisma } from "./data/datasources/nacionalidades-prisma.datasource";
 import { CasoUsoListarNacionalidades } from "./domain/usecases/listar-nacionalidades";
@@ -123,6 +124,7 @@ import { ModuloAlmacenamiento } from "../storage/storage.module";
     CasoUsoActualizarVerificacionCorreo,
     CasoUsoListarSesiones,
     CasoUsoCerrarOtraSesion,
+    CasoUsoCerrarOtrasSesiones,
     CasoUsoActualizarSegundoFactor,
     CasoUsoListarNacionalidades,
     CasoUsoAgregarNacionalidad,

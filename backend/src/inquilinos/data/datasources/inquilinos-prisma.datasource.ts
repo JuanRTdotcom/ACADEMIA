@@ -42,7 +42,7 @@ export class FuenteDatosInquilinosPrisma {
         estado: true,
         slug: true,
         nombre: true,
-        perfil: true,
+        perfil: { include: { idioma: { select: { codigo: true } } } },
         imagenes_login: {
           where: { estado: 1 },
           orderBy: [{ orden: "asc" }, { created_at: "asc" }],
@@ -65,7 +65,7 @@ export class FuenteDatosInquilinosPrisma {
       // Configuración pública necesaria para que el primer HTML del tenant ya
       // salga en su idioma, antes de que exista una sesión o preferencia personal.
       region: {
-        idioma_por_defecto: p?.idioma_por_defecto === "en" ? "en" : "es",
+        idioma_por_defecto: p?.idioma.codigo === "en" ? "en" : "es",
       },
       marca: {
         color_primario: colorValido(p?.color_primario),

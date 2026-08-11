@@ -20,11 +20,11 @@ import type {
 
 const MIME_PERMITIDOS = new Set(["image/jpeg", "image/png"]);
 const EXTENSIONES_PERMITIDAS = new Set([".jpg", ".jpeg", ".png"]);
-const DIMENSION_AVATAR = 80;
+const DIMENSION_AVATAR = 100;
 const CALIDAD_AVATAR = 90;
 const CALIDAD_MINIMA_AVATAR = 1;
 const PASO_CALIDAD_AVATAR = 5;
-const MAXIMO_AVATAR_PROCESADO_BYTES = 5 * 1024;
+const MAXIMO_AVATAR_PROCESADO_BYTES = 10 * 1024;
 const MAXIMO_PIXELES_ENTRADA = 25_000_000;
 
 function tieneFirmaPng(contenido: Buffer): boolean {

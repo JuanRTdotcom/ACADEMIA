@@ -15,6 +15,7 @@ export class DtoGuardarUsuario {
   @IsDefined() @IsString() @MinLength(2) @MaxLength(30) @Matches(PATRON_NOMBRE) @Transform(texto) apellido_materno!: string;
   @IsDefined() @IsEmail() @MaxLength(254) @Transform(({ value }: { value: unknown }) => typeof value === "string" ? value.trim().toLowerCase() : value) correo!: string;
   @IsDefined() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ArrayUnique() @IsUUID("4", { each: true }) fid_roles!: string[];
+  @IsDefined() @IsArray() @ArrayMaxSize(500) @ArrayUnique() @IsUUID("4", { each: true }) fid_permisos!: string[];
 }
 
 export class DtoCrearUsuario extends DtoGuardarUsuario {

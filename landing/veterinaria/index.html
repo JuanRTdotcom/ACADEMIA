@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sumaq Vet — Software para clínicas veterinarias</title>
+<meta name="description" content="Gestiona historias clínicas, agenda, facturación e inventario de tu clínica veterinaria en un solo sistema SaaS.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='14' height='14' x='1' y='1' rx='3' fill='%2310b981'/></svg>">
+<style>
+/* ── Reset ────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;overflow-x:hidden}
+img,svg,video{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{background:none;border:none;cursor:pointer;font:inherit;color:inherit}
+ul,ol{list-style:none}
+
+/* ── Theme tokens ─────────────────────────────── */
+:root{
+  --bg:#0a0a0d;
+  --fg:#f2f0e9;
+  --primary:#10b981;
+  --primary-fg:#fff;
+  --card:#0b0b0e;
+  --card-hover:#101016;
+  --border:rgba(240,238,230,.09);
+  --border-solid:#1c1c22;
+  --muted:#8b8b92;
+  --muted-2:#6b6b72;
+  --muted-3:#55555c;
+  --muted-4:#4a4a52;
+  --link:#b5b3ab;
+  --quote:#c9c7bf;
+  --success:#7ee2a8;
+  --dot:rgba(240,238,230,.05);
+  --header-bg:rgba(10,10,13,.85);
+  --mockup-shadow:0 40px 120px rgba(0,0,0,.6);
+  --sidebar-active:#15151b;
+  --bar:#1f1f26;
+  --bar-highlight:var(--primary);
+  color-scheme:dark;
+}
+
+@media(prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#fafaf8;--fg:#18181b;--primary:#059669;--primary-fg:#fff;
+    --card:#ffffff;--card-hover:#f5f5f3;
+    --border:rgba(20,20,30,.07);--border-solid:#e5e5e2;
+    --muted:#71717a;--muted-2:#a1a1aa;--muted-3:#c4c4cc;--muted-4:#d4d4d8;
+    --link:#52525b;--quote:#3f3f46;--success:#16a34a;
+    --dot:rgba(20,20,30,.03);--header-bg:rgba(250,250,248,.88);
+    --mockup-shadow:0 40px 120px rgba(0,0,0,.08);
+    --sidebar-active:#f0f0ee;--bar:#e5e5e2;--bar-highlight:var(--primary);
+    color-scheme:light;
+  }
+}
+
+:root[data-theme="light"]{
+  --bg:#fafaf8;--fg:#18181b;--primary:#059669;--primary-fg:#fff;
+  --card:#ffffff;--card-hover:#f5f5f3;
+  --border:rgba(20,20,30,.07);--border-solid:#e5e5e2;
+  --muted:#71717a;--muted-2:#a1a1aa;--muted-3:#c4c4cc;--muted-4:#d4d4d8;
+  --link:#52525b;--quote:#3f3f46;--success:#16a34a;
+  --dot:rgba(20,20,30,.03);--header-bg:rgba(250,250,248,.88);
+  --mockup-shadow:0 40px 120px rgba(0,0,0,.08);
+  --sidebar-active:#f0f0ee;--bar:#e5e5e2;--bar-highlight:var(--primary);
+  color-scheme:light;
+}
+
+/* ── Base ─────────────────────────────────────── */
+body{background:var(--bg);color:var(--fg)}
+.container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
+
+/* ── Typography ───────────────────────────────── */
+.display{font-size:clamp(2.75rem,7.5vw,6.5rem);line-height:.98;letter-spacing:-.045em;font-weight:600}
+.eyebrow{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.2em;color:var(--muted-2)}
+.section-title{font-size:clamp(1.875rem,4vw,3rem);font-weight:600;line-height:1.05;letter-spacing:-.03em;color:var(--fg)}
+.tabular-nums{font-variant-numeric:tabular-nums}
+
+/* ── Header ───────────────────────────────────── */
+.header{position:fixed;top:0;left:0;right:0;z-index:50;transition:background .3s,border-color .3s,backdrop-filter .3s}
+.header.scrolled{background:var(--header-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.header nav{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;max-width:1200px;margin:0 auto}
+.header .logo{display:flex;align-items:center;gap:.5rem}
+.header .logo-mark{width:14px;height:14px;border-radius:3px;background:var(--primary)}
+.header .logo-text{font-size:15px;font-weight:600;letter-spacing:-.02em;color:var(--fg)}
+.header .nav-links{display:none;align-items:center;gap:2rem}
+.header .nav-links a{font-size:13px;color:var(--muted);transition:color .2s}
+.header .nav-links a:hover{color:var(--fg)}
+.header .nav-actions{display:none;align-items:center;gap:1.5rem}
+.header .nav-actions .signin{font-size:13px;color:var(--muted);transition:color .2s}
+.header .nav-actions .signin:hover{color:var(--fg)}
+.btn-primary{display:inline-flex;align-items:center;gap:.375rem;padding:.5rem .875rem;border-radius:.375rem;font-size:13px;font-weight:500;color:var(--primary-fg);background:var(--primary);transition:filter .2s}
+.btn-primary:hover{filter:brightness(1.1)}
+.btn-primary svg{width:14px;height:14px;transition:transform .2s}
+.btn-primary:hover svg{transform:translate(2px,-2px)}
+.hamburger{display:flex;color:var(--fg)}
+.hamburger svg{width:20px;height:20px}
+.theme-toggle{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--muted);transition:color .2s}
+.theme-toggle:hover{color:var(--fg)}
+.theme-toggle svg{width:16px;height:16px}
+.theme-toggle .icon-sun{display:none}
+.theme-toggle .icon-moon{display:block}
+:root[data-theme="light"] .theme-toggle .icon-sun{display:block}
+:root[data-theme="light"] .theme-toggle .icon-moon{display:none}
+@media(prefers-color-scheme:light){
+  :root:not([data-theme="dark"]) .theme-toggle .icon-sun{display:block}
+  :root:not([data-theme="dark"]) .theme-toggle .icon-moon{display:none}
+}
+
+.mobile-menu{display:none;position:fixed;top:0;left:0;right:0;background:var(--bg);border-bottom:1px solid var(--border);padding:5rem 1.5rem 1.5rem;z-index:40;flex-direction:column;gap:.5rem}
+.mobile-menu.open{display:flex}
+.mobile-menu a{display:block;padding:.75rem 0;font-size:15px;color:var(--muted);border-bottom:1px solid var(--border);transition:color .2s}
+.mobile-menu a:hover{color:var(--fg)}
+.mobile-menu .btn-primary{justify-content:center;margin-top:.5rem;padding:.75rem}
+
+@media(min-width:768px){
+  .header .nav-links,.header .nav-actions{display:flex}
+  .hamburger{display:none}
+  .mobile-menu{display:none!important}
+}
+
+/* ── Hero ─────────────────────────────────────── */
+.hero{position:relative;overflow:hidden;padding:8rem 0 0}
+@media(min-width:640px){.hero{padding-top:10rem}}
+.dotgrid{position:absolute;inset:0;background-image:radial-gradient(var(--dot) 1px,transparent 1px);background-size:28px 28px;-webkit-mask-image:radial-gradient(ellipse 60% 50% at 50% 0%,#000 20%,transparent 100%);mask-image:radial-gradient(ellipse 60% 50% at 50% 0%,#000 20%,transparent 100%)}
+.hero .container{position:relative}
+.hero h1 span{display:block}
+.hero .accent{color:var(--primary)}
+.hero .hero-row{display:flex;flex-direction:column;gap:2rem;margin-top:2.5rem}
+.hero .hero-subtitle{max-width:28rem;font-size:15px;line-height:1.6;color:var(--muted)}
+.hero .hero-ctas{display:flex;align-items:center;gap:1rem}
+.hero .hero-ctas .btn-primary{padding:.75rem 1.25rem;font-size:14px}
+.hero .hero-ctas .btn-primary svg{width:16px;height:16px;transition:transform .2s}
+.hero .hero-ctas .btn-primary:hover svg{transform:translateX(2px)}
+.hero .link-underline{font-size:14px;color:var(--link);border-bottom:1px solid var(--border-solid);padding-bottom:2px;transition:color .2s,border-color .2s}
+.hero .link-underline:hover{color:var(--fg);border-color:var(--fg)}
+.trust-badges{display:flex;flex-wrap:wrap;gap:1.5rem .75rem;margin-top:1.5rem;font-size:12px;color:var(--muted-3)}
+.trust-badges .dot{color:var(--muted-4)}
+
+@media(min-width:640px){
+  .hero .hero-row{flex-direction:row;justify-content:space-between;align-items:flex-end}
+}
+
+/* ── Dashboard Mockup ─────────────────────────── */
+.mockup-wrapper{margin-top:4rem}
+@media(min-width:640px){.mockup-wrapper{margin-top:5rem}}
+.mockup{overflow:hidden;border-radius:.5rem;border:1px solid var(--border);background:var(--card);box-shadow:var(--mockup-shadow);text-align:left}
+.mockup-chrome{display:flex;align-items:center;gap:.75rem;padding:.625rem 1rem;border-bottom:1px solid var(--border)}
+.mockup-dots{display:flex;gap:6px}
+.mockup-dots span{width:10px;height:10px;border-radius:50%;background:var(--border-solid)}
+.mockup-url{margin:0 auto;display:flex;width:100%;max-width:20rem;align-items:center;gap:.5rem;border-radius:.375rem;border:1px solid var(--border);background:var(--card-hover);padding:.375rem .75rem;font-size:11px;color:var(--muted-2)}
+.mockup-url svg{width:12px;height:12px;flex-shrink:0}
+.mockup-url .shortcut{margin-left:auto;font-size:10px;color:var(--muted-4);letter-spacing:.02em}
+.mockup-body{display:flex}
+.mockup-sidebar{display:none;width:11rem;flex-shrink:0;flex-direction:column;border-right:1px solid var(--border);padding:.625rem}
+.mockup-sidebar .nav-item{display:flex;align-items:center;gap:.625rem;padding:.5rem .625rem;border-radius:.375rem;font-size:12px;color:var(--muted-2)}
+.mockup-sidebar .nav-item.active{background:var(--sidebar-active);color:var(--fg)}
+.mockup-sidebar .nav-item.active .dot-active{width:4px;height:4px;border-radius:50%;background:var(--primary);margin-left:auto}
+.mockup-sidebar .nav-item svg{width:14px;height:14px;flex-shrink:0}
+.mockup-sidebar .ai-card{margin-top:auto;border-radius:.375rem;border:1px solid var(--border);background:var(--card-hover);padding:.75rem}
+.mockup-sidebar .ai-card .ai-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:var(--primary)}
+.mockup-sidebar .ai-card p{margin-top:.375rem;font-size:11px;line-height:1.5;color:var(--muted)}
+.mockup-main{flex:1;min-width:0;padding:1rem}
+@media(min-width:640px){.mockup-main{padding:1.25rem}}
+.mockup-header{display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.mockup-header .overline{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-2)}
+.mockup-header h3{margin-top:.25rem;font-size:14px;font-weight:500;color:var(--fg)}
+.mockup-header .actions{display:none;gap:.5rem}
+.mockup-header .actions span{padding:.375rem .625rem;border-radius:.375rem;font-size:11px}
+.mockup-header .actions .filter{border:1px solid var(--border);color:var(--muted)}
+.mockup-header .actions .export{background:var(--primary);color:var(--primary-fg);font-weight:500}
+
+@media(min-width:640px){.mockup-header .actions{display:flex}}
+@media(min-width:768px){.mockup-sidebar{display:flex}}
+
+.metrics-row{display:grid;grid-template-columns:repeat(2,1fr);border-bottom:1px solid var(--border)}
+@media(min-width:1024px){.metrics-row{grid-template-columns:repeat(4,1fr)}}
+.metric-card{padding:.5rem 1rem}
+@media(min-width:640px){.metric-card{padding:1rem .75rem}}
+.metric-card+.metric-card{border-left:1px solid var(--border)}
+@media(max-width:1023px){.metric-card:nth-child(3){border-left:0;border-top:1px solid var(--border)}.metric-card:nth-child(4){border-top:1px solid var(--border)}}
+.metric-card .label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2)}
+.metric-card .value{margin-top:.375rem;font-size:1.125rem;font-weight:500;letter-spacing:-.02em;color:var(--fg)}
+.metric-card .change{margin-top:.25rem;display:flex;align-items:center;gap:.25rem;font-size:11px;color:var(--success)}
+.metric-card .change svg{width:12px;height:12px}
+
+.chart-grid{display:grid;gap:0;margin-top:1rem}
+@media(min-width:1024px){.chart-grid{grid-template-columns:1fr auto}}
+.chart-main{min-width:0}
+.chart-main .chart-label{font-size:11px;font-weight:500;color:var(--link)}
+.chart-main svg{width:100%;height:auto;margin-top:.5rem}
+.chart-main svg text{fill:var(--muted-3)}
+.chart-main svg line{stroke:var(--border)}
+.chart-main svg .line-forecast{stroke:var(--muted-4);stroke-width:1.5;stroke-dasharray:3 4;fill:none}
+.chart-main svg .line-actual{stroke:var(--primary);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.chart-main svg .dot-end{fill:var(--primary);stroke:var(--card);stroke-width:1.5}
+.chart-side{border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem}
+@media(min-width:1024px){.chart-side{border-top:0;border-left:1px solid var(--border);padding-left:1rem;padding-top:0;margin-top:0}}
+.chart-side .chart-label{font-size:11px;font-weight:500;color:var(--link)}
+.bars-row{display:flex;align-items:flex-end;gap:6px;height:120px;margin-top:.75rem}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.bar-col .bar{width:100%;border-radius:2px;background:var(--bar);transition:background .3s}
+.bar-col .bar.highlight{background:var(--bar-highlight)}
+.bar-col .bar-label{font-size:9px;color:var(--muted-3)}
+
+/* ── Logo Marquee ─────────────────────────────── */
+.logo-marquee{margin-top:6rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:1.25rem 0;overflow:hidden}
+.marquee-mask{position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.marquee-track{display:flex;width:max-content;gap:5rem;padding:0 2.5rem;animation:marquee 40s linear infinite}
+.marquee-track span{font-size:15px;font-weight:500;letter-spacing:.05em;color:var(--muted-4);white-space:nowrap;transition:color .2s}
+.marquee-track span:hover{color:var(--muted)}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ── Section shared ───────────────────────────── */
+.section{padding:7rem 0;border-top:1px solid var(--border)}
+@media(min-width:640px){.section{padding:9rem 0}}
+.section-header{display:flex;flex-direction:column;gap:1.5rem}
+@media(min-width:640px){.section-header{flex-direction:row;justify-content:space-between;align-items:flex-end}}
+.section-header .section-desc{max-width:20rem;font-size:14px;line-height:1.6;color:var(--muted)}
+
+/* ── Features ─────────────────────────────────── */
+.features-grid{display:grid;gap:1px;overflow:hidden;border-radius:.5rem;border:1px solid var(--border);background:var(--border-solid);margin-top:4rem}
+@media(min-width:640px){.features-grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1024px){.features-grid{grid-template-columns:repeat(3,1fr)}}
+.feature-card{background:var(--card);padding:2rem;transition:background .3s;cursor:default}
+.feature-card:hover{background:var(--card-hover)}
+.feature-top{display:flex;align-items:center;justify-content:space-between}
+.feature-num{font-size:12px;font-weight:500;color:var(--muted-4)}
+.feature-arrow{width:16px;height:16px;color:var(--border-solid);transition:all .3s}
+.feature-card:hover .feature-arrow{color:var(--primary);transform:translate(2px,-2px)}
+.feature-card h3{margin-top:2.5rem;font-size:17px;font-weight:600;letter-spacing:-.02em;color:var(--fg)}
+.feature-card p{margin-top:.625rem;font-size:13.5px;line-height:1.6;color:var(--muted)}
+
+/* ── Product ──────────────────────────────────── */
+.product-grid{display:grid;gap:4rem;align-items:center}
+@media(min-width:1024px){.product-grid{grid-template-columns:1fr 1fr}}
+.product-text .section-desc{margin-top:1.25rem}
+.product-list{margin-top:2.25rem;border-top:1px solid var(--border)}
+.product-list li{display:flex;align-items:center;gap:1rem;padding:.875rem 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--link)}
+.product-list .list-num{font-size:11px;font-weight:500;color:var(--muted-4)}
+
+.product-card{border-radius:.5rem;border:1px solid var(--border);background:var(--card);padding:2rem}
+.product-card-header{display:flex;align-items:center;justify-content:space-between}
+.product-card-header .overline{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-2)}
+.product-card-header .status{display:flex;align-items:center;gap:.375rem;font-size:11px;color:var(--success)}
+.product-card-header .status .status-dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.product-card .big-value{margin-top:1rem;font-size:3rem;font-weight:600;letter-spacing:-.03em;color:var(--fg)}
+.product-card .trend{margin-top:.375rem;font-size:13px;color:var(--success)}
+.product-card .progress-wrap{margin-top:2rem}
+.product-card .progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted-2)}
+.product-card .progress-bar{margin-top:.5rem;height:3px;border-radius:999px;background:var(--border-solid);overflow:hidden}
+.product-card .progress-fill{height:100%;border-radius:999px;background:var(--primary);transition:width 1.5s ease}
+.product-card .sub-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:2rem}
+.product-card .sub-metric{border-radius:.375rem;border:1px solid var(--border);padding:.75rem;text-align:center}
+.product-card .sub-metric .sub-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:var(--muted-2)}
+.product-card .sub-metric .sub-value{margin-top:.25rem;font-size:15px;font-weight:600;color:var(--fg)}
+.product-bars{display:flex;align-items:flex-end;gap:6px;height:7rem;margin-top:2rem}
+.product-bars .p-bar{flex:1;border-radius:2px;transform-origin:bottom}
+
+/* ── Stats ────────────────────────────────────── */
+.stats-bar{border-top:1px solid var(--border);padding:5rem 0}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2rem}
+@media(min-width:1024px){.stats-grid{grid-template-columns:repeat(4,1fr)}}
+.stat-item{text-align:center}
+.stat-value{font-size:clamp(2rem,4vw,3rem);font-weight:600;letter-spacing:-.03em;color:var(--fg)}
+.stat-label{margin-top:.25rem;font-size:13px;color:var(--muted)}
+
+/* ── Customers ────────────────────────────────── */
+.testimonials-grid{display:grid;gap:1px;overflow:hidden;border-radius:.5rem;border:1px solid var(--border);background:var(--border-solid);margin-top:4rem}
+@media(min-width:1024px){.testimonials-grid{grid-template-columns:repeat(3,1fr)}}
+.testimonial-card{display:flex;flex-direction:column;justify-content:space-between;background:var(--card);padding:2rem;transition:background .3s}
+.testimonial-card:hover{background:var(--card-hover)}
+.testimonial-card blockquote{font-size:15px;line-height:1.6;color:var(--quote)}
+.testimonial-card figcaption{display:flex;align-items:center;gap:.75rem;margin-top:2.5rem}
+.testimonial-card .avatar{width:2rem;height:2rem;border-radius:50%;flex-shrink:0}
+.testimonial-card .avatar.green{background:var(--primary)}
+.testimonial-card .avatar.gray{background:var(--border-solid)}
+.testimonial-card .avatar.teal{background:#2dd4bf}
+.testimonial-card .name{font-size:13px;font-weight:500;color:var(--fg)}
+.testimonial-card .role{font-size:12px;color:var(--muted-2)}
+
+/* ── Pricing ──────────────────────────────────── */
+.pricing-grid{display:grid;gap:1px;overflow:hidden;border-radius:.5rem;border:1px solid var(--border);background:var(--border-solid);margin-top:4rem}
+@media(min-width:1024px){.pricing-grid{grid-template-columns:repeat(3,1fr)}}
+.pricing-card{position:relative;display:flex;flex-direction:column;background:var(--card);padding:2rem;transition:background .3s}
+.pricing-card:hover{background:var(--card-hover)}
+.pricing-card .tier-header{display:flex;align-items:center;justify-content:space-between}
+.pricing-card .tier-name{font-size:15px;font-weight:600;color:var(--fg)}
+.pricing-card .popular-badge{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--primary);border:1px solid var(--primary);border-radius:999px;padding:.125rem .5rem}
+.pricing-card .tier-desc{margin-top:.25rem;font-size:13px;color:var(--muted-2)}
+.pricing-card .price-row{display:flex;align-items:baseline;gap:.5rem;margin-top:1.75rem}
+.pricing-card .price{font-size:2.25rem;font-weight:600;letter-spacing:-.03em;color:var(--fg)}
+.pricing-card .price-period{font-size:12px;color:var(--muted-3)}
+.pricing-card .feature-list{flex:1;margin-top:2rem;padding-top:1.75rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.75rem}
+.pricing-card .feature-list li{display:flex;align-items:flex-start;gap:.625rem;font-size:13.5px;color:var(--link)}
+.pricing-card .feature-list li svg{width:14px;height:14px;flex-shrink:0;margin-top:2px;color:var(--muted-4)}
+.pricing-card .tier-cta{display:block;margin-top:2rem;padding:.75rem;border-radius:.375rem;text-align:center;font-size:13.5px;font-weight:500;transition:all .2s}
+.pricing-card .tier-cta.outline{border:1px solid var(--border);color:var(--link)}
+.pricing-card .tier-cta.outline:hover{border-color:var(--fg);color:var(--fg)}
+.pricing-card .tier-cta.filled{background:var(--primary);color:var(--primary-fg)}
+.pricing-card .tier-cta.filled:hover{filter:brightness(1.1)}
+
+/* ── CTA ──────────────────────────────────────── */
+.cta-section .cta-heading{display:flex;align-items:center}
+.cta-section .blink{display:inline-block;width:.08em;height:.72em;transform:translateY(.08em);background:var(--primary);margin-left:.75rem;animation:blink 1.1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.cta-bottom{display:flex;flex-direction:column;gap:2rem;margin-top:3rem;padding-top:2.5rem;border-top:1px solid var(--border)}
+@media(min-width:640px){.cta-bottom{flex-direction:row;justify-content:space-between;align-items:center}}
+.cta-bottom p{max-width:28rem;font-size:15px;line-height:1.6;color:var(--muted)}
+.cta-bottom .cta-actions{display:flex;align-items:center;gap:1rem}
+.cta-bottom .btn-primary{padding:.875rem 1.5rem;font-size:14px}
+.cta-bottom .btn-primary svg{width:16px;height:16px;transition:transform .2s}
+.cta-bottom .btn-primary:hover svg{transform:translateX(2px)}
+
+/* ── Footer ───────────────────────────────────── */
+.site-footer{border-top:1px solid var(--border)}
+.footer-grid{display:grid;gap:3rem;padding:4rem 0}
+@media(min-width:1024px){.footer-grid{grid-template-columns:2fr 1fr 1fr 1fr 1fr}}
+.footer-brand .footer-tagline{margin-top:1rem;max-width:20rem;font-size:13px;line-height:1.6;color:var(--muted-2)}
+.footer-col h4{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-3)}
+.footer-col ul{margin-top:1rem;display:flex;flex-direction:column;gap:.625rem}
+.footer-col ul a{font-size:13px;color:var(--muted);transition:color .2s}
+.footer-col ul a:hover{color:var(--fg)}
+.footer-bottom{display:flex;flex-direction:column;gap:.75rem;padding:2rem 0;border-top:1px solid var(--border);align-items:flex-start}
+@media(min-width:640px){.footer-bottom{flex-direction:row;justify-content:space-between;align-items:center}}
+.footer-bottom p{font-size:12px;color:var(--muted-3)}
+
+/* ── Reveal animation ─────────────────────────── */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-hero{transform:translateY(40px)}
+.reveal-up{transform:translateY(32px)}
+.reveal-d1{transition-delay:.1s}.reveal-d2{transition-delay:.2s}.reveal-d3{transition-delay:.3s}
+.reveal-d4{transition-delay:.4s}.reveal-d5{transition-delay:.5s}.reveal-d6{transition-delay:.6s}
+
+/* ── Floating pet photos around mockup ─────────── */
+.mockup-wrapper{position:relative}
+.float-img{position:absolute;border-radius:.5rem;overflow:hidden;border:2px solid var(--border-solid);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:2;opacity:0;animation:floatIn .8s ease forwards}
+.float-img img{width:100%;height:100%;object-fit:cover}
+.float-img.fi-1{width:120px;height:90px;top:-30px;left:-40px;animation-delay:.6s}
+.float-img.fi-2{width:100px;height:100px;border-radius:50%;top:40%;right:-35px;animation-delay:.9s}
+.float-img.fi-3{width:110px;height:80px;bottom:-20px;left:10%;animation-delay:1.2s}
+.float-img.fi-4{width:90px;height:90px;border-radius:50%;bottom:20%;right:8%;animation-delay:1s}
+@keyframes floatIn{0%{opacity:0;transform:translateY(16px) scale(.9)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes floatBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.float-img.visible{animation:floatIn .8s ease forwards}
+.float-img.fi-1.visible,.float-img.fi-3.visible{animation:floatIn .8s ease forwards,floatBob 4s ease-in-out 1.5s infinite}
+.float-img.fi-2.visible,.float-img.fi-4.visible{animation:floatIn .8s ease forwards,floatBob 5s ease-in-out 2s infinite}
+@media(max-width:767px){.float-img{display:none}}
+
+/* ── Product image ────────────────────────────── */
+.product-text .product-photo{margin-top:2rem;border-radius:.5rem;overflow:hidden;border:1px solid var(--border)}
+.product-text .product-photo img{width:100%;height:200px;object-fit:cover}
+
+/* ── Testimonial avatars ──────────────────────── */
+.testimonial-card .avatar-img{width:2.5rem;height:2.5rem;border-radius:50%;object-fit:cover;flex-shrink:0}
+
+/* ── CTA background image ─────────────────────── */
+.cta-section{position:relative;overflow:hidden}
+.cta-bg{position:absolute;inset:0;z-index:0}
+.cta-bg img{width:100%;height:100%;object-fit:cover;opacity:.12}
+.cta-section .container{position:relative;z-index:1}
+
+/* ── Stats with image ─────────────────────────── */
+.stats-bar{position:relative;overflow:hidden}
+.stats-bg{position:absolute;inset:0;z-index:0}
+.stats-bg img{width:100%;height:100%;object-fit:cover;opacity:.06}
+.stats-bar .container{position:relative;z-index:1}
+
+@media(max-width:639px){
+  .sm-hide{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Header ═══ -->
+<header class="header" id="header">
+  <nav>
+    <a href="#" class="logo">
+      <span class="logo-mark"></span>
+      <span class="logo-text">Sumaq Vet</span>
+    </a>
+    <div class="nav-links">
+      <a href="#producto">Producto</a>
+      <a href="#funciones">Funciones</a>
+      <a href="#clientes">Clientes</a>
+      <a href="#precios">Precios</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme-toggle" id="themeToggle" aria-label="Cambiar tema">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a href="#" class="signin">Iniciar sesion</a>
+      <a href="#cta" class="btn-primary">Comenzar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+    </div>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </button>
+  </nav>
+</header>
+
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#producto" class="mobile-link">Producto</a>
+  <a href="#funciones" class="mobile-link">Funciones</a>
+  <a href="#clientes" class="mobile-link">Clientes</a>
+  <a href="#precios" class="mobile-link">Precios</a>
+  <a href="#" class="mobile-link">Iniciar sesion</a>
+  <a href="#cta" class="btn-primary">Comenzar</a>
+</div>
+
+<!-- ═══ Hero ═══ -->
+<section class="hero">
+  <div class="dotgrid"></div>
+  <div class="container">
+    <p class="eyebrow reveal">Sumaq Vet — Software veterinario</p>
+    <h1 class="display" style="margin-top:1.5rem">
+      <span class="reveal reveal-hero">Gestiona tu clinica</span>
+      <span class="reveal reveal-hero reveal-d1">como <span class="accent">nadie mas lo hace.</span></span>
+    </h1>
+    <div class="hero-row">
+      <p class="hero-subtitle reveal reveal-d2">Historias clinicas, agenda, facturacion e inventario en un solo sistema — con alertas que anticipan lo que necesitas saber.</p>
+      <div class="hero-ctas reveal reveal-d2">
+        <a href="#cta" class="btn-primary">Prueba gratuita<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+        <a href="#producto" class="link-underline">Ver la demo</a>
+      </div>
+    </div>
+    <div class="trust-badges reveal reveal-d3">
+      <span>Sin tarjeta de credito</span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span>Multi-sede</span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span>Activo en 5 minutos</span>
+    </div>
+
+    <!-- Dashboard Mockup -->
+    <div class="mockup-wrapper reveal reveal-up reveal-d4">
+      <div class="float-img fi-1"><img src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=240&h=180&fit=crop&q=80" alt="Golden retriever sonriendo"></div>
+      <div class="float-img fi-2"><img src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&h=200&fit=crop&q=80" alt="Gato naranja"></div>
+      <div class="float-img fi-3"><img src="https://images.unsplash.com/photo-1588950538967-ca7f8599c669?w=220&h=160&fit=crop&q=80" alt="Veterinaria con perro"></div>
+      <div class="float-img fi-4"><img src="https://images.unsplash.com/photo-1534361960057-19889db9621e?w=180&h=180&fit=crop&q=80" alt="Cachorro feliz"></div>
+      <div class="mockup">
+        <div class="mockup-chrome">
+          <div class="mockup-dots"><span></span><span></span><span></span></div>
+          <div class="mockup-url">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+            Buscar pacientes, citas…
+            <span class="shortcut">⌘K</span>
+          </div>
+        </div>
+        <div class="mockup-body">
+          <aside class="mockup-sidebar">
+            <div class="nav-item active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+              Dashboard
+              <span class="dot-active"></span>
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+              Historias
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+              Agenda
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg>
+              Inventario
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg>
+              Facturacion
+            </div>
+            <div class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Clientes
+            </div>
+            <div class="ai-card">
+              <span class="ai-label">Alerta</span>
+              <p>Stock de Amoxicilina bajo minimo. 3 unidades restantes. Reabastecer hoy.</p>
+            </div>
+          </aside>
+          <div class="mockup-main">
+            <div class="mockup-header">
+              <div>
+                <p class="overline">Dashboard</p>
+                <h3>Lunes, 11 de agosto</h3>
+              </div>
+              <div class="actions">
+                <span class="filter">Ultimos 30 dias</span>
+                <span class="export">Exportar</span>
+              </div>
+            </div>
+            <div class="metrics-row">
+              <div class="metric-card">
+                <p class="label">Pacientes</p>
+                <p class="value tabular-nums">2,847</p>
+                <p class="change tabular-nums"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>+12.4%</p>
+              </div>
+              <div class="metric-card">
+                <p class="label">Citas hoy</p>
+                <p class="value tabular-nums">18</p>
+                <p class="change tabular-nums"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>3 urgencias</p>
+              </div>
+              <div class="metric-card">
+                <p class="label">Inventario</p>
+                <p class="value tabular-nums">94.8%</p>
+                <p class="change tabular-nums"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>En stock</p>
+              </div>
+              <div class="metric-card">
+                <p class="label">Ingresos</p>
+                <p class="value tabular-nums">S/42.8K</p>
+                <p class="change tabular-nums"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>+18.3%</p>
+              </div>
+            </div>
+            <div class="chart-grid">
+              <div class="chart-main">
+                <p class="chart-label">Consultas mensuales</p>
+                <svg viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" style="margin-top:.5rem">
+                  <g><line x1="34" x2="552" y1="156" y2="156" stroke-width="1"/><text x="26" y="160" text-anchor="end" font-size="9">0</text></g>
+                  <g><line x1="34" x2="552" y1="108" y2="108" stroke-width="1"/><text x="26" y="111" text-anchor="end" font-size="9">120</text></g>
+                  <g><line x1="34" x2="552" y1="60" y2="60" stroke-width="1"/><text x="26" y="63" text-anchor="end" font-size="9">240</text></g>
+                  <g><line x1="34" x2="552" y1="12" y2="12" stroke-width="1"/><text x="26" y="15" text-anchor="end" font-size="9">360</text></g>
+                  <text x="34" y="174" text-anchor="middle" font-size="9">Feb</text>
+                  <text x="108" y="174" text-anchor="middle" font-size="9">Mar</text>
+                  <text x="182" y="174" text-anchor="middle" font-size="9">Abr</text>
+                  <text x="256" y="174" text-anchor="middle" font-size="9">May</text>
+                  <text x="330" y="174" text-anchor="middle" font-size="9">Jun</text>
+                  <text x="404" y="174" text-anchor="middle" font-size="9">Jul</text>
+                  <text x="478" y="174" text-anchor="middle" font-size="9">Ago</text>
+                  <text x="552" y="174" text-anchor="middle" font-size="9">Sep</text>
+                  <path class="line-forecast" d="M34,120 L108,116 L182,118 L256,112 L330,108 L404,105 L478,102 L552,98"/>
+                  <path class="line-actual" d="M34,110 L108,92 L182,98 L256,78 L330,68 L404,50 L478,55 L552,35"/>
+                  <circle class="dot-end" cx="552" cy="35" r="3.5"/>
+                </svg>
+              </div>
+              <div class="chart-side">
+                <p class="chart-label">Citas por dia</p>
+                <div class="bars-row">
+                  <div class="bar-col"><div class="bar" style="height:60%"></div><span class="bar-label">L</span></div>
+                  <div class="bar-col"><div class="bar" style="height:85%"></div><span class="bar-label">M</span></div>
+                  <div class="bar-col"><div class="bar" style="height:70%"></div><span class="bar-label">Mi</span></div>
+                  <div class="bar-col"><div class="bar highlight" style="height:100%"></div><span class="bar-label">J</span></div>
+                  <div class="bar-col"><div class="bar" style="height:92%"></div><span class="bar-label">V</span></div>
+                  <div class="bar-col"><div class="bar" style="height:50%"></div><span class="bar-label">S</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logo Marquee -->
+    <div class="logo-marquee">
+      <div class="marquee-mask">
+        <div class="marquee-track">
+          <span>Vet Care Plus</span><span>Animal Health</span><span>Pet Paradise</span><span>Clinica San Roque</span><span>VetMed Sur</span><span>Patitas Sanas</span><span>Dr. Huella</span><span>Centro Vet Lima</span>
+          <span>Vet Care Plus</span><span>Animal Health</span><span>Pet Paradise</span><span>Clinica San Roque</span><span>VetMed Sur</span><span>Patitas Sanas</span><span>Dr. Huella</span><span>Centro Vet Lima</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Features ═══ -->
+<section class="section" id="funciones">
+  <div class="container">
+    <div class="section-header reveal">
+      <div>
+        <p class="eyebrow">Funciones</p>
+        <h2 class="section-title" style="margin-top:1rem;max-width:32rem">Seis razones para dejar tu sistema actual.</h2>
+      </div>
+      <p class="section-desc">Una plataforma que reemplaza cuatro herramientas — hecha para la velocidad de una clinica real.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card reveal reveal-d1">
+        <div class="feature-top">
+          <span class="feature-num tabular-nums">01</span>
+          <svg class="feature-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <h3>Historias clinicas digitales</h3>
+        <p>Ficha completa del paciente: antecedentes, vacunas, cirugias y tratamientos. Acceso instantaneo desde cualquier dispositivo.</p>
+      </div>
+      <div class="feature-card reveal reveal-d2">
+        <div class="feature-top">
+          <span class="feature-num tabular-nums">02</span>
+          <svg class="feature-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <h3>Agenda inteligente</h3>
+        <p>Citas con recordatorio automatico por WhatsApp. Reduce inasistencias en un 40% sin esfuerzo manual.</p>
+      </div>
+      <div class="feature-card reveal reveal-d3">
+        <div class="feature-top">
+          <span class="feature-num tabular-nums">03</span>
+          <svg class="feature-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <h3>Control de inventario</h3>
+        <p>Medicamentos, insumos y vacunas con alertas de stock minimo y vencimiento. Cero sorpresas en la farmacia.</p>
+      </div>
+      <div class="feature-card reveal reveal-d4">
+        <div class="feature-top">
+          <span class="feature-num tabular-nums">04</span>
+          <svg class="feature-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <h3>Facturacion integrada</h3>
+        <p>Boletas y facturas electronicas desde la consulta. Conectado a SUNAT. Sin doble digitacion ni errores de cierre.</p>
+      </div>
+      <div class="feature-card reveal reveal-d5">
+        <div class="feature-top">
+          <span class="feature-num tabular-nums">05</span>
+          <svg class="feature-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <h3>Multi-sede nativo</h3>
+        <p>Clinica principal, sucursales y pet shops en una sola cuenta. Cada sede con su inventario y caja — reportes consolidados.</p>
+      </div>
+      <div class="feature-card reveal reveal-d6">
+        <div class="feature-top">
+          <span class="feature-num tabular-nums">06</span>
+          <svg class="feature-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <h3>Portal de clientes</h3>
+        <p>Duenos consultan vacunas, proximas citas y resultados de laboratorio desde su celular. Cero llamadas a la clinica.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Product ═══ -->
+<section class="section" id="producto">
+  <div class="container">
+    <div class="product-grid">
+      <div class="product-text reveal">
+        <p class="eyebrow">El producto</p>
+        <h2 class="section-title" style="margin-top:1rem">El centro de control para toda tu clinica.</h2>
+        <p class="section-desc">Deja de gestionar con cuadernos y Excel. Sumaq Vet le da a cada area — clinica, administrativa, comercial — una fuente unica de verdad.</p>
+        <ul class="product-list">
+          <li><span class="list-num tabular-nums">01</span>Dashboard con metricas en tiempo real de toda la operacion</li>
+          <li><span class="list-num tabular-nums">02</span>Alertas de vacunas pendientes via WhatsApp automatico</li>
+          <li><span class="list-num tabular-nums">03</span>Agenda, hospitalizacion y cirugia en un solo calendario</li>
+          <li><span class="list-num tabular-nums">04</span>Reportes financieros que tu contador si va a entender</li>
+        </ul>
+        <div class="product-photo">
+          <img src="https://images.unsplash.com/photo-1654895716780-b4664497420d?w=600&h=300&fit=crop&q=80" alt="Veterinario revisando paciente con tablet" loading="lazy">
+        </div>
+      </div>
+      <div class="reveal reveal-up">
+        <div class="product-card">
+          <div class="product-card-header">
+            <span class="overline">Rendimiento mensual</span>
+            <span class="status"><span class="status-dot"></span>En meta</span>
+          </div>
+          <p class="big-value tabular-nums">342</p>
+          <p class="trend tabular-nums">↑ 23.1% vs mes anterior</p>
+          <div class="progress-wrap">
+            <div class="progress-label"><span>Meta de consultas</span><span class="tabular-nums">86%</span></div>
+            <div class="progress-bar"><div class="progress-fill" style="width:0"></div></div>
+          </div>
+          <div class="product-bars">
+            <div class="p-bar" style="height:40%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:52%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:45%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:65%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:58%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:75%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:70%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:82%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:78%;background:var(--bar)"></div>
+            <div class="p-bar" style="height:92%;background:var(--primary)"></div>
+          </div>
+          <div class="sub-metrics">
+            <div class="sub-metric">
+              <span class="sub-label">Consultas</span>
+              <span class="sub-value tabular-nums">218</span>
+            </div>
+            <div class="sub-metric">
+              <span class="sub-label">Cirugias</span>
+              <span class="sub-value tabular-nums">47</span>
+            </div>
+            <div class="sub-metric">
+              <span class="sub-label">Urgencias</span>
+              <span class="sub-value tabular-nums">77</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Stats ═══ -->
+<section class="stats-bar">
+  <div class="stats-bg"><img src="https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=1400&h=400&fit=crop&q=60" alt="" loading="lazy"></div>
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-item reveal">
+        <p class="stat-value tabular-nums">200+</p>
+        <p class="stat-label">clinicas activas</p>
+      </div>
+      <div class="stat-item reveal reveal-d1">
+        <p class="stat-value tabular-nums">85K+</p>
+        <p class="stat-label">pacientes registrados</p>
+      </div>
+      <div class="stat-item reveal reveal-d2">
+        <p class="stat-value tabular-nums">99.9%</p>
+        <p class="stat-label">disponibilidad, 12 meses</p>
+      </div>
+      <div class="stat-item reveal reveal-d3">
+        <p class="stat-value tabular-nums">&lt;2s</p>
+        <p class="stat-label">carga promedio</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Customers ═══ -->
+<section class="section" id="clientes">
+  <div class="container">
+    <div class="reveal">
+      <p class="eyebrow">Clientes</p>
+      <h2 class="section-title" style="margin-top:1rem;max-width:34rem">Clinicas que viven de sus datos.</h2>
+    </div>
+    <div class="testimonials-grid">
+      <figure class="testimonial-card reveal reveal-d1">
+        <blockquote>"Eliminamos cuatro herramientas el mes que adoptamos Sumaq Vet. La recepcion ya no anota citas en una libreta y los veterinarios tienen la historia clinica completa en un clic."</blockquote>
+        <figcaption>
+          <img class="avatar-img" src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=80&h=80&fit=crop&q=80" alt="Dra. Patricia Campos">
+          <div>
+            <p class="name">Dra. Patricia Campos</p>
+            <p class="role">Directora, Clinica Vet Care Plus</p>
+          </div>
+        </figcaption>
+      </figure>
+      <figure class="testimonial-card reveal reveal-d2">
+        <blockquote>"La alerta de stock nos salvo dos veces este mes. Antes se nos acababa la anestesia un sabado y habia que cancelar cirugias. Ahora el sistema avisa con tres dias de anticipacion."</blockquote>
+        <figcaption>
+          <img class="avatar-img" src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=80&h=80&fit=crop&q=80" alt="Dr. Miguel Torres">
+          <div>
+            <p class="name">Dr. Miguel Torres</p>
+            <p class="role">Gerente, Animal Health Center</p>
+          </div>
+        </figcaption>
+      </figure>
+      <figure class="testimonial-card reveal reveal-d3">
+        <blockquote>"El portal de clientes lo activamos en una semana. Los duenos creen que lo construimos nosotros. Los dejamos creer."</blockquote>
+        <figcaption>
+          <img class="avatar-img" src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&h=80&fit=crop&q=80" alt="Dra. Lucia Paredes">
+          <div>
+            <p class="name">Dra. Lucia Paredes</p>
+            <p class="role">Fundadora, Pet Paradise</p>
+          </div>
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Pricing ═══ -->
+<section class="section" id="precios">
+  <div class="container">
+    <div class="section-header reveal">
+      <div>
+        <p class="eyebrow">Precios</p>
+        <h2 class="section-title" style="margin-top:1rem;max-width:32rem">Precio de herramienta, no de impuesto.</h2>
+      </div>
+      <p class="section-desc">Empieza gratis. Escala cuando tu clinica crezca.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card reveal reveal-d1">
+        <div class="tier-header">
+          <h3 class="tier-name">Starter</h3>
+        </div>
+        <p class="tier-desc">Consultorios independientes.</p>
+        <div class="price-row">
+          <span class="price tabular-nums">S/0</span>
+          <span class="price-period">gratis por siempre</span>
+        </div>
+        <ul class="feature-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>1 sede</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Hasta 100 pacientes</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Historias clinicas</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Soporte por email</li>
+        </ul>
+        <a href="#cta" class="tier-cta outline">Comenzar gratis</a>
+      </div>
+      <div class="pricing-card reveal reveal-d2">
+        <div class="tier-header">
+          <h3 class="tier-name">Pro</h3>
+          <span class="popular-badge">Popular</span>
+        </div>
+        <p class="tier-desc">Clinicas en crecimiento.</p>
+        <div class="price-row">
+          <span class="price tabular-nums">S/149</span>
+          <span class="price-period">/ mes</span>
+        </div>
+        <ul class="feature-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Hasta 3 sedes</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Pacientes ilimitados</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Inventario + alertas</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>WhatsApp automatico</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Portal de clientes</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Soporte prioritario</li>
+        </ul>
+        <a href="#cta" class="tier-cta filled">Prueba gratuita</a>
+      </div>
+      <div class="pricing-card reveal reveal-d3">
+        <div class="tier-header">
+          <h3 class="tier-name">Enterprise</h3>
+        </div>
+        <p class="tier-desc">Cadenas de clinicas y hospitales.</p>
+        <div class="price-row">
+          <span class="price">A medida</span>
+        </div>
+        <ul class="feature-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sedes ilimitadas</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>API completa</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>SSO / LDAP</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>SLA garantizado</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Gerente de cuenta dedicado</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Capacitacion presencial</li>
+        </ul>
+        <a href="#cta" class="tier-cta outline">Contactar ventas</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="section cta-section" id="cta">
+  <div class="cta-bg"><img src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=1400&h=600&fit=crop&q=60" alt="" loading="lazy"></div>
+  <div class="container">
+    <div class="reveal">
+      <p class="eyebrow">Comenzar</p>
+      <h2 class="display cta-heading" style="margin-top:1.5rem;max-width:56rem;color:var(--fg)">Tu clinica merece respuestas claras.<span class="blink"></span></h2>
+      <div class="cta-bottom">
+        <p>Unete a 200+ clinicas que toman mejores decisiones con Sumaq Vet. Gratis para siempre en tu primera sede.</p>
+        <div class="cta-actions">
+          <a href="#" class="btn-primary">Comenzar gratis<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+          <a href="#precios" class="link-underline" style="font-size:14px;color:var(--link);border-bottom:1px solid var(--border-solid);padding-bottom:2px">Comparar planes</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Footer ═══ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="logo">
+          <span class="logo-mark"></span>
+          <span class="logo-text">Sumaq Vet</span>
+        </a>
+        <p class="footer-tagline">Software de gestion veterinaria para equipos que prefieren actuar con datos, no con suposiciones.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Producto</h4>
+        <ul>
+          <li><a href="#">Dashboard</a></li>
+          <li><a href="#">Historias clinicas</a></li>
+          <li><a href="#">Agenda</a></li>
+          <li><a href="#">Inventario</a></li>
+          <li><a href="#">Facturacion</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Empresa</h4>
+        <ul>
+          <li><a href="#">Nosotros</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Trabaja con nosotros</a></li>
+          <li><a href="#">Prensa</a></li>
+          <li><a href="#">Contacto</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Recursos</h4>
+        <ul>
+          <li><a href="#">Documentacion</a></li>
+          <li><a href="#">API</a></li>
+          <li><a href="#">Comunidad</a></li>
+          <li><a href="#">Estado</a></li>
+          <li><a href="#">Capacitacion</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Privacidad</a></li>
+          <li><a href="#">Terminos</a></li>
+          <li><a href="#">Proteccion de datos</a></li>
+          <li><a href="#">Procesadores</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 Sumaq Vet. Todos los derechos reservados.</p>
+      <p>Un sistema. Sin excusas.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const getTheme = () => {
+    const s = localStorage.getItem('sumaq-vet-theme');
+    if (s) return s;
+    return matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark';
+  };
+  const setTheme = t => {
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('sumaq-vet-theme', t);
+  };
+  setTheme(getTheme());
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  const header = document.getElementById('header');
+  const onScroll = () => header.classList.toggle('scrolled', scrollY > 20);
+  addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  const hamburger = document.getElementById('hamburgerBtn');
+  const mobileMenu = document.getElementById('mobileMenu');
+  hamburger.addEventListener('click', () => mobileMenu.classList.toggle('open'));
+  mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.remove('open')));
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }});
+  }, {threshold:.1, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  const progressObs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const fill = e.target.querySelector('.progress-fill');
+        if (fill) setTimeout(() => fill.style.width = '86%', 300);
+        progressObs.unobserve(e.target);
+      }
+    });
+  }, {threshold:.3});
+  const pc = document.querySelector('.product-card');
+  if (pc) progressObs.observe(pc);
+})();
+</script>
+</body>
+</html>

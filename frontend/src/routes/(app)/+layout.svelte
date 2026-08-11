@@ -148,6 +148,7 @@
 			onToggleSidebar={toggleSidebar}
 			{title}
 			usuario={usuarioCabecera}
+			organizacionNombre={data.tenant.nombre}
 			lightColor={tenantAppearance.cabecera_claro}
 			darkColor={tenantAppearance.cabecera_oscuro}
 			hideBottomBorder={tenantAppearance.cabecera_ocultar_borde}

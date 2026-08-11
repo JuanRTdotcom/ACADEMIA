@@ -5,6 +5,9 @@ import {
   DtoGuardarComunicacionesEmpresa,
   DtoGuardarContactoEmpresa,
   DtoGuardarIdentidadEmpresa,
+  DtoGuardarRegionEmpresa,
+  DtoGuardarServiciosVeterinaria,
+  DtoGuardarFiscalVeterinaria,
 } from "./guardar-seccion-empresa.dto";
 
 describe("DTO de configuración de empresa actual", () => {
@@ -141,5 +144,46 @@ describe("DTO de configuración de empresa actual", () => {
     expect(
       errores.some((error) => error.property === "ui_tamano_escudo_menu"),
     ).toBe(true);
+  });
+
+  it("acepta UUID de maestros en región, especies y perfil fiscal", async () => {
+    const ids = [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333",
+    ];
+    expect(await validate(plainToInstance(DtoGuardarRegionEmpresa, {
+      fid_parametros_idioma: ids[0], fid_zonas_horarias: ids[1], fid_parametros_moneda: ids[2],
+    }))).toHaveLength(0);
+    expect(await validate(plainToInstance(DtoGuardarServiciosVeterinaria, {
+      fid_parametros_especies: ids,
+    }))).toHaveLength(0);
+    expect(await validate(plainToInstance(DtoGuardarFiscalVeterinaria, {
+      fid_parametros_tipo_persona_fiscal: ids[0],
+      fid_parametros_tipo_documento_fiscal: ids[1],
+      fid_parametros_responsabilidad_fiscal: ids[2],
+      fiscal_numero_documento: "20123456789",
+      fiscal_razon_social: "Veterinaria Central",
+      fiscal_afecto_igv: true,
+      fiscal_telefono: "+51 999 999 999",
+      fiscal_correo: "fiscal@veterinaria.pe",
+      fiscal_direccion: "Av. Principal 123",
+    }))).toHaveLength(0);
+  });
+
+  it("rechaza códigos, etiquetas y UUID duplicados en lugar de relaciones", async () => {
+    const region = await validate(plainToInstance(DtoGuardarRegionEmpresa, {
+      fid_parametros_idioma: "es",
+      fid_zonas_horarias: "America/Lima",
+      fid_parametros_moneda: "PEN",
+    }));
+    const servicios = await validate(plainToInstance(DtoGuardarServiciosVeterinaria, {
+      fid_parametros_especies: [
+        "11111111-1111-4111-8111-111111111111",
+        "11111111-1111-4111-8111-111111111111",
+      ],
+    }));
+    expect(region).toHaveLength(3);
+    expect(servicios.some((error) => error.property === "fid_parametros_especies")).toBe(true);
   });
 });

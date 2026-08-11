@@ -3,11 +3,12 @@
   import type { SubmitFunction } from '@sveltejs/kit';
   import { toast } from 'svelte-sonner';
   import type { PageProps } from './$types';
-  import { Breadcrumb, Button, Card, Icon, Input, Select, i18n } from '$lib';
+  import { Breadcrumb, Button, Card, Icon, Input, Select, UserPermissionsCard, i18n } from '$lib';
+  import { permissionsForRoles, reconcileRoleChange } from '$lib/config/user-permissions';
 
   let { data }: PageProps = $props();
   type CompanyOption = { id_organizaciones: string; nombre: string; slug: string };
-  type RoleOption = { id_roles: string; nombre: string; codigo: string; icono: string };
+  type RoleOption = { id_roles: string; nombre: string; codigo: string; icono: string; permisos: string[] };
   const roles = $derived(data.opciones.roles as RoleOption[]);
   let saving = $state(false);
   let attempted = $state(false);
@@ -26,7 +27,8 @@
       apellido_paterno: data.usuarioEditado.apellido_paterno,
       apellido_materno: data.usuarioEditado.apellido_materno,
       correoPrefix: extractCorreoPrefix(data.usuarioEditado.correo),
-      fid_roles: data.usuarioEditado.roles.map((role: RoleOption) => role.id_roles)
+      fid_roles: data.usuarioEditado.roles.map((role: RoleOption) => role.id_roles),
+      fid_permisos: data.usuarioEditado.permisos as string[]
     };
   }
 
@@ -39,6 +41,9 @@
     )
   );
   const companySlug = $derived(company?.slug ?? data.usuarioEditado.empresa?.slug ?? 'empresa');
+  const modules = $derived(data.opciones.modulos_por_empresa?.[form.fid_organizaciones] ?? []);
+  const availablePermissions = $derived(new Set<string>(modules.flatMap((module: any) => module.permisos.map((permission: any) => String(permission.id_permisos)))));
+  const inheritedPermissions = $derived(permissionsForRoles(form.fid_roles, roles, availablePermissions));
   const emailSuffix = $derived(`@${companySlug}.com`);
   const fullCorreo = $derived(form.correoPrefix.trim() ? `${form.correoPrefix.trim()}@${companySlug}.com` : '');
 
@@ -48,11 +53,19 @@
   }
 
   function addRole() {
-    if (roleToAdd && !form.fid_roles.includes(roleToAdd)) form.fid_roles = [...form.fid_roles, roleToAdd];
+    const role = roles.find((item) => item.id_roles === roleToAdd);
+    if (role && !form.fid_roles.includes(role.id_roles)) {
+      const nextRoles = [...form.fid_roles, role.id_roles];
+      form.fid_permisos = reconcileRoleChange(form.fid_permisos, inheritedPermissions, permissionsForRoles(nextRoles, roles, availablePermissions));
+      form.fid_roles = nextRoles;
+    }
     roleToAdd = '';
   }
   function removeRole(id: string) {
-    if (!saving) form.fid_roles = form.fid_roles.filter((roleId: string) => roleId !== id);
+    if (saving) return;
+    const nextRoles = form.fid_roles.filter((roleId: string) => roleId !== id);
+    form.fid_permisos = reconcileRoleChange(form.fid_permisos, inheritedPermissions, permissionsForRoles(nextRoles, roles, availablePermissions));
+    form.fid_roles = nextRoles;
   }
 
   const errors = $derived.by(() => {
@@ -107,6 +120,7 @@
         </div>
       </div>
     </Card>
+    <UserPermissionsCard modules={modules} bind:selected={form.fid_permisos} disabled={saving} />
     <Card>
       <div class="mb-5"><h2 class="text-base font-semibold text-ink">{i18n.t('users.title')}</h2><p class="mt-1 text-sm text-steel">Datos básicos que identifican la cuenta dentro de la institución.</p></div>
       <div class="grid gap-4 lg:grid-cols-3">
@@ -119,6 +133,7 @@
     </Card>
     <input type="hidden" name="fid_organizaciones" value={form.fid_organizaciones} />
     {#each form.fid_roles as fid_rol}<input type="hidden" name="fid_roles" value={fid_rol} />{/each}
+    {#each form.fid_permisos as fid_permiso}<input type="hidden" name="fid_permisos" value={fid_permiso} />{/each}
     <div class="flex justify-end"><Button type="submit" disabled={saving || !dirty}>{#if saving}<Icon name="loader-circle" class="animate-spin" size={18} />{:else}<Icon name="save" size={18} />{/if}{i18n.t('users.save')}</Button></div>
   </form>
 </section>

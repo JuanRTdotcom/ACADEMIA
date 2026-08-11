@@ -5,23 +5,16 @@
 
 	let { children, data }: LayoutProps = $props();
 	const base = '/administrator/company';
-	const tabs = [
-		{ path: 'general', key: 'companies.section.basic', icon: 'building-2' },
-		{ path: 'contact', key: 'companies.section.contact', icon: 'phone-call' },
-		{ path: 'digital-presence', key: 'companies.section.digital', icon: 'share-2' },
-		{ path: 'identity', key: 'companies.section.identity', icon: 'image' },
-		{ path: 'login-branding', key: 'companies.section.login', icon: 'log-in' },
-		{ path: 'communications', key: 'companies.section.communications', icon: 'mail' },
-		{ path: 'region', key: 'companies.section.regional', icon: 'globe' },
-		{ path: 'subscription', key: 'Suscripción', icon: 'credit-card' }
-	];
+	const tabs = $derived(data.usuario.modulos
+		.filter((modulo) => modulo.ruta?.startsWith(`${base}/`))
+		.map((modulo) => ({ path: modulo.ruta!.slice(base.length + 1), key: modulo.nombre, icon: modulo.icono ?? 'circle' })));
 	const active = (path: string) => page.url.pathname === `${base}/${path}`;
 	const activeTab = $derived(tabs.find((tab) => active(tab.path)) ?? tabs[0]);
 	const breadcrumbItems = $derived([
 		{ label: i18n.t('nav.dashboard'), href: '/dashboard' },
 		{ label: i18n.t('nav.group.administrator') },
 		{ label: data.empresa.nombre, href: `${base}/general` },
-		{ label: i18n.t(activeTab.key) }
+		{ label: activeTab?.key ?? i18n.t('companies.title') }
 	]);
 	const shieldVersion = $derived(theme.current === 'dark' ? data.empresa.escudo_oscuro_version : data.empresa.escudo_version);
 	const shieldType = $derived(theme.current === 'dark' ? 'escudo_oscuro' : 'escudo');
@@ -85,7 +78,7 @@
 								: 'text-steel hover:bg-surface hover:text-ink'}"
 						>
 							<span class="grid size-5 shrink-0 place-items-center"><Icon name={tab.icon} size={18} /></span>
-							<span class="min-w-0 truncate" title={i18n.t(tab.key)}>{i18n.t(tab.key)}</span>
+							<span class="min-w-0 truncate" title={tab.key}>{tab.key}</span>
 						</a>
 					{/each}
 				</div>

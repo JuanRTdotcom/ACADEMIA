@@ -226,6 +226,12 @@ export abstract class RepositorioPerfil {
     idSesionObjetivo: string,
     contexto: ContextoSolicitud,
   ): Promise<{ ok: true }>;
+  abstract cerrarOtrasSesiones(
+    idUsuario: string,
+    idOrganizacion: string,
+    idSesionActual: string,
+    contexto: ContextoSolicitud,
+  ): Promise<{ ok: true; cerradas: number }>;
   abstract agregarCorreo(
     idUsuario: string,
     idOrganizacion: string,

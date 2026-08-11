@@ -14,6 +14,7 @@ import { ServicioEventosSesion } from "../../../comun/eventos-sesion/servicio-ev
 import { ServicioAccionesRequeridas } from "../../../comun/acciones-requeridas/servicio-acciones-requeridas";
 import type { AvatarPerfil } from "../../../perfil/domain/entities/avatar-perfil";
 import type { DatosUsuario, OpcionesUsuario, UsuarioListado } from "../../domain/entities/usuario";
+import { normalizarPermisosPorModulo } from "../../domain/entities/permisos-usuario";
 
 type Tx = Prisma.TransactionClient;
 
@@ -26,6 +27,26 @@ export class FuenteDatosUsuariosPrisma {
     private readonly eventosSesion: ServicioEventosSesion,
     private readonly accionesRequeridas: ServicioAccionesRequeridas,
   ) {}
+
+  private permisosEfectivos(item: {
+    organizacion: { plan: { planes_modulos: { fid_modulos: string }[] } | null };
+    usuarios_roles: { rol: { roles_permisos: { fid_permisos: string; permiso: { fid_modulos: string } }[] } }[];
+    usuarios_permisos: { fid_permisos: string; efecto: string; permiso: { fid_modulos: string } }[];
+  }): string[] {
+    const modulosPlan = new Set(item.organizacion.plan?.planes_modulos.map(({ fid_modulos }) => fid_modulos) ?? []);
+    const permisos = new Set<string>();
+    for (const { rol } of item.usuarios_roles) {
+      for (const permiso of rol.roles_permisos) {
+        if (modulosPlan.has(permiso.permiso.fid_modulos)) permisos.add(permiso.fid_permisos);
+      }
+    }
+    for (const excepcion of item.usuarios_permisos) {
+      if (!modulosPlan.has(excepcion.permiso.fid_modulos)) continue;
+      if (excepcion.efecto === "denegar") permisos.delete(excepcion.fid_permisos);
+      else permisos.add(excepcion.fid_permisos);
+    }
+    return [...permisos];
+  }
 
   private async validarActor(tx: Tx, idActor: string): Promise<void> {
     const actor = await tx.usuarios.findFirst({
@@ -42,6 +63,119 @@ export class FuenteDatosUsuariosPrisma {
     if (roles.length === 0) throw new BadRequestException("users.rolesRequired");
     const encontrados = await tx.roles.findMany({ where: { id_roles: { in: roles }, estado: 1, eliminado_en: null }, select: { id_roles: true } });
     if (encontrados.length !== roles.length) throw new BadRequestException("users.invalidRoles");
+  }
+
+  /** Valida plan ∩ módulos del rol y agrega los módulos obligatorios de base. */
+  private async normalizarPermisosEmpresa(
+    tx: Tx,
+    empresa: string,
+    roles: string[],
+    permisos: string[],
+  ): Promise<string[]> {
+    if (new Set(permisos).size !== permisos.length) {
+      throw new BadRequestException("users.invalidPermissions");
+    }
+    const organizacion = await tx.organizaciones.findFirst({
+      where: { id_organizaciones: empresa, estado: 1, eliminado_en: null },
+      select: { fid_planes: true },
+    });
+    if (!organizacion) throw new BadRequestException("users.companyUnavailable");
+    const modulos = await tx.modulos.findMany({
+      where: {
+        estado: 1,
+        planes_modulos: { some: { fid_planes: organizacion.fid_planes, estado: 1 } },
+        permisos: { some: { estado: 1 } },
+      },
+      select: {
+        id_modulos: true,
+        fid_modulos_padre: true,
+        acceso_usuario_obligatorio: true,
+        permisos: {
+          where: { estado: 1 },
+          select: {
+            id_permisos: true,
+            roles_permisos: {
+              where: {
+                estado: 1,
+                fid_roles: { in: roles },
+                rol: { estado: 1, eliminado_en: null },
+              },
+              select: { id_roles_permisos: true },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    const efectivos = normalizarPermisosPorModulo(
+      modulos.map((modulo) => ({
+        ...modulo,
+        permisos: modulo.permisos.map((permiso) => ({
+          id_permisos: permiso.id_permisos,
+          pertenece_al_rol: permiso.roles_permisos.length > 0,
+        })),
+      })),
+      permisos,
+    );
+    if (!efectivos) throw new BadRequestException("users.invalidPermissions");
+    return efectivos;
+  }
+
+  private async guardarPermisos(
+    tx: Tx,
+    usuario: string,
+    empresa: string,
+    roles: string[],
+    permisosEfectivos: string[],
+    actor: string,
+  ): Promise<void> {
+    const organizacion = await tx.organizaciones.findUniqueOrThrow({
+      where: { id_organizaciones: empresa },
+      select: { fid_planes: true },
+    });
+    const heredados = await tx.roles_permisos.findMany({
+      where: {
+        fid_roles: { in: roles },
+        estado: 1,
+        rol: { estado: 1, eliminado_en: null },
+        permiso: {
+          estado: 1,
+          modulo: {
+            estado: 1,
+            planes_modulos: { some: { fid_planes: organizacion.fid_planes, estado: 1 } },
+          },
+        },
+      },
+      select: { fid_permisos: true },
+    });
+    const base = new Set(heredados.map(({ fid_permisos }) => fid_permisos));
+    const efectivos = new Set(permisosEfectivos);
+    const excepciones = [
+      ...[...efectivos].filter((permiso) => !base.has(permiso)).map((fid_permisos) => ({ fid_permisos, efecto: "permitir" as const })),
+      ...[...base].filter((permiso) => !efectivos.has(permiso)).map((fid_permisos) => ({ fid_permisos, efecto: "denegar" as const })),
+    ];
+    await tx.usuarios_permisos.updateMany({
+      where: { fid_usuarios: usuario, estado: 1 },
+      data: { estado: 0, updated_by: actor },
+    });
+    for (const excepcion of excepciones) {
+      await tx.usuarios_permisos.upsert({
+        where: {
+          fid_usuarios_fid_permisos: {
+            fid_usuarios: usuario,
+            fid_permisos: excepcion.fid_permisos,
+          },
+        },
+        update: { efecto: excepcion.efecto, estado: 1, updated_by: actor },
+        create: {
+          fid_usuarios: usuario,
+          fid_permisos: excepcion.fid_permisos,
+          efecto: excepcion.efecto,
+          created_by: actor,
+          updated_by: actor,
+        },
+      });
+    }
   }
 
   private conflicto(error: unknown): never {
@@ -73,8 +207,9 @@ export class FuenteDatosUsuariosPrisma {
       select: {
         id_usuarios: true, fid_organizaciones: true, usuario: true, estado: true, estado_cuenta: true, created_at: true,
         persona: { select: { nombres: true, apellido_paterno: true, apellido_materno: true, foto_url: true, correos: { where: { estado: 1 }, orderBy: { created_at: "asc" }, take: 1, select: { correo: true } } } },
-        organizacion: { select: { nombre: true, slug: true } },
-        usuarios_roles: { where: { estado: 1, rol: { estado: 1, eliminado_en: null } }, select: { rol: { select: { id_roles: true, nombre: true, codigo: true, icono: true } } } },
+        organizacion: { select: { nombre: true, slug: true, plan: { select: { planes_modulos: { where: { estado: 1 }, select: { fid_modulos: true } } } } } },
+        usuarios_roles: { where: { estado: 1, rol: { estado: 1, eliminado_en: null } }, select: { rol: { select: { id_roles: true, nombre: true, codigo: true, icono: true, roles_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, permiso: { select: { fid_modulos: true } } } } } } } },
+        usuarios_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, efecto: true, permiso: { select: { fid_modulos: true } } } },
       },
     });
     return {
@@ -82,7 +217,9 @@ export class FuenteDatosUsuariosPrisma {
         id_usuarios: item.id_usuarios, fid_organizaciones: item.fid_organizaciones, usuario: item.usuario,
         nombres: item.persona.nombres, apellido_paterno: item.persona.apellido_paterno, apellido_materno: item.persona.apellido_materno,
         correo: item.persona.correos[0]?.correo ?? null, foto_version: item.persona.foto_url?.split("/").at(-1) ?? null, estado: item.estado, estado_cuenta: item.estado_cuenta, created_at: item.created_at,
-        empresa: item.organizacion, roles: item.usuarios_roles.map(({ rol }) => rol),
+        empresa: { nombre: item.organizacion.nombre, slug: item.organizacion.slug },
+        roles: item.usuarios_roles.map(({ rol }) => ({ id_roles: rol.id_roles, nombre: rol.nombre, codigo: rol.codigo, icono: rol.icono })),
+        permisos: this.permisosEfectivos(item),
       })), total: usuarios.length,
     };
   }
@@ -94,8 +231,9 @@ export class FuenteDatosUsuariosPrisma {
       select: {
         id_usuarios: true, fid_organizaciones: true, usuario: true, estado: true, estado_cuenta: true, created_at: true, eliminado_en: true,
         persona: { select: { nombres: true, apellido_paterno: true, apellido_materno: true, foto_url: true, correos: { where: { estado: 1, usos: { some: { tipo: "principal", estado: 1 } } }, take: 1, select: { correo: true } } } },
-        organizacion: { select: { nombre: true, slug: true, estado: true, eliminado_en: true } },
-        usuarios_roles: { where: { estado: 1, rol: { estado: 1, eliminado_en: null } }, select: { rol: { select: { id_roles: true, nombre: true, codigo: true, icono: true } } } },
+        organizacion: { select: { nombre: true, slug: true, estado: true, eliminado_en: true, plan: { select: { planes_modulos: { where: { estado: 1 }, select: { fid_modulos: true } } } } } },
+        usuarios_roles: { where: { estado: 1, rol: { estado: 1, eliminado_en: null } }, select: { rol: { select: { id_roles: true, nombre: true, codigo: true, icono: true, roles_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, permiso: { select: { fid_modulos: true } } } } } } } },
+        usuarios_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, efecto: true, permiso: { select: { fid_modulos: true } } } },
       },
     });
     if (!item || item.eliminado_en) throw new NotFoundException("users.notFound");
@@ -107,7 +245,8 @@ export class FuenteDatosUsuariosPrisma {
       correo: item.persona.correos[0]?.correo ?? null, foto_version: item.persona.foto_url?.split("/").at(-1) ?? null,
       estado: item.estado, estado_cuenta: item.estado_cuenta, created_at: item.created_at,
       empresa: { nombre: item.organizacion.nombre, slug: item.organizacion.slug },
-      roles: item.usuarios_roles.map(({ rol }) => rol),
+      roles: item.usuarios_roles.map(({ rol }) => ({ id_roles: rol.id_roles, nombre: rol.nombre, codigo: rol.codigo, icono: rol.icono })),
+      permisos: this.permisosEfectivos(item),
     };
   }
 
@@ -153,17 +292,71 @@ export class FuenteDatosUsuariosPrisma {
           id_organizaciones: true,
           nombre: true,
           slug: true,
+          fid_planes: true,
         },
       }),
-      this.prisma.roles.findMany({ where: { estado: 1, eliminado_en: null }, orderBy: [{ nombre: "asc" }], select: { id_roles: true, nombre: true, codigo: true, icono: true } }),
+      this.prisma.roles.findMany({
+        where: { estado: 1, eliminado_en: null },
+        orderBy: [{ nombre: "asc" }],
+        select: {
+          id_roles: true,
+          nombre: true,
+          codigo: true,
+          icono: true,
+          roles_permisos: {
+            where: { estado: 1, permiso: { estado: 1 } },
+            select: { fid_permisos: true },
+          },
+        },
+      }),
     ]);
+    const modulos = await this.prisma.modulos.findMany({
+      where: {
+        estado: 1,
+        permisos: { some: { estado: 1 } },
+        planes_modulos: {
+          some: { fid_planes: { in: [...new Set(empresas.map(({ fid_planes }) => fid_planes))] }, estado: 1 },
+        },
+      },
+      orderBy: [{ orden: "asc" }, { nombre: "asc" }],
+      select: {
+        id_modulos: true,
+        codigo: true,
+        nombre: true,
+        descripcion: true,
+        acceso_usuario_obligatorio: true,
+        icono: true,
+        ruta: true,
+        fid_modulos_padre: true,
+        orden: true,
+        planes_modulos: { where: { estado: 1 }, select: { fid_planes: true } },
+        permisos: {
+          where: { estado: 1 },
+          orderBy: [{ accion: "asc" }],
+          select: { id_permisos: true, codigo: true, accion: true, descripcion: true },
+        },
+      },
+    });
+    const modulosPorEmpresa = Object.fromEntries(
+      empresas.map((empresa) => [
+        empresa.id_organizaciones,
+        modulos
+          .filter((modulo) => modulo.planes_modulos.some(({ fid_planes }) => fid_planes === empresa.fid_planes))
+          .map(({ planes_modulos: _, ...modulo }) => modulo),
+      ]),
+    );
     return {
       empresas: empresas.map(({ id_organizaciones, nombre, slug }) => ({
         id_organizaciones,
         nombre,
         slug,
       })),
-      roles,
+      roles: roles.map(({ roles_permisos, ...rol }) => ({
+        ...rol,
+        permisos: roles_permisos.map(({ fid_permisos }) => fid_permisos),
+      })),
+      modulos: [],
+      modulos_por_empresa: modulosPorEmpresa,
     };
   }
 
@@ -173,6 +366,7 @@ export class FuenteDatosUsuariosPrisma {
       await this.prisma.$transaction(async (tx) => {
         await this.validarActor(tx, idActor);
         await this.validarEmpresaYRoles(tx, datos.fid_organizaciones, datos.fid_roles);
+        const permisos = await this.normalizarPermisosEmpresa(tx, datos.fid_organizaciones, datos.fid_roles, datos.fid_permisos);
         const existente = await tx.usuarios.findFirst({ where: { fid_organizaciones: datos.fid_organizaciones, usuario: datos.usuario, eliminado_en: null }, select: { id_usuarios: true } });
         if (existente) throw new ConflictException("users.duplicateUsername");
         const correoUsado = await tx.personas_correos.findFirst({ where: { fid_organizaciones: datos.fid_organizaciones, correo: { equals: datos.correo, mode: "insensitive" }, estado: 1 }, select: { id_personas_correos: true } });
@@ -186,8 +380,9 @@ export class FuenteDatosUsuariosPrisma {
         await tx.personas_correos_usos.create({ data: { fid_personas: persona.id_personas, fid_personas_correos: correo.id_personas_correos, tipo: "principal", created_by: idActor, updated_by: idActor } });
         await tx.credenciales.create({ data: { fid_usuarios: usuario.id_usuarios, tipo: "contrasenia", hash_contrasenia: hash, created_by: idActor, updated_by: idActor } });
         await tx.usuarios_roles.createMany({ data: datos.fid_roles.map((fid_roles) => ({ fid_usuarios: usuario.id_usuarios, fid_roles, created_by: idActor, updated_by: idActor })) });
+        await this.guardarPermisos(tx, usuario.id_usuarios, datos.fid_organizaciones, datos.fid_roles, permisos, idActor);
         await this.accionesRequeridas.crearCambioContraseniaRequerido(tx, usuario.id_usuarios, datos.fid_organizaciones);
-        await this.auditoria.registrar({ accion: "usuarios.creado", entidad: "usuarios", id_entidad: usuario.id_usuarios, fid_organizaciones: datos.fid_organizaciones, fid_usuarios: idActor, peticion: contexto, metadatos: { usuario: datos.usuario, roles: datos.fid_roles, correo: datos.correo } }, tx);
+        await this.auditoria.registrar({ accion: "usuarios.creado", entidad: "usuarios", id_entidad: usuario.id_usuarios, fid_organizaciones: datos.fid_organizaciones, fid_usuarios: idActor, peticion: contexto, metadatos: { usuario: datos.usuario, roles: datos.fid_roles, permisos, correo: datos.correo } }, tx);
       });
     } catch (error) { this.conflicto(error); }
   }
@@ -213,6 +408,7 @@ export class FuenteDatosUsuariosPrisma {
           throw new BadRequestException("users.companyImmutable");
         }
         await this.validarEmpresaYRoles(tx, datos.fid_organizaciones, datos.fid_roles);
+        const permisos = await this.normalizarPermisosEmpresa(tx, datos.fid_organizaciones, datos.fid_roles, datos.fid_permisos);
         const duplicado = await tx.usuarios.findFirst({ where: { id_usuarios: { not: id }, fid_organizaciones: datos.fid_organizaciones, usuario: datos.usuario, eliminado_en: null }, select: { id_usuarios: true } });
         if (duplicado) throw new ConflictException("users.duplicateUsername");
         const principal = await tx.personas_correos_usos.findUnique({ where: { fid_personas_tipo: { fid_personas: actual.fid_personas, tipo: "principal" } }, select: { id_personas_correos_usos: true, fid_personas_correos: true } });
@@ -232,8 +428,9 @@ export class FuenteDatosUsuariosPrisma {
         }
         await tx.usuarios_roles.updateMany({ where: { fid_usuarios: id, estado: 1 }, data: { estado: 0, updated_by: idActor } });
         for (const rol of datos.fid_roles) await tx.usuarios_roles.upsert({ where: { fid_usuarios_fid_roles: { fid_usuarios: id, fid_roles: rol } }, update: { estado: 1, updated_by: idActor }, create: { fid_usuarios: id, fid_roles: rol, created_by: idActor, updated_by: idActor } });
+        await this.guardarPermisos(tx, id, datos.fid_organizaciones, datos.fid_roles, permisos, idActor);
         await this.revocarSesiones(tx, id, idActor);
-        await this.auditoria.registrar({ accion: "usuarios.modificado", entidad: "usuarios", id_entidad: id, fid_organizaciones: datos.fid_organizaciones, fid_usuarios: idActor, peticion: contexto, metadatos: { usuario: datos.usuario, roles: datos.fid_roles } }, tx);
+        await this.auditoria.registrar({ accion: "usuarios.modificado", entidad: "usuarios", id_entidad: id, fid_organizaciones: datos.fid_organizaciones, fid_usuarios: idActor, peticion: contexto, metadatos: { usuario: datos.usuario, roles: datos.fid_roles, permisos } }, tx);
       });
     } catch (error) { this.conflicto(error); }
   }
@@ -284,6 +481,7 @@ export class FuenteDatosUsuariosPrisma {
       await tx.$executeRaw`UPDATE seguridad.usuarios SET estado = 0, eliminado_en = CURRENT_TIMESTAMP, eliminado_por = ${idActor}::uuid, updated_at = CURRENT_TIMESTAMP, updated_by = ${idActor} WHERE id_usuarios = ${id}::uuid`;
       await tx.personas_correos.updateMany({ where: { fid_personas: usuario.fid_personas, estado: 1 }, data: { estado: 0, updated_by: idActor } });
       await tx.usuarios_roles.updateMany({ where: { fid_usuarios: id, estado: 1 }, data: { estado: 0, updated_by: idActor } });
+      await tx.usuarios_permisos.updateMany({ where: { fid_usuarios: id, estado: 1 }, data: { estado: 0, updated_by: idActor } });
       await this.revocarSesiones(tx, id, idActor);
       await this.auditoria.registrar({ accion: "usuarios.eliminado", entidad: "usuarios", id_entidad: id, fid_organizaciones: usuario.fid_organizaciones, fid_usuarios: idActor, peticion: contexto, metadatos: { usuario: usuario.usuario } }, tx);
     });
@@ -308,8 +506,9 @@ export class FuenteDatosUsuariosPrisma {
       select: {
         id_usuarios: true, fid_organizaciones: true, usuario: true, estado: true, estado_cuenta: true, created_at: true,
         persona: { select: { nombres: true, apellido_paterno: true, apellido_materno: true, foto_url: true, correos: { where: { estado: 1 }, orderBy: { created_at: "asc" }, take: 1, select: { correo: true } } } },
-        organizacion: { select: { nombre: true, slug: true } },
-        usuarios_roles: { where: { estado: 1, rol: { estado: 1, eliminado_en: null } }, select: { rol: { select: { id_roles: true, nombre: true, codigo: true, icono: true } } } },
+        organizacion: { select: { nombre: true, slug: true, plan: { select: { planes_modulos: { where: { estado: 1 }, select: { fid_modulos: true } } } } } },
+        usuarios_roles: { where: { estado: 1, rol: { estado: 1, eliminado_en: null } }, select: { rol: { select: { id_roles: true, nombre: true, codigo: true, icono: true, roles_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, permiso: { select: { fid_modulos: true } } } } } } } },
+        usuarios_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, efecto: true, permiso: { select: { fid_modulos: true } } } },
       },
     });
     return {
@@ -317,20 +516,74 @@ export class FuenteDatosUsuariosPrisma {
         id_usuarios: item.id_usuarios, fid_organizaciones: item.fid_organizaciones, usuario: item.usuario,
         nombres: item.persona.nombres, apellido_paterno: item.persona.apellido_paterno, apellido_materno: item.persona.apellido_materno,
         correo: item.persona.correos[0]?.correo ?? null, foto_version: item.persona.foto_url?.split("/").at(-1) ?? null, estado: item.estado, estado_cuenta: item.estado_cuenta, created_at: item.created_at,
-        empresa: item.organizacion, roles: item.usuarios_roles.map(({ rol }) => rol),
+        empresa: { nombre: item.organizacion.nombre, slug: item.organizacion.slug },
+        roles: item.usuarios_roles.map(({ rol }) => ({ id_roles: rol.id_roles, nombre: rol.nombre, codigo: rol.codigo, icono: rol.icono })),
+        permisos: this.permisosEfectivos(item),
       })), total: usuarios.length,
     };
   }
 
-  async opcionesDeEmpresa(): Promise<OpcionesUsuario> {
-    const roles = await this.prisma.roles.findMany({
-      where: { estado: 1, eliminado_en: null, NOT: { codigo: "SUPERADMIN" } },
+  async opcionesDeEmpresa(empresaId: string): Promise<OpcionesUsuario> {
+    const [organizacion, roles] = await Promise.all([
+      this.prisma.organizaciones.findFirst({
+        where: { id_organizaciones: empresaId, estado: 1, eliminado_en: null },
+        select: { fid_planes: true },
+      }),
+      this.prisma.roles.findMany({
+      where: { estado: 1, eliminado_en: null, asignable_por_empresa: true },
       orderBy: [{ nombre: "asc" }],
-      select: { id_roles: true, nombre: true, codigo: true, icono: true },
+      select: {
+        id_roles: true,
+        nombre: true,
+        codigo: true,
+        icono: true,
+        roles_permisos: {
+          where: { estado: 1, permiso: { estado: 1 } },
+          select: { fid_permisos: true },
+        },
+      },
+      }),
+    ]);
+    if (!organizacion) throw new BadRequestException("users.companyUnavailable");
+    const modulos = await this.prisma.modulos.findMany({
+      where: {
+        estado: 1,
+        planes_modulos: { some: { fid_planes: organizacion.fid_planes, estado: 1 } },
+        permisos: { some: { estado: 1 } },
+      },
+      orderBy: [{ orden: "asc" }, { nombre: "asc" }],
+      select: {
+        id_modulos: true,
+        codigo: true,
+        nombre: true,
+        descripcion: true,
+        acceso_usuario_obligatorio: true,
+        icono: true,
+        ruta: true,
+        fid_modulos_padre: true,
+        orden: true,
+        permisos: {
+          where: { estado: 1 },
+          orderBy: [{ accion: "asc" }],
+          select: {
+            id_permisos: true,
+            codigo: true,
+            accion: true,
+            descripcion: true,
+          },
+        },
+      },
     });
     return {
       empresas: [],
-      roles,
+      roles: roles.map(({ roles_permisos, ...rol }) => ({
+        ...rol,
+        permisos: roles_permisos
+          .map(({ fid_permisos }) => fid_permisos)
+          .filter((permiso) => modulos.some((modulo) => modulo.permisos.some(({ id_permisos }) => id_permisos === permiso))),
+      })),
+      modulos,
+      modulos_por_empresa: {},
     };
   }
 }

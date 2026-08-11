@@ -41,7 +41,7 @@ describe("PATCH /profile/password (e2e)", () => {
   const slug = exigirEntorno("OWNER_ORG_SLUG");
   const sufijo = randomUUID();
   const usuarioIngreso =
-    `P${sufijo.replaceAll("-", "").slice(0, 19)}`.toUpperCase();
+    `P${sufijo.replaceAll("-", "").slice(0, 9)}`.toUpperCase();
 
   beforeAll(async () => {
     const modulo: TestingModule = await Test.createTestingModule({

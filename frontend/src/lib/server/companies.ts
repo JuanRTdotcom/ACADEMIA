@@ -18,6 +18,9 @@ export type CompanySection =
   | "identity"
   | "communications"
   | "region"
+  | "services"
+  | "agenda"
+  | "fiscal"
   | "login-branding";
 
 export async function companyRequest(

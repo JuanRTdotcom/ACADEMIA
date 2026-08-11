@@ -20,7 +20,7 @@ describe("hobbies del perfil (e2e)", () => {
   let codigoFrecuencia = "";
   let cookies: string[] = [];
   const sufijo = randomUUID().replaceAll("-", "");
-  const usuarioIngreso = `H${sufijo.slice(0, 19)}`.toUpperCase();
+  const usuarioIngreso = `H${sufijo.slice(0, 9)}`.toUpperCase();
   const contrasenia = "Hobbies1!Pass";
   const slug = process.env.OWNER_ORG_SLUG!;
 

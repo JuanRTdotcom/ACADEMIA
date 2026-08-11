@@ -29,6 +29,7 @@ import type {
 } from "../../domain/entities/marca-empresa";
 import { versionMedioEmpresa } from "../../domain/entities/medio-empresa";
 import { AlmacenMediosEmpresaR2 } from "./company-media-r2.datasource";
+import { PROCEDIMIENTOS_VETERINARIOS_INICIALES } from "../../../comun/catalogos/procedimientos-veterinarios-iniciales";
 
 type ClientePrisma = Prisma.TransactionClient;
 
@@ -67,6 +68,20 @@ export class FuenteDatosEmpresasPrisma {
     return url.origin;
   }
 
+  private async regionalizacionPredeterminada(tx: ClientePrisma) {
+    const [idioma, zona, moneda] = await Promise.all([
+      tx.parametros.findUnique({ where: { codigo_grupo_codigo: { codigo_grupo: "idiomas", codigo: "es" } }, select: { id_parametros: true } }),
+      tx.zonas_horarias.findUnique({ where: { nombre_iana: "America/Lima" }, select: { id_zonas_horarias: true } }),
+      tx.parametros.findUnique({ where: { codigo_grupo_codigo: { codigo_grupo: "monedas", codigo: "PEN" } }, select: { id_parametros: true } }),
+    ]);
+    if (!idioma || !zona || !moneda) throw new BadRequestException("companies.invalidRegionalization");
+    return {
+      fid_parametros_idioma: idioma.id_parametros,
+      fid_zonas_horarias: zona.id_zonas_horarias,
+      fid_parametros_moneda: moneda.id_parametros,
+    };
+  }
+
   private horariosDesde(
     filas: Array<{
       dia_semana: number;
@@ -92,6 +107,12 @@ export class FuenteDatosEmpresasPrisma {
             hora_cierre: null,
           };
     });
+  }
+
+  private horariosAgendaDesde(
+    filas: Array<{ dia_semana: number; turno: number; cerrado: boolean; hora_apertura: string | null; hora_cierre: string | null }>,
+  ): SeccionesEmpresa["agenda"]["horarios"] {
+    return filas.map((fila) => ({ ...fila, turno: fila.turno ?? 1 }));
   }
 
   /** Durante la construcción de módulos solo exige una organización de sesión activa. */
@@ -203,6 +224,12 @@ export class FuenteDatosEmpresasPrisma {
         created_at: true,
         suscripcion_inicia_en: true,
         suscripcion_expira_en: true,
+        agenda_activa: true,
+        duracion_cita_estimada: true,
+        especies_atendidas: {
+          where: { estado: 1 },
+          select: { fid_parametros: true },
+        },
         perfil: {
           select: {
             estado: true,
@@ -272,12 +299,14 @@ export class FuenteDatosEmpresasPrisma {
         estado: true,
         eliminado_en: true,
         created_at: true,
+        especies_atendidas: { where: { estado: 1 }, select: { fid_parametros: true } },
         perfil: {
           select: {
             estado: true,
             razon_social: true,
             ruc_nif: true,
             direccion: true,
+            sin_sede_fisica: true,
             telefono: true,
             telefono_secundario: true,
             correo_contacto: true,
@@ -289,8 +318,20 @@ export class FuenteDatosEmpresasPrisma {
             youtube_url: true,
             linkedin_url: true,
             x_url: true,
-            idioma_por_defecto: true,
-            zona_horaria_por_defecto: true,
+            fid_parametros_idioma: true,
+            fid_zonas_horarias: true,
+            latitud: true,
+            longitud: true,
+            fid_parametros_moneda: true,
+            fid_parametros_tipo_persona_fiscal: true,
+            fid_parametros_tipo_documento_fiscal: true,
+            fiscal_numero_documento: true,
+            fiscal_razon_social: true,
+            fiscal_afecto_igv: true,
+            fid_parametros_responsabilidad_fiscal: true,
+            fiscal_telefono: true,
+            fiscal_correo: true,
+            fiscal_direccion: true,
             logo_url: true,
             escudo_url: true,
             escudo_oscuro_url: true,
@@ -435,10 +476,16 @@ export class FuenteDatosEmpresasPrisma {
         slug: true,
         suscripcion_inicia_en: true,
         suscripcion_expira_en: true,
+        agenda_activa: true,
+        duracion_cita_estimada: true,
         plan: {
           select: {
             nombre: true,
           },
+        },
+        especies_atendidas: {
+          where: { estado: 1 },
+          select: { fid_parametros: true },
         },
         perfil: {
           select: {
@@ -446,6 +493,7 @@ export class FuenteDatosEmpresasPrisma {
             razon_social: true,
             ruc_nif: true,
             direccion: true,
+            sin_sede_fisica: true,
             referencia: true,
             fid_admin_level_0: true,
             admin_level_3: { select: { codigo: true } },
@@ -481,8 +529,20 @@ export class FuenteDatosEmpresasPrisma {
             soporte_correo: true,
             soporte_telefono: true,
             soporte_whatsapp: true,
-            idioma_por_defecto: true,
-            zona_horaria_por_defecto: true,
+            fid_parametros_idioma: true,
+            fid_zonas_horarias: true,
+            latitud: true,
+            longitud: true,
+            fid_parametros_moneda: true,
+            fid_parametros_tipo_persona_fiscal: true,
+            fid_parametros_tipo_documento_fiscal: true,
+            fiscal_numero_documento: true,
+            fiscal_razon_social: true,
+            fiscal_afecto_igv: true,
+            fid_parametros_responsabilidad_fiscal: true,
+            fiscal_telefono: true,
+            fiscal_correo: true,
+            fiscal_direccion: true,
             login_usar_filtro_color: true,
             login_mostrar_etiqueta: true,
             login_mostrar_destacados: true,
@@ -513,6 +573,7 @@ export class FuenteDatosEmpresasPrisma {
           orderBy: { dia_semana: "asc" },
           select: {
             dia_semana: true,
+            turno: true,
             cerrado: true,
             hora_apertura: true,
             hora_cierre: true,
@@ -534,6 +595,7 @@ export class FuenteDatosEmpresasPrisma {
         suscripcion_expira_en: (empresa as any).suscripcion_expira_en ?? null,
       },
       contacto: {
+        sin_sede_fisica: perfil?.sin_sede_fisica ?? false,
         direccion: perfil?.direccion ?? "",
         referencia: perfil?.referencia ?? "",
         fid_admin_level_0: perfil?.fid_admin_level_0 ?? "",
@@ -542,6 +604,8 @@ export class FuenteDatosEmpresasPrisma {
         telefono_secundario: perfil?.telefono_secundario ?? "",
         correo_contacto: perfil?.correo_contacto ?? "",
         correo_contacto_secundario: perfil?.correo_contacto_secundario ?? "",
+        latitud: perfil?.latitud?.toString() ?? "",
+        longitud: perfil?.longitud?.toString() ?? "",
       },
       digital: {
         sitio_web: perfil?.sitio_web ?? "",
@@ -577,9 +641,28 @@ export class FuenteDatosEmpresasPrisma {
         horarios: this.horariosDesde(empresa.horarios_atencion),
       },
       region: {
-        idioma_por_defecto: perfil?.idioma_por_defecto ?? "es",
-        zona_horaria_por_defecto:
-          perfil?.zona_horaria_por_defecto ?? "America/Lima",
+        fid_parametros_idioma: perfil?.fid_parametros_idioma ?? "",
+        fid_zonas_horarias: perfil?.fid_zonas_horarias ?? "",
+        fid_parametros_moneda: perfil?.fid_parametros_moneda ?? "",
+      },
+      servicios: {
+        fid_parametros_especies: empresa.especies_atendidas.map((fila) => fila.fid_parametros),
+      },
+      agenda: {
+        agenda_activa: empresa.agenda_activa,
+        duracion_cita_estimada: empresa.duracion_cita_estimada,
+        horarios: this.horariosAgendaDesde(empresa.horarios_atencion),
+      },
+      fiscal: {
+        fid_parametros_tipo_persona_fiscal: perfil?.fid_parametros_tipo_persona_fiscal ?? null,
+        fid_parametros_tipo_documento_fiscal: perfil?.fid_parametros_tipo_documento_fiscal ?? null,
+        fiscal_numero_documento: perfil?.fiscal_numero_documento ?? "",
+        fiscal_razon_social: perfil?.fiscal_razon_social ?? "",
+        fiscal_afecto_igv: perfil?.fiscal_afecto_igv ?? false,
+        fid_parametros_responsabilidad_fiscal: perfil?.fid_parametros_responsabilidad_fiscal ?? null,
+        fiscal_telefono: perfil?.fiscal_telefono ?? "",
+        fiscal_correo: perfil?.fiscal_correo ?? "",
+        fiscal_direccion: perfil?.fiscal_direccion ?? "",
       },
       login: {
         login_usar_filtro_color: perfil?.login_usar_filtro_color ?? true,
@@ -633,12 +716,14 @@ export class FuenteDatosEmpresasPrisma {
                 nombre: true,
               },
             },
+            especies_atendidas: { where: { estado: 1 }, select: { fid_parametros: true } },
             perfil: {
               select: {
                 estado: true,
                 razon_social: true,
                 ruc_nif: true,
                 direccion: true,
+                sin_sede_fisica: true,
                 referencia: true,
                 fid_admin_level_0: true,
                 admin_level_3: { select: { codigo: true } },
@@ -674,8 +759,18 @@ export class FuenteDatosEmpresasPrisma {
                 soporte_correo: true,
                 soporte_telefono: true,
                 soporte_whatsapp: true,
-                idioma_por_defecto: true,
-                zona_horaria_por_defecto: true,
+                fid_parametros_idioma: true,
+                fid_zonas_horarias: true,
+                fid_parametros_moneda: true,
+                fid_parametros_tipo_persona_fiscal: true,
+                fid_parametros_tipo_documento_fiscal: true,
+                fid_parametros_responsabilidad_fiscal: true,
+                fiscal_numero_documento: true,
+                fiscal_razon_social: true,
+                fiscal_afecto_igv: true,
+                fiscal_telefono: true,
+                fiscal_correo: true,
+                fiscal_direccion: true,
                 login_usar_filtro_color: true,
                 login_mostrar_etiqueta: true,
                 login_mostrar_destacados: true,
@@ -717,12 +812,31 @@ export class FuenteDatosEmpresasPrisma {
 
         if (seccion === "region") {
           const regional = datos as SeccionesEmpresa["region"];
-          const zona = await tx.zonas_horarias.findUnique({
-            where: { nombre_iana: regional.zona_horaria_por_defecto },
-            select: { estado: true },
-          });
-          if (zona?.estado !== 1) {
-            throw new BadRequestException("companies.invalidTimezone");
+          const [idioma, zona, moneda] = await Promise.all([
+            tx.parametros.findFirst({ where: { id_parametros: regional.fid_parametros_idioma, codigo_grupo: "idiomas", estado: 1 }, select: { id_parametros: true } }),
+            tx.zonas_horarias.findFirst({ where: { id_zonas_horarias: regional.fid_zonas_horarias, estado: 1 }, select: { id_zonas_horarias: true } }),
+            tx.parametros.findFirst({ where: { id_parametros: regional.fid_parametros_moneda, codigo_grupo: "monedas", estado: 1 }, select: { id_parametros: true } }),
+          ]);
+          if (!idioma || !zona || !moneda) throw new BadRequestException("companies.invalidRegionalization");
+        }
+
+        if (seccion === "servicios") {
+          const especies = (datos as SeccionesEmpresa["servicios"]).fid_parametros_especies;
+          const catalogo = await tx.parametros.findMany({ where: { codigo_grupo: "especies_animales", id_parametros: { in: especies }, estado: 1 }, select: { id_parametros: true } });
+          if (catalogo.length !== especies.length) throw new BadRequestException("companies.invalidData");
+        }
+
+        if (seccion === "fiscal") {
+          const fiscal = datos as SeccionesEmpresa["fiscal"];
+          const referencias = [
+            [fiscal.fid_parametros_tipo_persona_fiscal, "tipos_persona_fiscal"],
+            [fiscal.fid_parametros_tipo_documento_fiscal, "tipos_documento"],
+            [fiscal.fid_parametros_responsabilidad_fiscal, "responsabilidades_fiscales"],
+          ] as const;
+          for (const [id, grupo] of referencias) {
+            if (!id) continue;
+            const parametro = await tx.parametros.findFirst({ where: { id_parametros: id, codigo_grupo: grupo, estado: 1 }, select: { id_parametros: true } });
+            if (!parametro) throw new BadRequestException("companies.invalidData");
           }
         }
 
@@ -768,6 +882,10 @@ export class FuenteDatosEmpresasPrisma {
         } | null = null;
         if (seccion === "contacto") {
           const contacto = datos as SeccionesEmpresa["contacto"];
+          if (contacto.sin_sede_fisica) {
+            if (contacto.direccion || contacto.referencia || contacto.latitud || contacto.longitud || contacto.fid_admin_level_0 || contacto.codigo_admin_level_3) throw new BadRequestException("companies.invalidLocation");
+            ubicacion = { fid_admin_level_0: null, fid_admin_level_3: null };
+          } else {
           const ambosVacios =
             !contacto.fid_admin_level_0 && !contacto.codigo_admin_level_3;
           if (
@@ -797,6 +915,7 @@ export class FuenteDatosEmpresasPrisma {
               fid_admin_level_0: contacto.fid_admin_level_0,
               fid_admin_level_3: nivel3.id_admin_level_3,
             };
+          }
           }
         }
 
@@ -841,6 +960,7 @@ export class FuenteDatosEmpresasPrisma {
                     admin_level_3: null,
                   }
                 : null,
+            especies_atendidas: actual.especies_atendidas,
             horarios_atencion: actual.horarios_atencion,
           },
           seccion,
@@ -862,6 +982,7 @@ export class FuenteDatosEmpresasPrisma {
               updated_by: idUsuarioActual,
             },
           });
+          const regionalizacion = await this.regionalizacionPredeterminada(tx);
           await tx.perfil_organizacion.upsert({
             where: { fid_organizaciones: idOrganizacion },
             update: {
@@ -872,6 +993,7 @@ export class FuenteDatosEmpresasPrisma {
             },
             create: {
               fid_organizaciones: idOrganizacion,
+              ...regionalizacion,
               estado: 1,
               razon_social: general.razon_social || null,
               ruc_nif: general.ruc_nif || null,
@@ -883,6 +1005,7 @@ export class FuenteDatosEmpresasPrisma {
           const datosPerfil =
             seccion === "contacto"
               ? {
+                  sin_sede_fisica: (datos as SeccionesEmpresa["contacto"]).sin_sede_fisica,
                   direccion: (datos as SeccionesEmpresa["contacto"]).direccion,
                   referencia: (datos as SeccionesEmpresa["contacto"])
                     .referencia,
@@ -894,8 +1017,12 @@ export class FuenteDatosEmpresasPrisma {
                   correo_contacto_secundario: (
                     datos as SeccionesEmpresa["contacto"]
                   ).correo_contacto_secundario,
+                  latitud: (datos as SeccionesEmpresa["contacto"]).latitud || null,
+                  longitud: (datos as SeccionesEmpresa["contacto"]).longitud || null,
                   ...ubicacion,
                 }
+              : seccion === "agenda" || seccion === "servicios"
+                ? {}
               : seccion === "comunicaciones"
                 ? {
                     soporte_correo: (
@@ -915,25 +1042,64 @@ export class FuenteDatosEmpresasPrisma {
               typeof valor === "string" ? valor || null : valor,
             ]),
           );
+          const regionalizacion = await this.regionalizacionPredeterminada(tx);
           await tx.perfil_organizacion.upsert({
             where: { fid_organizaciones: idOrganizacion },
             update: { ...perfil, estado: 1, updated_by: idUsuarioActual },
             create: {
               fid_organizaciones: idOrganizacion,
+              ...regionalizacion,
               ...perfil,
               estado: 1,
               created_by: idUsuarioActual,
               updated_by: idUsuarioActual,
             },
           });
+          if (seccion === "servicios") {
+            const especies = (datos as SeccionesEmpresa["servicios"]).fid_parametros_especies;
+            await tx.organizaciones_especies_atendidas.updateMany({
+              where: { fid_organizaciones: idOrganizacion },
+              data: { estado: 0, updated_by: idUsuarioActual },
+            });
+            for (const fidParametros of especies) {
+              await tx.organizaciones_especies_atendidas.upsert({
+                where: { fid_organizaciones_fid_parametros: { fid_organizaciones: idOrganizacion, fid_parametros: fidParametros } },
+                update: { estado: 1, updated_by: idUsuarioActual },
+                create: { fid_organizaciones: idOrganizacion, fid_parametros: fidParametros, estado: 1, created_by: idUsuarioActual, updated_by: idUsuarioActual },
+              });
+            }
+          }
+          if (seccion === "agenda") {
+            const agenda = datos as SeccionesEmpresa["agenda"];
+            const claves = new Set(agenda.horarios.map((h) => `${h.dia_semana}:${h.turno}`));
+            if (claves.size !== agenda.horarios.length || agenda.horarios.some((h) => !h.cerrado && (!h.hora_apertura || !h.hora_cierre || h.hora_apertura >= h.hora_cierre))) {
+              throw new BadRequestException("companies.invalidSchedule");
+            }
+            await tx.organizaciones.update({
+              where: { id_organizaciones: idOrganizacion },
+              data: { agenda_activa: agenda.agenda_activa, duracion_cita_estimada: agenda.duracion_cita_estimada, updated_by: idUsuarioActual },
+            });
+            await tx.horarios_atencion_organizacion.updateMany({
+              where: { fid_organizaciones: idOrganizacion },
+              data: { estado: 0, updated_by: idUsuarioActual },
+            });
+            for (const horario of agenda.horarios) {
+              await tx.horarios_atencion_organizacion.upsert({
+                where: { fid_organizaciones_dia_semana_turno: { fid_organizaciones: idOrganizacion, dia_semana: horario.dia_semana, turno: horario.turno } },
+                update: { cerrado: horario.cerrado, hora_apertura: horario.hora_apertura, hora_cierre: horario.hora_cierre, estado: 1, updated_by: idUsuarioActual },
+                create: { fid_organizaciones: idOrganizacion, ...horario, estado: 1, created_by: idUsuarioActual, updated_by: idUsuarioActual },
+              });
+            }
+          }
           if (seccion === "comunicaciones") {
             for (const horario of (datos as SeccionesEmpresa["comunicaciones"])
               .horarios) {
               await tx.horarios_atencion_organizacion.upsert({
                 where: {
-                  fid_organizaciones_dia_semana: {
+                  fid_organizaciones_dia_semana_turno: {
                     fid_organizaciones: idOrganizacion,
                     dia_semana: horario.dia_semana,
+                    turno: 1,
                   },
                 },
                 update: {
@@ -979,6 +1145,7 @@ export class FuenteDatosEmpresasPrisma {
       slug: string;
       plan?: { nombre: string } | null;
       perfil: Record<string, unknown> | null;
+      especies_atendidas?: Array<{ fid_parametros: string }>;
       horarios_atencion?: Array<{
         dia_semana: number;
         cerrado: boolean;
@@ -1004,6 +1171,7 @@ export class FuenteDatosEmpresasPrisma {
         plan_nombre: actual.plan?.nombre ?? "",
       },
       contacto: {
+        sin_sede_fisica: bandera("sin_sede_fisica", false),
         direccion: texto("direccion"),
         referencia: texto("referencia"),
         fid_admin_level_0: texto("fid_admin_level_0"),
@@ -1012,6 +1180,8 @@ export class FuenteDatosEmpresasPrisma {
         telefono_secundario: texto("telefono_secundario"),
         correo_contacto: texto("correo_contacto"),
         correo_contacto_secundario: texto("correo_contacto_secundario"),
+        latitud: texto("latitud"),
+        longitud: texto("longitud"),
       },
       digital: {
         sitio_web: texto("sitio_web"),
@@ -1051,11 +1221,28 @@ export class FuenteDatosEmpresasPrisma {
         horarios: this.horariosDesde(actual.horarios_atencion ?? []),
       },
       region: {
-        idioma_por_defecto: texto("idioma_por_defecto", "es"),
-        zona_horaria_por_defecto: texto(
-          "zona_horaria_por_defecto",
-          "America/Lima",
-        ),
+        fid_parametros_idioma: texto("fid_parametros_idioma"),
+        fid_zonas_horarias: texto("fid_zonas_horarias"),
+        fid_parametros_moneda: texto("fid_parametros_moneda"),
+      },
+      servicios: {
+        fid_parametros_especies: (actual.especies_atendidas ?? []).map((fila) => fila.fid_parametros),
+      },
+      agenda: {
+        agenda_activa: bandera("agenda_activa", true),
+        duracion_cita_estimada: entero("duracion_cita_estimada", 20),
+        horarios: this.horariosAgendaDesde((actual.horarios_atencion ?? []).map((h) => ({ ...h, turno: (h as { turno?: number }).turno ?? 1 }))),
+      },
+      fiscal: {
+        fid_parametros_tipo_persona_fiscal: texto("fid_parametros_tipo_persona_fiscal") || null,
+        fid_parametros_tipo_documento_fiscal: texto("fid_parametros_tipo_documento_fiscal") || null,
+        fiscal_numero_documento: texto("fiscal_numero_documento"),
+        fiscal_razon_social: texto("fiscal_razon_social"),
+        fiscal_afecto_igv: bandera("fiscal_afecto_igv", false),
+        fid_parametros_responsabilidad_fiscal: texto("fid_parametros_responsabilidad_fiscal") || null,
+        fiscal_telefono: texto("fiscal_telefono"),
+        fiscal_correo: texto("fiscal_correo"),
+        fiscal_direccion: texto("fiscal_direccion"),
       },
       login: {
         login_usar_filtro_color: bandera("login_usar_filtro_color", true),
@@ -1087,6 +1274,7 @@ export class FuenteDatosEmpresasPrisma {
     try {
       await this.prisma.$transaction(async (tx) => {
         await this.validarOrganizacionActiva(tx, idOrganizacionActual);
+        const regionalizacion = await this.regionalizacionPredeterminada(tx);
         const DEFAULT_PLAN_UUID = "40000000-0000-4000-8000-000000000003"; // Plan inicial / demo por defecto
         const organizacion = await tx.organizaciones.create({
           data: {
@@ -1100,6 +1288,7 @@ export class FuenteDatosEmpresasPrisma {
             updated_by: idUsuarioActual,
             perfil: {
               create: {
+                ...regionalizacion,
                 estado: 1,
                 razon_social: datos.razon_social,
                 ruc_nif: datos.ruc_nif,
@@ -1112,6 +1301,31 @@ export class FuenteDatosEmpresasPrisma {
           },
           select: { id_organizaciones: true },
         });
+
+        await tx.$executeRaw`
+          INSERT INTO nucleo.tipos_hospitalizacion
+            (fid_organizaciones, nombre, estado, created_by, updated_by)
+          VALUES
+            (${organizacion.id_organizaciones}::uuid, 'Hospitalización', 1, ${idUsuarioActual}, ${idUsuarioActual}),
+            (${organizacion.id_organizaciones}::uuid, 'Ambulatorio', 1, ${idUsuarioActual}, ${idUsuarioActual})
+        `;
+
+        await tx.procedimientos_veterinarios.createMany({
+          data: PROCEDIMIENTOS_VETERINARIOS_INICIALES.map((procedimiento) => ({
+            ...procedimiento,
+            fid_organizaciones: organizacion.id_organizaciones,
+            created_by: idUsuarioActual,
+            updated_by: idUsuarioActual,
+          })),
+        });
+
+        await tx.$executeRaw`
+          INSERT INTO nucleo.pruebas_laboratorio
+            (fid_organizaciones, fid_categorias_pruebas_laboratorio, nombre, estado, created_by, updated_by)
+          SELECT ${organizacion.id_organizaciones}::uuid, base.fid_categorias_pruebas_laboratorio, base.nombre, 1, ${idUsuarioActual}, ${idUsuarioActual}
+          FROM configuracion.catalogo_pruebas_laboratorio_base base
+          WHERE base.estado = 1
+        `;
 
         await this.auditoria.registrar(
           {
@@ -1200,11 +1414,13 @@ export class FuenteDatosEmpresasPrisma {
           SET updated_at = CURRENT_TIMESTAMP
           WHERE id_organizaciones = ${idOrganizacion}::uuid`;
         // upsert: contempla organizaciones antiguas sin fila de perfil.
+        const regionalizacion = await this.regionalizacionPredeterminada(tx);
         await tx.perfil_organizacion.upsert({
           where: { fid_organizaciones: idOrganizacion },
           update: { ...perfil, estado: 1, updated_by: idUsuarioActual },
           create: {
             fid_organizaciones: idOrganizacion,
+            ...regionalizacion,
             ...perfil,
             created_by: idUsuarioActual,
             updated_by: idUsuarioActual,
@@ -1738,11 +1954,13 @@ export class FuenteDatosEmpresasPrisma {
             anteriores.add(perfil?.[campoOscuro] ?? null);
             datos[campoOscuro] = nuevo.clave;
           }
+          const regionalizacion = await this.regionalizacionPredeterminada(tx);
           await tx.perfil_organizacion.upsert({
             where: { fid_organizaciones: idOrganizacion },
             update: datos,
             create: {
               fid_organizaciones: idOrganizacion,
+              ...regionalizacion,
               ...datos,
               created_by: idUsuarioActual,
             },
@@ -1924,6 +2142,7 @@ export class FuenteDatosEmpresasPrisma {
 
       anteriores.add(perfil?.[campoOscuro] ?? null);
       const clara = perfil?.[campoClaro] ?? null;
+      const regionalizacion = await this.regionalizacionPredeterminada(tx);
       await tx.perfil_organizacion.upsert({
         where: { fid_organizaciones: idOrganizacion },
         update: {
@@ -1940,6 +2159,7 @@ export class FuenteDatosEmpresasPrisma {
         },
         create: {
           fid_organizaciones: idOrganizacion,
+          ...regionalizacion,
           [campoMisma]: comando.usar_misma_imagen,
           [campoOscuro]: comando.usar_misma_imagen ? clara : null,
           ...(esEscudo && !clara
@@ -2065,6 +2285,7 @@ export class FuenteDatosEmpresasPrisma {
       });
       if (!usuario) throw new NotFoundException("companies.notFound");
 
+      const regionalizacion = await this.regionalizacionPredeterminada(tx);
       await tx.perfil_organizacion.upsert({
         where: { fid_organizaciones: idOrganizacion },
         update: {
@@ -2074,6 +2295,7 @@ export class FuenteDatosEmpresasPrisma {
         },
         create: {
           fid_organizaciones: idOrganizacion,
+          ...regionalizacion,
           login_usar_filtro_color: activo,
           estado: 1,
           created_by: idUsuarioActual,
@@ -2098,7 +2320,7 @@ export class FuenteDatosEmpresasPrisma {
 
   async obtenerCatalogosUbicacionActual(idOrganizacion: string) {
     await this.validarEmpresaActual(this.prisma, idOrganizacion);
-    const [paises, nivel1, nivel2, nivel3] = await Promise.all([
+    const [paises, nivel1, nivel2, nivel3, zonasHorarias, idiomas, monedas, tiposDocumento, especiesAnimales, tiposPersonaFiscal, responsabilidadesFiscales] = await Promise.all([
       this.prisma.admin_level_0.findMany({
         where: { estado: 1 },
         orderBy: { nombre_es: "asc" },
@@ -2147,6 +2369,13 @@ export class FuenteDatosEmpresasPrisma {
           nombre: true,
         },
       }),
+      this.prisma.zonas_horarias.findMany({ where: { estado: 1 }, orderBy: { nombre_iana: "asc" }, select: { id_zonas_horarias: true, nombre_iana: true } }),
+      this.prisma.parametros.findMany({ where: { codigo_grupo: "idiomas", estado: 1 }, orderBy: { orden: "asc" }, select: { id_parametros: true, codigo: true, etiqueta: true } }),
+      this.prisma.parametros.findMany({ where: { codigo_grupo: "monedas", estado: 1 }, orderBy: { orden: "asc" }, select: { id_parametros: true, codigo: true, etiqueta: true } }),
+      this.prisma.parametros.findMany({ where: { codigo_grupo: "tipos_documento", estado: 1 }, orderBy: { orden: "asc" }, select: { id_parametros: true, codigo: true, etiqueta: true } }),
+      this.prisma.parametros.findMany({ where: { codigo_grupo: "especies_animales", estado: 1 }, orderBy: { orden: "asc" }, select: { id_parametros: true, codigo: true, etiqueta: true } }),
+      this.prisma.parametros.findMany({ where: { codigo_grupo: "tipos_persona_fiscal", estado: 1 }, orderBy: { orden: "asc" }, select: { id_parametros: true, codigo: true, etiqueta: true } }),
+      this.prisma.parametros.findMany({ where: { codigo_grupo: "responsabilidades_fiscales", estado: 1 }, orderBy: { orden: "asc" }, select: { id_parametros: true, codigo: true, etiqueta: true } }),
     ]);
     return {
       admin_level_0: paises.map(({ nombre_es, ...pais }) => ({
@@ -2156,6 +2385,13 @@ export class FuenteDatosEmpresasPrisma {
       admin_level_1: nivel1,
       admin_level_2: nivel2,
       admin_level_3: nivel3,
+      zonas_horarias: zonasHorarias,
+      idiomas,
+      monedas,
+      tipos_documento: tiposDocumento,
+      especies_animales: especiesAnimales,
+      tipos_persona_fiscal: tiposPersonaFiscal,
+      responsabilidades_fiscales: responsabilidadesFiscales,
     };
   }
 

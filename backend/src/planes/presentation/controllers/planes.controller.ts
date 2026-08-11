@@ -17,7 +17,10 @@ import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/
 import { Permisos } from "../../../autenticacion/presentation/decorators/permisos.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
 import { FuenteDatosPlanesPrisma } from "../../data/datasources/planes-prisma.datasource";
-import { DtoGestionarPlan, DtoActualizarModulosPlan } from "../dto/gestionar-plan.dto";
+import {
+  DtoGestionarPlan,
+  DtoActualizarModulosPlan,
+} from "../dto/gestionar-plan.dto";
 
 const LIMITE_MUTACIONES = 20;
 

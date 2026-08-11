@@ -1,7 +1,6 @@
 import { Transform } from "class-transformer";
 import {
   IsDefined,
-  IsIn,
   IsOptional,
   IsString,
   Matches,
@@ -81,17 +80,6 @@ export class DtoGuardarEmpresa {
   @Matches(/^$|^https?:\/\/[^\s]+$/)
   @Transform(texto)
   sitio_web?: string;
-
-  @IsOptional()
-  @IsIn(["es", "en"])
-  idioma_por_defecto!: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  @Matches(/^$|^[A-Za-z0-9_+\-/]+$/)
-  @Transform(texto)
-  zona_horaria_por_defecto?: string;
 
   @IsOptional()
   @IsString()

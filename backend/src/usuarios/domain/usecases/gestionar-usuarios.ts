@@ -10,7 +10,7 @@ export class CasoUsoGestionarUsuarios {
   listarDeEmpresa(empresaId: string, busqueda: string) { return this.usuarios.listarDeEmpresa(empresaId, busqueda); }
   obtener(id: string, actor: string) { return this.usuarios.obtener(id, actor); }
   opciones() { return this.usuarios.opciones(); }
-  opcionesDeEmpresa() { return this.usuarios.opcionesDeEmpresa(); }
+  opcionesDeEmpresa(empresaId: string) { return this.usuarios.opcionesDeEmpresa(empresaId); }
   obtenerAvatar(id: string, actor: string) { return this.usuarios.obtenerAvatar(id, actor); }
   crear(datos: DatosUsuario, actor: string, contexto: ContextoSolicitud) { return this.usuarios.crear(datos, actor, contexto); }
   actualizar(id: string, datos: Omit<DatosUsuario, "contrasenia_temporal">, actor: string, contexto: ContextoSolicitud) { return this.usuarios.actualizar(id, datos, actor, contexto); }

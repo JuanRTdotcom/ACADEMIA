@@ -184,6 +184,12 @@ export class RepositorioPerfilDatos extends RepositorioPerfil {
     return this.fuenteDatos.cerrarOtraSesion(...argumentos);
   }
 
+  cerrarOtrasSesiones(
+    ...argumentos: Parameters<RepositorioPerfil["cerrarOtrasSesiones"]>
+  ) {
+    return this.fuenteDatos.cerrarOtrasSesiones(...argumentos);
+  }
+
   agregarCorreo(...argumentos: Parameters<RepositorioPerfil["agregarCorreo"]>) {
     return this.fuenteDatos.agregarCorreo(...argumentos);
   }

@@ -59,9 +59,9 @@ const avatarMaxBytes = requiredPositiveInteger(
   "AVATAR_MAX_BYTES",
   env.AVATAR_MAX_BYTES,
 );
-if (avatarMaxBytes !== 2 * 1024 * 1024) {
+if (avatarMaxBytes !== 3 * 1024 * 1024) {
   throw new Error(
-    "Environment variable AVATAR_MAX_BYTES must be exactly 2097152 (2 MB).",
+    "Environment variable AVATAR_MAX_BYTES must be exactly 3145728 (3 MB).",
   );
 }
 

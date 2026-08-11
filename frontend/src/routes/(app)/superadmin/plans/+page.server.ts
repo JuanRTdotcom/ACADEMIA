@@ -39,10 +39,14 @@ const text = (form: FormData, field: string) =>
     .replace(/\s+/g, " ");
 
 function planBody(form: FormData) {
+  const almacenamiento = text(form, "almacenamiento_gb");
   return {
     codigo: text(form, "codigo").toUpperCase(),
     nombre: text(form, "nombre"),
     descripcion: text(form, "descripcion"),
+    almacenamiento_max_bytes: almacenamiento
+      ? Number(almacenamiento) * 1024 ** 3
+      : null,
   };
 }
 
@@ -51,7 +55,11 @@ function validPlan(body: ReturnType<typeof planBody>) {
     CODE.test(body.codigo) &&
     body.nombre.length >= 2 &&
     body.nombre.length <= 100 &&
-    body.descripcion.length <= 250
+    body.descripcion.length <= 250 &&
+    (body.almacenamiento_max_bytes === null ||
+      (Number.isSafeInteger(body.almacenamiento_max_bytes) &&
+        body.almacenamiento_max_bytes >= 1024 ** 3 &&
+        body.almacenamiento_max_bytes % 1024 ** 3 === 0))
   );
 }
 

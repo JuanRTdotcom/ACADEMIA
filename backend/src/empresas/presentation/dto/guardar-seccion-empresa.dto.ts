@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsDefined,
   IsBoolean,
@@ -9,6 +10,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -71,6 +73,7 @@ export class DtoGuardarGeneralEmpresa {
 }
 
 export class DtoGuardarContactoEmpresa {
+  @IsOptional() @IsBoolean() sin_sede_fisica?: boolean;
   @IsDefined()
   @IsString()
   @MaxLength(200)
@@ -123,6 +126,11 @@ export class DtoGuardarContactoEmpresa {
   @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/)
   @Transform(minusculas)
   correo_contacto_secundario!: string;
+
+  @IsOptional() @IsString() @Matches(/^$|^-?(?:[1-8]?\d(?:\.\d{1,8})?|90(?:\.0{1,8})?)$/)
+  latitud?: string;
+  @IsOptional() @IsString() @Matches(/^$|^-?(?:1[0-7]\d|[1-9]?\d)(?:\.\d{1,8})?$/)
+  longitud?: string;
 }
 
 export class DtoGuardarDigitalEmpresa {
@@ -326,14 +334,35 @@ export class DtoGuardarComunicacionesEmpresa {
 }
 
 export class DtoGuardarRegionEmpresa {
-  @IsDefined()
-  @IsString()
-  @IsIn(["es", "en"])
-  idioma_por_defecto!: string;
+  @IsDefined() @IsUUID("4") fid_parametros_idioma!: string;
+  @IsDefined() @IsUUID("4") fid_zonas_horarias!: string;
+  @IsDefined() @IsUUID("4") fid_parametros_moneda!: string;
+}
 
-  @IsDefined()
-  @IsString()
-  @MaxLength(100)
-  @Matches(/^[A-Za-z0-9_+\-/]+$/)
-  zona_horaria_por_defecto!: string;
+export class DtoGuardarServiciosVeterinaria {
+  @IsDefined() @IsArray() @ArrayMaxSize(20) @ArrayUnique() @IsUUID("4", { each: true })
+  fid_parametros_especies!: string[];
+}
+
+export class DtoHorarioAgendaVeterinaria extends DtoHorarioAtencionEmpresa {
+  @IsDefined() @IsInt() @Min(1) @Max(3) turno!: number;
+}
+
+export class DtoGuardarAgendaVeterinaria {
+  @IsDefined() @IsBoolean() agenda_activa!: boolean;
+  @IsDefined() @Type(() => Number) @IsInt() @Min(5) @Max(480) duracion_cita_estimada!: number;
+  @IsDefined() @IsArray() @ArrayMaxSize(21) @ValidateNested({ each: true }) @Type(() => DtoHorarioAgendaVeterinaria)
+  horarios!: DtoHorarioAgendaVeterinaria[];
+}
+
+export class DtoGuardarFiscalVeterinaria {
+  @IsOptional() @IsUUID("4") fid_parametros_tipo_persona_fiscal!: string | null;
+  @IsOptional() @IsUUID("4") fid_parametros_tipo_documento_fiscal!: string | null;
+  @IsDefined() @IsString() @MaxLength(30) @Transform(mayusculas) fiscal_numero_documento!: string;
+  @IsDefined() @IsString() @MaxLength(150) @Transform(texto) fiscal_razon_social!: string;
+  @IsDefined() @IsBoolean() fiscal_afecto_igv!: boolean;
+  @IsOptional() @IsUUID("4") fid_parametros_responsabilidad_fiscal!: string | null;
+  @IsDefined() @IsString() @MaxLength(30) @Matches(/^$|^[+0-9()\-\s]+$/) @Transform(texto) fiscal_telefono!: string;
+  @IsDefined() @IsString() @MaxLength(120) @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/) @Transform(minusculas) fiscal_correo!: string;
+  @IsDefined() @IsString() @MaxLength(250) @Transform(texto) fiscal_direccion!: string;
 }

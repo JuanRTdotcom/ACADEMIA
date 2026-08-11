@@ -7,7 +7,7 @@ export abstract class RepositorioUsuarios {
   abstract listarDeEmpresa(empresaId: string, busqueda: string): Promise<{ usuarios: UsuarioListado[]; total: number }>;
   abstract obtener(id: string, actor: string): Promise<UsuarioListado>;
   abstract opciones(): Promise<OpcionesUsuario>;
-  abstract opcionesDeEmpresa(): Promise<OpcionesUsuario>;
+  abstract opcionesDeEmpresa(empresaId: string): Promise<OpcionesUsuario>;
   abstract obtenerAvatar(id: string, actor: string): Promise<AvatarPerfil>;
   abstract crear(datos: DatosUsuario, idActor: string, contexto: ContextoSolicitud): Promise<void>;
   abstract actualizar(id: string, datos: Omit<DatosUsuario, "contrasenia_temporal">, idActor: string, contexto: ContextoSolicitud): Promise<void>;

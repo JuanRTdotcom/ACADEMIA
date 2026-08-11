@@ -17,7 +17,7 @@ describe("estudios del perfil (e2e)", () => {
   let idOrganizacion = "";
   let cookies: string[] = [];
   const sufijo = randomUUID().replaceAll("-", "");
-  const usuarioIngreso = `E${sufijo.slice(0, 19)}`.toUpperCase();
+  const usuarioIngreso = `E${sufijo.slice(0, 9)}`.toUpperCase();
   const contrasenia = "Estudios1!Pass";
   const slug = process.env.OWNER_ORG_SLUG!;
 

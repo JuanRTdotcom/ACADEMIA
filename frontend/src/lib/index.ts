@@ -5,6 +5,7 @@ export { default as Badge } from "./components/Badge.svelte";
 export { default as Breadcrumb } from "./components/Breadcrumb.svelte";
 export { default as Input } from "./components/Input.svelte";
 export { default as Select } from "./components/Select.svelte";
+export { default as ColorSelect } from "./components/ColorSelect.svelte";
 export { default as Switch } from "./components/Switch.svelte";
 export { default as Icon } from "./components/Icon.svelte";
 export { default as Logo } from "./components/Logo.svelte";
@@ -19,6 +20,7 @@ export { default as CompanyBrandMediaGroup } from "./components/CompanyBrandMedi
 export { default as CompanyCoverGallery } from "./components/CompanyCoverGallery.svelte";
 export { default as BenefitIconSelect } from "./components/BenefitIconSelect.svelte";
 export { default as RoleIconSelect } from "./components/RoleIconSelect.svelte";
+export { default as UserPermissionsCard } from "./components/UserPermissionsCard.svelte";
 export { default as AdministrativeLocation } from "./components/AdministrativeLocation.svelte";
 export type { ConfirmationVariant } from "./components/ConfirmationDialog.svelte";
 export { default as StatCard } from "./components/StatCard.svelte";
@@ -32,4 +34,3 @@ export { parameterLabel } from "./parameter-label";
 export type { TranslatedParameter } from "./parameter-label";
 export { tienePermiso } from "./permissions-client";
 export { formatLocalDate, formatLocalDateTime } from "./date-utils";
-

@@ -24,7 +24,8 @@ function body(form: FormData) {
     apellido_paterno: formText(form, 'apellido_paterno'),
     apellido_materno: formText(form, 'apellido_materno'),
     correo: formText(form, 'correo').toLowerCase(),
-    fid_roles: form.getAll('fid_roles').map(String)
+    fid_roles: form.getAll('fid_roles').map(String),
+    fid_permisos: form.getAll('fid_permisos').map(String)
   };
 }
 
@@ -34,6 +35,7 @@ function validationError(data: ReturnType<typeof body>): string | null {
   if (![data.nombres, data.apellido_paterno, data.apellido_materno].every((value, index) => value.length >= 2 && value.length <= (index === 0 ? 50 : 30) && NAME.test(value))) return 'users.validation.name';
   if (data.correo.length > 254 || !EMAIL.test(data.correo)) return 'users.validation.email';
   if (data.fid_roles.length === 0 || data.fid_roles.length > 20 || new Set(data.fid_roles).size !== data.fid_roles.length || !data.fid_roles.every((id) => UUID.test(id))) return 'users.validation.roles';
+  if (data.fid_permisos.length > 500 || new Set(data.fid_permisos).size !== data.fid_permisos.length || !data.fid_permisos.every((id) => UUID.test(id))) return 'users.validation.permissions';
   return null;
 }
 

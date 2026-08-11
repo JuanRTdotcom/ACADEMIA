@@ -30,7 +30,10 @@ const VARIABLES_ENTERAS = [
   "REFRESH_SESSION_RATE_WINDOW_SECONDS",
   "LOGIN_MAX_INTENTOS", // intentos de contraseña fallidos antes de bloquear la cuenta
   "LOGIN_BLOQUEO_MINUTOS", // minutos que dura el bloqueo tras alcanzar el límite
-  "AVATAR_MAX_BYTES", // máximo aceptado antes de procesar el avatar
+  "AVATAR_MAX_BYTES", // máximo aceptado antes de procesar avatar o foto de mascota
+  "ATTENTION_ATTACHMENT_MAX_BYTES", // máximo por archivo adjunto de una atención
+  "ATTENTION_ATTACHMENT_MAX_FILES", // máximo de archivos por registro de atención
+  "ATTENTION_ATTACHMENT_CACHE_TTL_SECONDS", // caché privada del adjunto clínico inmutable
   "AVATAR_CACHE_TTL_SECONDS", // caché privada de cada versión inmutable del avatar
   "COMPANY_MEDIA_MAX_BYTES", // máximo del original antes de procesar identidad/portadas
   "PROFILE_MAX_EMAILS", // tope de correos activos por persona
@@ -141,9 +144,34 @@ export function validarEntorno(
   }
 
   const maximoAvatarBytes = exigirEntero(configuracion, "AVATAR_MAX_BYTES");
-  if (maximoAvatarBytes !== 2 * 1024 * 1024) {
+  if (maximoAvatarBytes !== 3 * 1024 * 1024) {
     throw new Error(
-      "La variable AVATAR_MAX_BYTES debe ser exactamente 2097152 (2 MB)",
+      "La variable AVATAR_MAX_BYTES debe ser exactamente 3145728 (3 MB)",
+    );
+  }
+  const maximoAdjuntoAtencion = exigirEntero(
+    configuracion,
+    "ATTENTION_ATTACHMENT_MAX_BYTES",
+  );
+  if (maximoAdjuntoAtencion !== 10 * 1024 * 1024) {
+    throw new Error(
+      "ATTENTION_ATTACHMENT_MAX_BYTES debe ser exactamente 10485760 (10 MB)",
+    );
+  }
+  const maximoArchivosAtencion = exigirEntero(
+    configuracion,
+    "ATTENTION_ATTACHMENT_MAX_FILES",
+  );
+  if (maximoArchivosAtencion !== 10) {
+    throw new Error("ATTENTION_ATTACHMENT_MAX_FILES debe ser exactamente 10");
+  }
+  const ttlCacheAdjuntoAtencion = exigirEntero(
+    configuracion,
+    "ATTENTION_ATTACHMENT_CACHE_TTL_SECONDS",
+  );
+  if (ttlCacheAdjuntoAtencion > 86_400) {
+    throw new Error(
+      "ATTENTION_ATTACHMENT_CACHE_TTL_SECONDS no puede superar 86400 segundos",
     );
   }
   const ttlCacheAvatar = exigirEntero(
@@ -257,6 +285,9 @@ export function validarEntorno(
     UPLOADS_DIRECTORY: exigirTexto(configuracion, "UPLOADS_DIRECTORY"),
     OWNER_ORG_SLUG: exigirTexto(configuracion, "OWNER_ORG_SLUG").toLowerCase(),
     AVATAR_MAX_BYTES: maximoAvatarBytes,
+    ATTENTION_ATTACHMENT_MAX_BYTES: maximoAdjuntoAtencion,
+    ATTENTION_ATTACHMENT_MAX_FILES: maximoArchivosAtencion,
+    ATTENTION_ATTACHMENT_CACHE_TTL_SECONDS: ttlCacheAdjuntoAtencion,
     AVATAR_CACHE_TTL_SECONDS: ttlCacheAvatar,
     COMPANY_MEDIA_MAX_BYTES: maximoMedioEmpresaBytes,
     STORAGE_PROVIDER: proveedorAlmacenamiento,

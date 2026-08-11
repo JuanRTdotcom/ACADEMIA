@@ -12,6 +12,7 @@ import {
 // El backend toma fid_organizaciones del usuario autenticado.
 
 interface Contact {
+  sin_sede_fisica: boolean;
   direccion: string;
   referencia: string;
   fid_admin_level_0: string;
@@ -20,6 +21,8 @@ interface Contact {
   telefono_secundario: string;
   correo_contacto: string;
   correo_contacto_secundario: string;
+  latitud: string;
+  longitud: string;
 }
 const PHONE = /^$|^[+0-9()\-\s]+$/;
 const EMAIL = /^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -42,6 +45,7 @@ export const actions: Actions = {
   default: async (event) => {
     const form = await event.request.formData();
     const body = {
+      sin_sede_fisica: form.get("sin_sede_fisica") === "true",
       direccion: formText(form, "direccion"),
       referencia: formText(form, "referencia"),
       fid_admin_level_0: formText(form, "fid_admin_level_0"),
@@ -53,11 +57,14 @@ export const actions: Actions = {
         form,
         "correo_contacto_secundario",
       ).toLowerCase(),
+      latitud: formText(form, "latitud"),
+      longitud: formText(form, "longitud"),
     };
-    const locationComplete =
-      (!body.fid_admin_level_0 && !body.codigo_admin_level_3) ||
+    const locationComplete = body.sin_sede_fisica
+      ? !body.direccion && !body.referencia && !body.fid_admin_level_0 && !body.codigo_admin_level_3 && !body.latitud && !body.longitud
+      : ((!body.fid_admin_level_0 && !body.codigo_admin_level_3) ||
       (UUID.test(body.fid_admin_level_0) &&
-        /^[A-Za-z0-9.-]{1,20}$/.test(body.codigo_admin_level_3));
+        /^[A-Za-z0-9.-]{1,20}$/.test(body.codigo_admin_level_3)));
     if (
       body.direccion.length > 200 ||
       body.referencia.length > 200 ||
@@ -70,6 +77,8 @@ export const actions: Actions = {
       !EMAIL.test(body.correo_contacto) ||
       body.correo_contacto_secundario.length > 120 ||
       !EMAIL.test(body.correo_contacto_secundario)
+      || !/^$|^-?(?:[1-8]?\d(?:\.\d{1,8})?|90(?:\.0{1,8})?)$/.test(body.latitud)
+      || !/^$|^-?(?:1[0-7]\d|[1-9]?\d)(?:\.\d{1,8})?$/.test(body.longitud)
     )
       return fail(400, { companyMessage: "companies.invalidData" });
     return saveCompanySection(event, "contact", body);

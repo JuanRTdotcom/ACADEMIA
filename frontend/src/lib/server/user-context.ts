@@ -32,6 +32,7 @@ export interface UserContext {
   organizacion: { slug: string; nombre: string };
   roles: { codigo: string; nombre: string }[];
   permisos: string[];
+  modulos: { codigo: string; nombre: string; icono: string | null; ruta: string | null }[];
   preferencias: UserPreferences;
   seguridad: { segundo_factor_habilitado: boolean };
   acciones_requeridas: ResumenAccionesRequeridas;
@@ -54,6 +55,7 @@ export function parseUserContext(value: unknown): UserContext {
   const requiredActions = data?.acciones_requeridas;
   const roles = data?.roles;
   const permissions = data?.permisos;
+  const modules = data?.modulos;
   const valid =
     data !== null &&
     typeof data.id_usuarios === "string" &&
@@ -96,6 +98,13 @@ export function parseUserContext(value: unknown): UserContext {
     permissions.every(
       (permission: unknown) => typeof permission === "string",
     ) &&
+    Array.isArray(modules) &&
+    modules.every((module: unknown) => {
+      const item = asRecord(module);
+      return typeof item?.codigo === "string" && typeof item.nombre === "string" &&
+        (item.icono === null || typeof item.icono === "string") &&
+        (item.ruta === null || typeof item.ruta === "string");
+    }) &&
     (preferences?.tema === null || isTheme(preferences?.tema)) &&
     (preferences?.idioma === null || isLocale(preferences?.idioma)) &&
     typeof preferences?.menu_colapsado === "boolean" &&

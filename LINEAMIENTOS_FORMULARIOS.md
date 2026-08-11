@@ -1,5 +1,9 @@
 # Lineamientos de formularios
 
+## Alta rápida desde un selector
+
+Cuando un `select` permita crear una opción que todavía no existe en su catálogo, la acción `Agregar …` debe mostrarse en la misma fila del label, alineada a la derecha, con icono Lucide `plus` y color primario. Es un botón semántico accesible, pero visualmente se presenta como acción textual —sin caja, fondo ni borde— con hover subrayado y foco visible. El `select` permanece debajo y ocupa siempre todo el ancho disponible; no se reduce para colocar la acción a su lado. La acción solo se muestra cuando el usuario posee el permiso de creación correspondiente. Tras confirmar el alta, se reutilizan validación, loading, Sonner y auditoría, se incorpora la opción al catálogo, queda seleccionada y el formulario principal conserva sus valores.
+
 Estas reglas son obligatorias para formularios nuevos y para cualquier refactorización de formularios existentes.
 
 ## 1. Regla de autoridad
@@ -47,6 +51,7 @@ La comprobación del usuario activo debe hacerse nuevamente dentro de la operaci
 - Verificar correos, teléfonos, contraseñas, documentos, fechas y UUID.
 - Comprobar fechas civiles y reglas cronológicas con el reloj de PostgreSQL.
 - Validar códigos contra enum o tabla maestra activa; no aceptar códigos solo porque tengan el formato correcto.
+- En relaciones con maestros, el formulario envía el UUID del registro. El backend no acepta la etiqueta ni guarda el código como sustituto de la FK; además valida grupo y estado del maestro.
 - Validar relaciones y jerarquías completas: tenant, país, divisiones administrativas y demás padres.
 - Validar reglas entre campos, por ejemplo documento obligatorio salvo `sin_documento`.
 - Rechazar una mutación cuando el formulario no contiene cambios reales.
@@ -83,6 +88,14 @@ La comprobación del usuario activo debe hacerse nuevamente dentro de la operaci
 - Bloquear el botón durante el envío y mostrar progreso o spinner.
 - Manejar 400, 401, 403, 404, 409, 429 y 500.
 - No reiniciar ni reemplazar visualmente el formulario después de un guardado exitoso si los valores ya coinciden.
+
+### Iconografía obligatoria
+
+- Todo icono visible debe provenir del catálogo oficial de Lucide instalado en el proyecto (`@lucide/svelte`).
+- No dibujar SVG, `path`, emojis, formas CSS ni pictogramas propios para reemplazar un icono. Tampoco inventar nombres que no existan en Lucide.
+- Para un icono nuevo, importar el componente oficial o usar `LucideIcon` con un nombre comprobado en el catálogo. El componente liviano `Icon` solo puede reutilizar entradas que reproduzcan un icono oficial de Lucide.
+- Si Lucide no contiene el concepto exacto, usar el icono oficial semánticamente más cercano o texto; no crear uno nuevo.
+- Logotipos, marcas y miniaturas de formatos aprobadas como recursos del proyecto se consideran imágenes de contenido, no iconos de interfaz. Nunca deben sustituir iconos de botones, acciones o controles, que continúan siendo exclusivamente Lucide.
 
 ## 9. Auditoría
 

@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Param,
@@ -20,6 +21,7 @@ import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/tipos";
 import { UsuarioActual } from "../../../autenticacion/presentation/decorators/usuario-actual.decorador";
+import { Permisos } from "../../../autenticacion/presentation/decorators/permisos.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
 import type {
   SeccionEmpresa,
@@ -32,12 +34,16 @@ import type {
 import { CasoUsoGestionarEmpresaActual } from "../../domain/usecases/gestionar-empresa-actual";
 import {
   DtoActualizarFiltroColorLoginEmpresa,
+  DtoGuardarGeneralEmpresa,
   DtoGuardarComunicacionesEmpresa,
   DtoGuardarContactoEmpresa,
   DtoGuardarDigitalEmpresa,
   DtoGuardarIdentidadEmpresa,
   DtoGuardarLoginEmpresa,
   DtoGuardarRegionEmpresa,
+  DtoGuardarServiciosVeterinaria,
+  DtoGuardarAgendaVeterinaria,
+  DtoGuardarFiscalVeterinaria,
 } from "../dto/guardar-seccion-empresa.dto";
 import { InterceptorErroresMediosEmpresa } from "../interceptors/interceptor-errores-medios-empresa";
 import { DtoGuardarMedioEmpresa } from "../dto/guardar-medio-empresa.dto";
@@ -51,13 +57,34 @@ const SECCIONES: Readonly<Record<string, SeccionEmpresa>> = {
   identity: "identidad",
   communications: "comunicaciones",
   region: "region",
+  services: "servicios",
+  agenda: "agenda",
+  fiscal: "fiscal",
   "login-branding": "login",
+};
+const PERMISOS_LECTURA_SECCION: Readonly<Record<SeccionEmpresa, string>> = {
+  general: "administrator.company.general.read",
+  contacto: "administrator.company.contact.read",
+  digital: "administrator.company.digital_presence.read",
+  identidad: "administrator.company.identity.read",
+  comunicaciones: "administrator.company.communications.read",
+  region: "administrator.company.region.read",
+  servicios: "administrator.company.services.read",
+  agenda: "administrator.company.agenda.read",
+  fiscal: "administrator.company.fiscal.read",
+  login: "administrator.company.login_branding.read",
 };
 
 /** Configuración del tenant obtenido exclusivamente desde la sesión. */
 @Controller("company/current")
 export class ControladorEmpresaActual {
   constructor(private empresa: CasoUsoGestionarEmpresaActual) {}
+
+  private exigirPermiso(usuario: UsuarioAutenticado, permiso: string) {
+    if (!usuario.permisos.includes(permiso)) {
+      throw new ForbiddenException("auth.noPermission");
+    }
+  }
 
   private tipoMedio(tipo: string): TipoMedioEmpresa {
     if (
@@ -84,6 +111,20 @@ export class ControladorEmpresaActual {
   }
 
   @Get("summary")
+  @Permisos(
+    "administrator.company.general.read",
+    "administrator.company.contact.read",
+    "administrator.company.region.read",
+    "administrator.company.services.read",
+    "administrator.company.agenda.read",
+    "administrator.company.fiscal.read",
+    "administrator.company.digital_presence.read",
+    "administrator.company.identity.read",
+    "administrator.company.login_branding.read",
+    "administrator.company.communications.read",
+    "administrator.company.region.read",
+    "administrator.company.subscription.read",
+  )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   resumen(@UsuarioActual() usuario: UsuarioAutenticado) {
     return this.empresa.resumen(usuario.fid_organizaciones);
@@ -97,16 +138,38 @@ export class ControladorEmpresaActual {
   ) {
     const seccion = SECCIONES[section];
     if (!seccion) throw new BadRequestException("companies.invalidSection");
+    this.exigirPermiso(usuario, PERMISOS_LECTURA_SECCION[seccion]);
     return this.empresa.seccion(usuario.fid_organizaciones, seccion);
   }
 
   @Get("branding")
+  @Permisos(
+    "administrator.company.identity.read",
+    "administrator.company.login_branding.read",
+  )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  marca(@UsuarioActual() usuario: UsuarioAutenticado) {
-    return this.empresa.marca(usuario.fid_organizaciones);
+  async marca(@UsuarioActual() usuario: UsuarioAutenticado) {
+    const marca = await this.empresa.marca(usuario.fid_organizaciones);
+    if (!usuario.permisos.includes("administrator.company.identity.read")) {
+      marca.escudo_version = null;
+      marca.escudo_oscuro_version = null;
+      marca.imagotipo_version = null;
+      marca.imagotipo_oscuro_version = null;
+      marca.portadas = [];
+    }
+    if (!usuario.permisos.includes("administrator.company.login_branding.read")) {
+      marca.login_escudo_version = null;
+      marca.login_escudo_oscuro_version = null;
+    }
+    return marca;
   }
 
   @Get("location-catalogs")
+  @Permisos(
+    "administrator.company.contact.read",
+    "administrator.company.services.read",
+    "administrator.company.fiscal.read",
+  )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   catalogosUbicacion(@UsuarioActual() usuario: UsuarioAutenticado) {
     return this.empresa.catalogosUbicacion(usuario.fid_organizaciones);
@@ -122,6 +185,12 @@ export class ControladorEmpresaActual {
     @Res({ passthrough: true }) respuesta: Response,
   ) {
     const medioTipo = this.tipoMedio(tipo);
+    this.exigirPermiso(
+      usuario,
+      medioTipo.startsWith("login_")
+        ? "administrator.company.login_branding.read"
+        : "administrator.company.identity.read",
+    );
     const uuid =
       "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
     const extensiones = medioTipo === "portada" ? "webp" : "(?:png|jpg|webp)";
@@ -153,6 +222,12 @@ export class ControladorEmpresaActual {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() peticion: Request,
   ) {
+    this.exigirPermiso(
+      usuario,
+      tipo === "login_escudo"
+        ? "administrator.company.login_branding.update"
+        : "administrator.company.identity.update",
+    );
     return this.empresa.compartirMedio(
       usuario.fid_organizaciones,
       {
@@ -178,6 +253,12 @@ export class ControladorEmpresaActual {
     if (!archivo) {
       throw new BadRequestException("companies.media.invalidRequest");
     }
+    this.exigirPermiso(
+      usuario,
+      tipo.startsWith("login_")
+        ? "administrator.company.login_branding.update"
+        : "administrator.company.identity.update",
+    );
     return this.empresa.guardarMedio(
       usuario.fid_organizaciones,
       {
@@ -211,6 +292,12 @@ export class ControladorEmpresaActual {
     ) {
       throw new BadRequestException("companies.media.invalidRequest");
     }
+    this.exigirPermiso(
+      usuario,
+      tipo.startsWith("login_")
+        ? "administrator.company.login_branding.update"
+        : "administrator.company.identity.update",
+    );
     return this.empresa.eliminarMedio(
       usuario.fid_organizaciones,
       { tipo: this.tipoMedio(tipo), id_portada: portada },
@@ -234,7 +321,19 @@ export class ControladorEmpresaActual {
     );
   }
 
+  @Patch("sections/general")
+  @Permisos("administrator.company.general.update")
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  actualizarGeneral(
+    @Body() dto: DtoGuardarGeneralEmpresa,
+    @UsuarioActual() u: UsuarioAutenticado,
+    @Req() r: Request,
+  ) {
+    return this.actualizar(u, "general", dto, r);
+  }
+
   @Patch("sections/contact")
+  @Permisos("administrator.company.contact.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
   actualizarContacto(
     @Body() dto: DtoGuardarContactoEmpresa,
@@ -245,6 +344,7 @@ export class ControladorEmpresaActual {
   }
 
   @Patch("sections/digital-presence")
+  @Permisos("administrator.company.digital_presence.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
   actualizarDigital(
     @Body() dto: DtoGuardarDigitalEmpresa,
@@ -255,6 +355,7 @@ export class ControladorEmpresaActual {
   }
 
   @Patch("sections/identity")
+  @Permisos("administrator.company.identity.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
   actualizarIdentidad(
     @Body() dto: DtoGuardarIdentidadEmpresa,
@@ -265,6 +366,7 @@ export class ControladorEmpresaActual {
   }
 
   @Patch("sections/communications")
+  @Permisos("administrator.company.communications.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
   actualizarComunicaciones(
     @Body() dto: DtoGuardarComunicacionesEmpresa,
@@ -275,6 +377,7 @@ export class ControladorEmpresaActual {
   }
 
   @Patch("sections/region")
+  @Permisos("administrator.company.region.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
   actualizarRegion(
     @Body() dto: DtoGuardarRegionEmpresa,
@@ -284,7 +387,29 @@ export class ControladorEmpresaActual {
     return this.actualizar(u, "region", dto, r);
   }
 
+  @Patch("sections/services")
+  @Permisos("administrator.company.services.update")
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  actualizarServicios(@Body() dto: DtoGuardarServiciosVeterinaria, @UsuarioActual() u: UsuarioAutenticado, @Req() r: Request) {
+    return this.actualizar(u, "servicios", dto, r);
+  }
+
+  @Patch("sections/agenda")
+  @Permisos("administrator.company.agenda.update")
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  actualizarAgenda(@Body() dto: DtoGuardarAgendaVeterinaria, @UsuarioActual() u: UsuarioAutenticado, @Req() r: Request) {
+    return this.actualizar(u, "agenda", dto, r);
+  }
+
+  @Patch("sections/fiscal")
+  @Permisos("administrator.company.fiscal.update")
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  actualizarFiscal(@Body() dto: DtoGuardarFiscalVeterinaria, @UsuarioActual() u: UsuarioAutenticado, @Req() r: Request) {
+    return this.actualizar(u, "fiscal", dto, r);
+  }
+
   @Patch("sections/login-branding")
+  @Permisos("administrator.company.login_branding.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
   actualizarLogin(
     @Body() dto: DtoGuardarLoginEmpresa,
@@ -295,6 +420,7 @@ export class ControladorEmpresaActual {
   }
 
   @Patch("login/color-filter")
+  @Permisos("administrator.company.login_branding.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
   @HttpCode(200)
   async actualizarFiltroColorLogin(

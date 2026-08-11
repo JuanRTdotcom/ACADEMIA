@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import { Badge, Breadcrumb, Card, Icon, Input, Avatar, formatLocalDate, formatLocalDateTime } from '$lib';
+	import { Badge, Breadcrumb, Card, Icon, Input, formatLocalDate, formatLocalDateTime } from '$lib';
 
 	let { data }: PageProps = $props();
 	let search = $state('');
@@ -83,7 +83,12 @@
 							<tr class="transition-colors hover:bg-surface/55">
 								<td class="px-5 py-4">
 									<div class="flex min-w-0 items-center gap-3.5">
-										<Avatar name={renewal.nombre_empresa} src={companyShield(renewal) || undefined} size={36} />
+										<span class="relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-hairline bg-primary-soft text-sm font-semibold text-primary">
+											{renewal.nombre_empresa.slice(0, 1).toUpperCase()}
+											{#if companyShield(renewal)}
+												<img src={companyShield(renewal) ?? ''} alt="" class="absolute inset-0 size-full bg-canvas object-contain p-1" loading="lazy" decoding="async" onerror={(event) => { (event.currentTarget as HTMLImageElement).hidden = true; }} />
+											{/if}
+										</span>
 										<div class="min-w-0">
 											<strong class="block truncate text-sm text-ink">{renewal.nombre_empresa}</strong>
 											<span class="mt-0.5 block font-mono text-xs text-stone">{renewal.slug_empresa}</span>

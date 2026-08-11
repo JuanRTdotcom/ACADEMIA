@@ -9,6 +9,9 @@ import {
   MaxLength,
   MinLength,
   IsUUID,
+  IsInt,
+  Min,
+  Max,
 } from "class-validator";
 
 const texto = ({ value }: { value: unknown }) =>
@@ -39,6 +42,12 @@ export class DtoGestionarPlan {
   @MaxLength(250)
   @Transform(texto)
   descripcion?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1024 * 1024)
+  @Max(Number.MAX_SAFE_INTEGER)
+  almacenamiento_max_bytes?: number | null;
 }
 
 export class DtoActualizarModulosPlan {

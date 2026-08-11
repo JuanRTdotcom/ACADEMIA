@@ -56,6 +56,7 @@ import { DtoSeleccionarCorreoUso } from "../dto/seleccionar-correo-uso.dto";
 import { DtoActualizarVerificacionCorreo } from "../dto/actualizar-verificacion-correo.dto";
 import { CasoUsoListarSesiones } from "../../domain/usecases/listar-sesiones";
 import { CasoUsoCerrarOtraSesion } from "../../domain/usecases/cerrar-otra-sesion";
+import { CasoUsoCerrarOtrasSesiones } from "../../domain/usecases/cerrar-otras-sesiones";
 import { CasoUsoActualizarSegundoFactor } from "../../domain/usecases/actualizar-segundo-factor";
 import { DtoActualizarSegundoFactor } from "../dto/actualizar-segundo-factor.dto";
 import { CasoUsoListarNacionalidades } from "../../domain/usecases/listar-nacionalidades";
@@ -121,6 +122,7 @@ export class ControladorPerfil {
     private casoActualizarVerificacionCorreo: CasoUsoActualizarVerificacionCorreo,
     private casoListarSesiones: CasoUsoListarSesiones,
     private casoCerrarOtraSesion: CasoUsoCerrarOtraSesion,
+    private casoCerrarOtrasSesiones: CasoUsoCerrarOtrasSesiones,
     private casoActualizarSegundoFactor: CasoUsoActualizarSegundoFactor,
     private casoListarNacionalidades: CasoUsoListarNacionalidades,
     private casoAgregarNacionalidad: CasoUsoAgregarNacionalidad,
@@ -580,6 +582,21 @@ export class ControladorPerfil {
       usuario.fid_organizaciones,
       usuario.sid,
       id_sesiones,
+      crearContextoSolicitud(peticion),
+    );
+  }
+
+  @Delete("sessions")
+  @HttpCode(200)
+  @Throttle({ default: { limit: LIMITE_MUTACIONES_PERFIL, ttl: 60_000 } })
+  cerrarOtrasSesiones(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() peticion: Request,
+  ) {
+    return this.casoCerrarOtrasSesiones.ejecutar(
+      usuario.sub,
+      usuario.fid_organizaciones,
+      usuario.sid,
       crearContextoSolicitud(peticion),
     );
   }

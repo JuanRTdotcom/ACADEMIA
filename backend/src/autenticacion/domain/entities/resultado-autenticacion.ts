@@ -8,6 +8,5 @@ export interface UsuarioPublico {
   usuario: string;
   fid_organizaciones: string;
   roles: string[];
-  permisos: string[];
   idioma: string;
 }

@@ -122,10 +122,9 @@
 
   <Card padding="none" class="overflow-hidden">
     <div class="overflow-x-auto">
-      <div class="min-w-[600px]">
-        <!-- Cabecera: bloque de marcado a la izquierda en móvil, a la derecha en escritorio (md:flex-row-reverse) -->
-        <div class="flex items-center border-b border-hairline text-[11px] font-semibold uppercase tracking-[0.04em] text-stone md:flex-row-reverse">
-          <div class="flex w-96 shrink-0">
+      <div class="min-w-[760px]">
+        <div class="flex items-center border-b border-hairline text-[11px] font-semibold uppercase tracking-[0.04em] text-stone">
+          <div class="order-1 flex w-96 shrink-0 divide-x divide-hairline md:order-2">
             <div class="w-16 px-2 py-2 text-center">{i18n.t('permissions.all')}</div>
             <div class="w-16 px-2 py-2 text-center">{i18n.t('permissions.actions.read')}</div>
             <div class="w-16 px-2 py-2 text-center">{i18n.t('permissions.actions.create')}</div>
@@ -133,31 +132,31 @@
             <div class="w-16 px-2 py-2 text-center">{i18n.t('permissions.actions.delete')}</div>
             <div class="w-16 px-2 py-2 text-center">{i18n.t('permissions.actions.export')}</div>
           </div>
-          <div class="flex-1 min-w-0 border-l border-hairline px-3 py-2 md:border-l-0 md:border-r">{i18n.t('permissions.module')}</div>
+          <div class="order-2 flex-1 min-w-0 border-l border-hairline px-5 py-2 md:order-1 md:border-l-0 md:border-r">{i18n.t('permissions.module')}</div>
         </div>
         <div class="divide-y divide-hairline">
           {#each groups as group (group.key)}
             {@const groupIds = idsOf(group.modules)}
-            <div class="flex items-center bg-surface/60 md:flex-row-reverse">
-              <div class="flex w-96 shrink-0">
+            <div class="flex items-center border-b border-hairline bg-surface/60">
+              <div class="order-1 flex w-96 shrink-0 divide-x divide-hairline md:order-2">
                 <div class="w-16 px-2 py-1.5"><div class="flex justify-center"><Switch checked={allSelected(groupIds)} label={`${i18n.t('permissions.all')}: ${groupName(group.key)}`} onchange={(enabled) => toggleAll(groupIds, enabled)} /></div></div>
                 <div class="flex-1"></div>
               </div>
-              <div class="flex-1 min-w-0 border-l border-hairline px-3 py-1.5 md:border-l-0 md:border-r"><strong class="text-[13px] font-extrabold text-ink">{groupName(group.key)}</strong></div>
+              <div class="order-2 flex-1 min-w-0 border-l border-hairline px-5 py-2 md:order-1 md:border-l-0 md:border-r"><strong class="text-[13px] font-extrabold text-ink">{groupName(group.key)}</strong></div>
             </div>
             {#each group.subgroups as subgroup (`${group.key}:${subgroup.key}`)}
               {@const subgroupIds = idsOf(subgroup.modules)}
-              <div class="flex items-center md:flex-row-reverse">
-                <div class="flex w-96 shrink-0">
+              <div class="flex items-center border-b border-hairline bg-surface-soft/50">
+                <div class="order-1 flex w-96 shrink-0 divide-x divide-hairline md:order-2">
                   <div class="w-16 px-2 py-1.5"><div class="flex justify-center"><Switch checked={allSelected(subgroupIds)} label={`${i18n.t('permissions.all')}: ${subgroupName(subgroup.key)}`} onchange={(enabled) => toggleAll(subgroupIds, enabled)} /></div></div>
                   <div class="flex-1"></div>
                 </div>
-                <div class="flex-1 min-w-0 border-l border-hairline px-3 py-1.5 md:border-l-0 md:border-r"><span class="pl-3 text-[13px] font-semibold text-charcoal">{subgroupName(subgroup.key)}</span></div>
+                <div class="order-2 flex-1 min-w-0 border-l border-hairline px-5 py-2 md:order-1 md:border-l-0 md:border-r"><span class="pl-4 text-[13px] font-semibold text-charcoal">{subgroupName(subgroup.key)}</span></div>
               </div>
               {#each subgroup.modules as module (module.id_modulos)}
                 {@const ids = module.permisos.map((permission) => permission.id_permisos)}
-                <div class="flex items-stretch transition-colors hover:bg-surface/50 md:flex-row-reverse">
-                  <div class="flex w-96 shrink-0">
+                <div class="flex items-stretch border-b border-hairline transition-colors hover:bg-surface/50">
+                  <div class="order-1 flex w-96 shrink-0 divide-x divide-hairline md:order-2">
                     <div class="flex w-16 items-center justify-center px-2 py-1.5"><Switch checked={allSelected(ids)} label={`${i18n.t('permissions.all')}: ${module.nombre}`} onchange={(enabled) => toggleAll(ids, enabled)} /></div>
                     {#each CANONICAL_ACTIONS as action (action)}
                       {@const actionPerms = getPermissionsForAction(module, action)}
@@ -181,7 +180,7 @@
                       </div>
                     {/each}
                   </div>
-                  <div class="flex flex-1 min-w-0 items-center border-l border-hairline px-3 py-1.5 md:border-l-0 md:border-r"><span class="block truncate pl-6 text-ink {allSelected(ids) ? 'font-bold' : 'font-normal'}">{module.nombre}</span></div>
+                  <div class="order-2 flex flex-1 min-w-0 items-center border-l border-hairline px-5 py-2 md:order-1 md:border-l-0 md:border-r"><span class="block truncate pl-6 text-ink {allSelected(ids) ? 'font-bold' : 'font-normal'}">{module.nombre}</span></div>
                 </div>
               {/each}
             {/each}

@@ -1,8 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../../../comun/prisma.service";
 import { ServicioAuditoria } from "../../../comun/auditoria/servicio-auditoria";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { PlanListado, DatosGestionarPlan, DatosActualizarModulosPlan } from "../../domain/entities/plan";
+import type {
+  PlanListado,
+  DatosGestionarPlan,
+  DatosActualizarModulosPlan,
+} from "../../domain/entities/plan";
 
 type Tx = Parameters<Parameters<PrismaService["$transaction"]>[0]>[0];
 
@@ -22,6 +30,7 @@ export class FuenteDatosPlanesPrisma {
         codigo: true,
         nombre: true,
         descripcion: true,
+        almacenamiento_max_bytes: true,
         estado: true,
         created_at: true,
         planes_modulos: {
@@ -44,6 +53,10 @@ export class FuenteDatosPlanesPrisma {
       codigo: f.codigo,
       nombre: f.nombre,
       descripcion: f.descripcion,
+      almacenamiento_max_bytes:
+        f.almacenamiento_max_bytes === null
+          ? null
+          : Number(f.almacenamiento_max_bytes),
       estado: f.estado,
       created_at: f.created_at,
       modulos: f.planes_modulos.map((pm) => pm.modulo),
@@ -58,6 +71,7 @@ export class FuenteDatosPlanesPrisma {
         codigo: true,
         nombre: true,
         descripcion: true,
+        almacenamiento_max_bytes: true,
         estado: true,
         created_at: true,
         planes_modulos: {
@@ -81,6 +95,10 @@ export class FuenteDatosPlanesPrisma {
       codigo: f.codigo,
       nombre: f.nombre,
       descripcion: f.descripcion,
+      almacenamiento_max_bytes:
+        f.almacenamiento_max_bytes === null
+          ? null
+          : Number(f.almacenamiento_max_bytes),
       estado: f.estado,
       created_at: f.created_at,
       modulos: f.planes_modulos.map((pm) => pm.modulo),
@@ -105,6 +123,11 @@ export class FuenteDatosPlanesPrisma {
           codigo: datos.codigo.toUpperCase(),
           nombre: datos.nombre,
           descripcion: datos.descripcion || null,
+          almacenamiento_max_bytes:
+            datos.almacenamiento_max_bytes === null ||
+            datos.almacenamiento_max_bytes === undefined
+              ? null
+              : BigInt(datos.almacenamiento_max_bytes),
           estado: 1,
           created_by: idActor,
           updated_by: idActor,
@@ -122,6 +145,7 @@ export class FuenteDatosPlanesPrisma {
           metadatos: {
             codigo: datos.codigo,
             nombre: datos.nombre,
+            almacenamiento_max_bytes: datos.almacenamiento_max_bytes ?? null,
           },
         },
         tx,
@@ -156,6 +180,11 @@ export class FuenteDatosPlanesPrisma {
           codigo: datos.codigo.toUpperCase(),
           nombre: datos.nombre,
           descripcion: datos.descripcion || null,
+          almacenamiento_max_bytes:
+            datos.almacenamiento_max_bytes === null ||
+            datos.almacenamiento_max_bytes === undefined
+              ? null
+              : BigInt(datos.almacenamiento_max_bytes),
           updated_by: idActor,
         },
       });
@@ -171,6 +200,7 @@ export class FuenteDatosPlanesPrisma {
           metadatos: {
             codigo: datos.codigo,
             nombre: datos.nombre,
+            almacenamiento_max_bytes: datos.almacenamiento_max_bytes ?? null,
           },
         },
         tx,
@@ -354,7 +384,9 @@ export class FuenteDatosPlanesPrisma {
     });
   }
 
-  async opcionesCreacion(): Promise<{ id_modulos: string; codigo: string; nombre: string }[]> {
+  async opcionesCreacion(): Promise<
+    { id_modulos: string; codigo: string; nombre: string }[]
+  > {
     return this.prisma.modulos.findMany({
       where: {
         estado: 1,

@@ -5,6 +5,9 @@ export const SECCIONES_EMPRESA = [
   "identidad",
   "comunicaciones",
   "region",
+  "servicios",
+  "agenda",
+  "fiscal",
   "login",
 ] as const;
 
@@ -25,12 +28,14 @@ export interface DatosGeneralesEmpresa {
   slug: string;
   razon_social: string;
   ruc_nif: string;
-  plan_nombre: string;
+  /** Dato informativo devuelto al leer; no forma parte de la edición. */
+  plan_nombre?: string;
   suscripcion_inicia_en?: Date | null;
   suscripcion_expira_en?: Date | null;
 }
 
 export interface DatosContactoEmpresa {
+	 sin_sede_fisica?: boolean;
   direccion: string;
   referencia: string;
   fid_admin_level_0: string;
@@ -39,6 +44,8 @@ export interface DatosContactoEmpresa {
   telefono_secundario: string;
   correo_contacto: string;
   correo_contacto_secundario: string;
+  latitud?: string;
+  longitud?: string;
 }
 
 export interface DatosDigitalesEmpresa {
@@ -126,11 +133,51 @@ export interface CatalogosUbicacionEmpresa {
     codigo: string;
     nombre: string;
   }>;
+  zonas_horarias: Array<{ id_zonas_horarias: string; nombre_iana: string }>;
+  idiomas: CatalogoParametroEmpresa[];
+  monedas: CatalogoParametroEmpresa[];
+  tipos_documento: CatalogoParametroEmpresa[];
+  especies_animales: CatalogoParametroEmpresa[];
+  tipos_persona_fiscal: CatalogoParametroEmpresa[];
+  responsabilidades_fiscales: CatalogoParametroEmpresa[];
+}
+
+export interface CatalogoParametroEmpresa {
+  id_parametros: string;
+  codigo: string;
+  etiqueta: string;
 }
 
 export interface DatosRegionEmpresa {
-  idioma_por_defecto: string;
-  zona_horaria_por_defecto: string;
+  fid_parametros_idioma: string;
+  fid_zonas_horarias: string;
+  fid_parametros_moneda: string;
+}
+
+export interface DatosServiciosVeterinaria {
+  fid_parametros_especies: string[];
+}
+
+export interface HorarioAgendaVeterinaria extends HorarioAtencionEmpresa {
+  turno: number;
+}
+
+export interface DatosAgendaVeterinaria {
+  agenda_activa: boolean;
+  duracion_cita_estimada: number;
+  horarios: HorarioAgendaVeterinaria[];
+}
+
+export interface DatosFiscalVeterinaria {
+  fid_parametros_tipo_persona_fiscal: string | null;
+  fid_parametros_tipo_documento_fiscal: string | null;
+  fiscal_numero_documento: string;
+  fiscal_razon_social: string;
+  fiscal_afecto_igv: boolean;
+  fid_parametros_responsabilidad_fiscal: string | null;
+  fiscal_telefono: string;
+  fiscal_correo: string;
+  fiscal_direccion: string;
 }
 
 export interface SeccionesEmpresa {
@@ -140,5 +187,8 @@ export interface SeccionesEmpresa {
   identidad: DatosIdentidadEmpresa;
   comunicaciones: DatosComunicacionesEmpresa;
   region: DatosRegionEmpresa;
+  servicios: DatosServiciosVeterinaria;
+  agenda: DatosAgendaVeterinaria;
+  fiscal: DatosFiscalVeterinaria;
   login: DatosLoginEmpresa;
 }

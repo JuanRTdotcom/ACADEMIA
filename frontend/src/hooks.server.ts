@@ -15,12 +15,18 @@ export const handle: Handle = async ({ event, resolve }) => {
       html.replace("%lang%", normalizeLocale(event.cookies.get(COOKIE))),
   });
 
-  // Las respuestas dinámicas siempre deben volver al servidor. La única excepción
-  // es el JPEG privado del avatar cuya versión ya validó /media/avatar. Así no
-  // sobrescribimos su caché segura; errores y respuestas sin versión siguen no-store.
+  // Las respuestas dinámicas siempre deben volver al servidor. Las rutas privadas
+  // versionadas conservan la caché segura validada por su endpoint; errores y
+  // respuestas sin versión siguen no-store.
   const esRutaImagenVersionada =
     event.url.pathname === "/media/avatar" ||
     /^\/media\/(tenant|company)\//.test(event.url.pathname) ||
+    /^\/media\/pets\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.jpg$/i.test(
+      event.url.pathname,
+    ) ||
+    /^\/media\/attentions\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/records\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/attachments\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(
+      event.url.pathname,
+    ) ||
     /^\/media\/users\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/avatar\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.jpg$/i.test(
       event.url.pathname,
     );

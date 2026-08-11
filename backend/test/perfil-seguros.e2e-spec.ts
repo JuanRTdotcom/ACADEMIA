@@ -18,7 +18,7 @@ describe("seguros del perfil (e2e)", () => {
   let codigoSeguro = "";
   let cookies: string[] = [];
   const sufijo = randomUUID().replaceAll("-", "");
-  const usuarioIngreso = `S${sufijo.slice(0, 19)}`.toUpperCase();
+  const usuarioIngreso = `S${sufijo.slice(0, 9)}`.toUpperCase();
   const contrasenia = "Insurance1!Pass";
   const slug = process.env.OWNER_ORG_SLUG!;
 

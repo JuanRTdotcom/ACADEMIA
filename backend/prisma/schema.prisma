@@ -42,24 +42,26 @@ model configuracion_usuario {
 }
 
 model modulos {
-  id_modulos             String                   @id @default(uuid()) @db.Uuid
-  codigo                 String                   @unique
-  nombre                 String
-  icono                  String?
-  ruta                   String?
-  fid_modulos_padre      String?                  @db.Uuid
-  requiere_permiso       String?
-  orden                  Int                      @default(0)
-  estado                 Int                      @default(1)
-  created_at             DateTime                 @default(now()) @db.Timestamptz(3)
-  created_by             String?
-  updated_at             DateTime                 @default(now()) @db.Timestamptz(3)
-  updated_by             String?
-  modulo_padre           modulos?                 @relation("arbol_modulos", fields: [fid_modulos_padre], references: [id_modulos])
-  modulos_hijos          modulos[]                @relation("arbol_modulos")
-  organizaciones_modulos organizaciones_modulos[]
-  planes_modulos         planes_modulos[]
-  permisos               permisos[]
+  id_modulos                 String                   @id @default(uuid()) @db.Uuid
+  codigo                     String                   @unique
+  nombre                     String
+  descripcion                String                   @db.VarChar(250)
+  acceso_usuario_obligatorio Boolean                  @default(false)
+  icono                      String?
+  ruta                       String?
+  fid_modulos_padre          String?                  @db.Uuid
+  requiere_permiso           String?
+  orden                      Int                      @default(0)
+  estado                     Int                      @default(1)
+  created_at                 DateTime                 @default(now()) @db.Timestamptz(3)
+  created_by                 String?
+  updated_at                 DateTime                 @default(now()) @db.Timestamptz(3)
+  updated_by                 String?
+  modulo_padre               modulos?                 @relation("arbol_modulos", fields: [fid_modulos_padre], references: [id_modulos])
+  modulos_hijos              modulos[]                @relation("arbol_modulos")
+  organizaciones_modulos     organizaciones_modulos[]
+  planes_modulos             planes_modulos[]
+  permisos                   permisos[]
 
   @@schema("configuracion")
 }
@@ -83,19 +85,20 @@ model organizaciones_modulos {
 }
 
 model planes {
-  id_planes      String           @id @default(uuid()) @db.Uuid
-  codigo         String           @unique
-  nombre         String
-  descripcion    String?
-  estado         Int              @default(1)
-  created_at     DateTime         @default(now()) @db.Timestamptz(3)
-  created_by     String?
-  updated_at     DateTime         @default(now()) @db.Timestamptz(3)
-  updated_by     String?
-  eliminado_en   DateTime?        @db.Timestamptz(3)
-  organizaciones organizaciones[]
-  planes_modulos planes_modulos[]
-  renovaciones   renovaciones[]
+  id_planes                String           @id @default(uuid()) @db.Uuid
+  codigo                   String           @unique
+  nombre                   String
+  descripcion              String?
+  almacenamiento_max_bytes BigInt?
+  estado                   Int              @default(1)
+  created_at               DateTime         @default(now()) @db.Timestamptz(3)
+  created_by               String?
+  updated_at               DateTime         @default(now()) @db.Timestamptz(3)
+  updated_by               String?
+  eliminado_en             DateTime?        @db.Timestamptz(3)
+  organizaciones           organizaciones[]
+  planes_modulos           planes_modulos[]
+  renovaciones             renovaciones[]
 
   @@schema("configuracion")
 }
@@ -134,17 +137,35 @@ model renovaciones {
 }
 
 model parametros {
-  id_parametros String                    @id @default(uuid()) @db.Uuid
-  codigo_grupo  String
-  codigo        String
-  etiqueta      String
-  orden         Int                       @default(0)
-  estado        Int                       @default(1)
-  created_at    DateTime                  @default(now()) @db.Timestamptz(3)
-  created_by    String?
-  updated_at    DateTime                  @default(now()) @db.Timestamptz(3)
-  updated_by    String?
-  traducciones  parametros_traducciones[]
+  id_parametros                           String                              @id @default(uuid()) @db.Uuid
+  codigo_grupo                            String
+  codigo                                  String
+  etiqueta                                String
+  orden                                   Int                                 @default(0)
+  estado                                  Int                                 @default(1)
+  created_at                              DateTime                            @default(now()) @db.Timestamptz(3)
+  created_by                              String?
+  updated_at                              DateTime                            @default(now()) @db.Timestamptz(3)
+  updated_by                              String?
+  color_hex                               String?                             @db.VarChar(7)
+  traducciones                            parametros_traducciones[]
+  perfiles_idioma                         perfil_organizacion[]               @relation("perfil_idioma")
+  perfiles_moneda                         perfil_organizacion[]               @relation("perfil_moneda")
+  perfiles_tipo_persona_fiscal            perfil_organizacion[]               @relation("perfil_tipo_persona_fiscal")
+  perfiles_tipo_documento_fiscal          perfil_organizacion[]               @relation("perfil_tipo_documento_fiscal")
+  perfiles_responsabilidad_fiscal         perfil_organizacion[]               @relation("perfil_responsabilidad_fiscal")
+  organizaciones_especies                 organizaciones_especies_atendidas[]
+  propietarios_tipo_documento             propietarios[]                      @relation("propietario_tipo_documento")
+  propietarios_como_conocio               propietarios[]                      @relation("propietario_como_conocio")
+  mascotas_genero                         mascotas[]                          @relation("mascota_genero")
+  mascotas_unidad_peso                    mascotas[]                          @relation("mascota_unidad_peso")
+  mascotas_talla                          mascotas[]                          @relation("mascota_talla")
+  mascotas_estado_reproductivo            mascotas[]                          @relation("mascota_estado_reproductivo")
+  mascotas_temperamento                   mascotas[]                          @relation("mascota_temperamento")
+  mascotas_color                          mascotas[]                          @relation("mascota_color")
+  atenciones_estado                       atenciones[]                        @relation("atencion_estado")
+  registros_tipo_desparasitacion          registros_atencion[]                @relation("registro_tipo_desparasitacion")
+  registros_motivo_salida_hospitalizacion registros_atencion[]                @relation("registro_motivo_salida_hospitalizacion")
 
   @@unique([codigo_grupo, codigo])
   @@schema("configuracion")
@@ -185,6 +206,7 @@ model admin_level_0 {
   personas_residencia     personas[]                @relation("persona_pais_residencia")
   personas_nacionalidades personas_nacionalidades[]
   perfiles_organizacion   perfil_organizacion[]     @relation("perfil_organizacion_pais")
+  propietarios            propietarios[]
   rangos_geo_ip           rangos_geo_ip[]
 
   @@schema("configuracion")
@@ -245,6 +267,7 @@ model admin_level_3 {
   personas_procedencia  personas[]            @relation("persona_admin_level_3_procedencia")
   personas_residencia   personas[]            @relation("persona_admin_level_3_residencia")
   perfiles_organizacion perfil_organizacion[] @relation("perfil_organizacion_admin_level_3")
+  propietarios          propietarios[]
 
   @@unique([fid_admin_level_1, codigo])
   @@index([fid_admin_level_1])
@@ -296,14 +319,15 @@ model acciones_requeridas_maestro {
 }
 
 model zonas_horarias {
-  id_zonas_horarias    String                 @id @default(uuid()) @db.Uuid
-  nombre_iana          String                 @unique
-  estado               Int                    @default(1)
-  created_at           DateTime               @default(now()) @db.Timestamptz(3)
-  created_by           String?
-  updated_at           DateTime               @default(now()) @db.Timestamptz(3)
-  updated_by           String?
-  preferencias_usuario preferencias_usuario[]
+  id_zonas_horarias     String                 @id @default(uuid()) @db.Uuid
+  nombre_iana           String                 @unique
+  estado                Int                    @default(1)
+  created_at            DateTime               @default(now()) @db.Timestamptz(3)
+  created_by            String?
+  updated_at            DateTime               @default(now()) @db.Timestamptz(3)
+  updated_by            String?
+  preferencias_usuario  preferencias_usuario[]
+  perfiles_organizacion perfil_organizacion[]
 
   @@schema("system")
 }
@@ -374,128 +398,684 @@ model eventos {
 }
 
 model organizaciones {
-  id_organizaciones          String                           @id @default(uuid()) @db.Uuid
-  slug                       String
-  nombre                     String
-  estado                     Int                              @default(1)
-  created_at                 DateTime                         @default(now()) @db.Timestamptz(3)
-  created_by                 String?
-  updated_at                 DateTime                         @default(now()) @db.Timestamptz(3)
-  updated_by                 String?
-  eliminado_en               DateTime?                        @db.Timestamptz(3)
-  eliminado_por              String?
-  fid_planes                 String                           @default("40000000-0000-4000-8000-000000000003") @db.Uuid
-  suscripcion_inicia_en      DateTime?                        @db.Timestamptz(3)
-  suscripcion_expira_en      DateTime?                        @db.Timestamptz(3)
-  configuracion_organizacion configuracion_organizacion[]
-  organizaciones_modulos     organizaciones_modulos[]
-  perfil                     perfil_organizacion?
-  imagenes_login             imagenes_login_organizacion[]
-  horarios_atencion          horarios_atencion_organizacion[]
-  personas                   personas[]
-  usuarios                   usuarios[]
-  acciones_requeridas        acciones_requeridas[]
-  renovaciones               renovaciones[]
-  plan                       planes                           @relation(fields: [fid_planes], references: [id_planes])
+  id_organizaciones            String                              @id @default(uuid()) @db.Uuid
+  slug                         String
+  nombre                       String
+  estado                       Int                                 @default(1)
+  created_at                   DateTime                            @default(now()) @db.Timestamptz(3)
+  created_by                   String?
+  updated_at                   DateTime                            @default(now()) @db.Timestamptz(3)
+  updated_by                   String?
+  eliminado_en                 DateTime?                           @db.Timestamptz(3)
+  eliminado_por                String?
+  fid_planes                   String                              @default("40000000-0000-4000-8000-000000000003") @db.Uuid
+  suscripcion_inicia_en        DateTime?                           @db.Timestamptz(3)
+  suscripcion_expira_en        DateTime?                           @db.Timestamptz(3)
+  duracion_cita_estimada       Int                                 @default(20)
+  agenda_activa                Boolean                             @default(true)
+  configuracion_organizacion   configuracion_organizacion[]
+  organizaciones_modulos       organizaciones_modulos[]
+  perfil                       perfil_organizacion?
+  imagenes_login               imagenes_login_organizacion[]
+  horarios_atencion            horarios_atencion_organizacion[]
+  personas                     personas[]
+  usuarios                     usuarios[]
+  acciones_requeridas          acciones_requeridas[]
+  renovaciones                 renovaciones[]
+  servicios_veterinaria        servicios_veterinaria[]
+  propietarios                 propietarios[]
+  mascotas                     mascotas[]
+  atenciones                   atenciones[]
+  registros_atencion           registros_atencion[]
+  motivos_consulta             motivos_consulta[]
+  vacunas                      vacunas[]
+  tipos_hospitalizacion        tipos_hospitalizacion[]
+  procedimientos_veterinarios  procedimientos_veterinarios[]
+  pruebas_laboratorio          pruebas_laboratorio[]
+  pruebas_registro_laboratorio pruebas_registro_laboratorio[]
+  adjuntos_registro_atencion   adjuntos_registro_atencion[]
+  archivos_organizacion        archivos_organizacion[]
+  especies_atendidas           organizaciones_especies_atendidas[]
+  plan                         planes                              @relation(fields: [fid_planes], references: [id_planes])
 
   @@index([eliminado_en, estado, nombre])
   @@schema("nucleo")
 }
 
+model archivos_organizacion {
+  id_archivos_organizacion String         @id @default(uuid()) @db.Uuid
+  fid_organizaciones       String         @db.Uuid
+  clave_objeto             String         @unique @db.VarChar(1024)
+  tipo_mime                String         @db.VarChar(120)
+  bytes                    BigInt
+  estado                   Int            @default(2)
+  created_at               DateTime       @default(now()) @db.Timestamptz(3)
+  created_by               String?
+  updated_at               DateTime       @default(now()) @db.Timestamptz(3)
+  updated_by               String?
+  eliminado_en             DateTime?      @db.Timestamptz(3)
+  eliminado_por            String?
+  organizacion             organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+
+  @@index([fid_organizaciones, estado])
+  @@schema("nucleo")
+}
+
 model perfil_organizacion {
-  id_perfil_organizacion         String         @id @default(uuid()) @db.Uuid
-  fid_organizaciones             String         @unique @db.Uuid
-  razon_social                   String?
-  ruc_nif                        String?
-  direccion                      String?
-  referencia                     String?        @db.VarChar(200)
-  fid_admin_level_0              String?        @db.Uuid
-  fid_admin_level_3              String?        @db.Uuid
-  telefono                       String?
-  telefono_secundario            String?        @db.VarChar(30)
-  correo_contacto                String?
-  correo_contacto_secundario     String?        @db.VarChar(120)
-  sitio_web                      String?
-  facebook_url                   String?        @db.VarChar(200)
-  instagram_url                  String?        @db.VarChar(200)
-  tiktok_url                     String?        @db.VarChar(200)
-  youtube_url                    String?        @db.VarChar(200)
-  linkedin_url                   String?        @db.VarChar(200)
-  x_url                          String?        @db.VarChar(200)
-  logo_url                       String?
-  escudo_url                     String?
-  escudo_oscuro_url              String?
-  escudo_misma_imagen            Boolean        @default(true)
-  login_escudo_url               String?
-  login_escudo_oscuro_url        String?
-  login_escudo_misma_imagen      Boolean        @default(true)
-  imagotipo_url                  String?
-  imagotipo_oscuro_url           String?
-  imagotipo_misma_imagen         Boolean        @default(true)
-  color_primario                 String?
-  ui_cabecera_claro              String?        @db.VarChar(7)
-  ui_cabecera_oscuro             String?        @db.VarChar(7)
-  ui_esquinero_claro             String?        @db.VarChar(7)
-  ui_esquinero_oscuro            String?        @db.VarChar(7)
-  ui_menu_claro                  String?        @db.VarChar(7)
-  ui_menu_oscuro                 String?        @db.VarChar(7)
-  ui_mostrar_escudo_menu         Boolean        @default(false)
-  ui_mostrar_nombre_empresa_menu Boolean        @default(true)
-  ui_ocultar_esquinero_expandido Boolean        @default(false)
-  ui_esquinero_fondo_activo      Boolean        @default(false)
-  ui_cabecera_ocultar_borde      Boolean        @default(false)
-  ui_menu_ocultar_borde          Boolean        @default(false)
-  ui_tamano_escudo_menu          Int            @default(100) @db.SmallInt
-  login_mostrar_panel            Boolean        @default(true)
-  login_usar_filtro_color        Boolean        @default(true)
-  login_mostrar_etiqueta         Boolean        @default(true)
-  login_mostrar_destacados       Boolean        @default(true)
-  login_mostrar_comunidad        Boolean        @default(true)
-  login_mostrar_recuperar        Boolean        @default(false)
-  login_mostrar_recordar         Boolean        @default(false)
-  login_mostrar_google           Boolean        @default(false)
-  login_mostrar_sso              Boolean        @default(false)
-  login_mostrar_solicitud        Boolean        @default(false)
-  login_mostrar_pie              Boolean        @default(true)
-  login_etiqueta                 String?        @db.VarChar(60)
-  login_titulo                   String?        @db.VarChar(120)
-  login_subtitulo                String?        @db.VarChar(240)
-  login_destacado_1              String?        @db.VarChar(120)
-  login_destacado_2              String?        @db.VarChar(120)
-  login_destacado_3              String?        @db.VarChar(120)
-  login_destacado_icono_1        String         @default("book") @db.VarChar(40)
-  login_destacado_icono_2        String         @default("users") @db.VarChar(40)
-  login_destacado_icono_3        String         @default("award") @db.VarChar(40)
-  login_texto_comunidad          String?        @db.VarChar(120)
-  login_bienvenida_titulo        String?        @db.VarChar(80)
-  login_bienvenida_subtitulo     String?        @db.VarChar(160)
-  login_pie                      String?        @db.VarChar(160)
-  correo_remitente_nombre        String?
-  correo_remitente_direccion     String?
-  cabecera_impresion             String?
-  soporte_correo                 String?        @db.VarChar(120)
-  soporte_telefono               String?        @db.VarChar(30)
-  soporte_whatsapp               String?        @db.VarChar(30)
-  idioma_por_defecto             String         @default("es")
-  zona_horaria_por_defecto       String         @default("America/Lima")
-  estado                         Int            @default(1)
-  created_at                     DateTime       @default(now()) @db.Timestamptz(3)
-  created_by                     String?
-  updated_at                     DateTime       @default(now()) @db.Timestamptz(3)
-  updated_by                     String?
-  organizacion                   organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
-  pais                           admin_level_0? @relation("perfil_organizacion_pais", fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
-  admin_level_3                  admin_level_3? @relation("perfil_organizacion_admin_level_3", fields: [fid_admin_level_3], references: [id_admin_level_3], onDelete: Restrict)
+  id_perfil_organizacion                String         @id @default(uuid()) @db.Uuid
+  fid_organizaciones                    String         @unique @db.Uuid
+  razon_social                          String?
+  ruc_nif                               String?
+  direccion                             String?
+  sin_sede_fisica                       Boolean        @default(false)
+  referencia                            String?        @db.VarChar(200)
+  fid_admin_level_0                     String?        @db.Uuid
+  fid_admin_level_3                     String?        @db.Uuid
+  telefono                              String?
+  telefono_secundario                   String?        @db.VarChar(30)
+  correo_contacto                       String?
+  correo_contacto_secundario            String?        @db.VarChar(120)
+  sitio_web                             String?
+  facebook_url                          String?        @db.VarChar(200)
+  instagram_url                         String?        @db.VarChar(200)
+  tiktok_url                            String?        @db.VarChar(200)
+  youtube_url                           String?        @db.VarChar(200)
+  linkedin_url                          String?        @db.VarChar(200)
+  x_url                                 String?        @db.VarChar(200)
+  logo_url                              String?
+  escudo_url                            String?
+  escudo_oscuro_url                     String?
+  escudo_misma_imagen                   Boolean        @default(true)
+  login_escudo_url                      String?
+  login_escudo_oscuro_url               String?
+  login_escudo_misma_imagen             Boolean        @default(true)
+  imagotipo_url                         String?
+  imagotipo_oscuro_url                  String?
+  imagotipo_misma_imagen                Boolean        @default(true)
+  color_primario                        String?
+  ui_cabecera_claro                     String?        @db.VarChar(7)
+  ui_cabecera_oscuro                    String?        @db.VarChar(7)
+  ui_esquinero_claro                    String?        @db.VarChar(7)
+  ui_esquinero_oscuro                   String?        @db.VarChar(7)
+  ui_menu_claro                         String?        @db.VarChar(7)
+  ui_menu_oscuro                        String?        @db.VarChar(7)
+  ui_mostrar_escudo_menu                Boolean        @default(false)
+  ui_mostrar_nombre_empresa_menu        Boolean        @default(true)
+  ui_ocultar_esquinero_expandido        Boolean        @default(false)
+  ui_esquinero_fondo_activo             Boolean        @default(false)
+  ui_cabecera_ocultar_borde             Boolean        @default(false)
+  ui_menu_ocultar_borde                 Boolean        @default(false)
+  ui_tamano_escudo_menu                 Int            @default(100) @db.SmallInt
+  login_mostrar_panel                   Boolean        @default(true)
+  login_usar_filtro_color               Boolean        @default(true)
+  login_mostrar_etiqueta                Boolean        @default(true)
+  login_mostrar_destacados              Boolean        @default(true)
+  login_mostrar_comunidad               Boolean        @default(true)
+  login_mostrar_recuperar               Boolean        @default(false)
+  login_mostrar_recordar                Boolean        @default(false)
+  login_mostrar_google                  Boolean        @default(false)
+  login_mostrar_sso                     Boolean        @default(false)
+  login_mostrar_solicitud               Boolean        @default(false)
+  login_mostrar_pie                     Boolean        @default(true)
+  login_etiqueta                        String?        @db.VarChar(60)
+  login_titulo                          String?        @db.VarChar(120)
+  login_subtitulo                       String?        @db.VarChar(240)
+  login_destacado_1                     String?        @db.VarChar(120)
+  login_destacado_2                     String?        @db.VarChar(120)
+  login_destacado_3                     String?        @db.VarChar(120)
+  login_destacado_icono_1               String         @default("book") @db.VarChar(40)
+  login_destacado_icono_2               String         @default("users") @db.VarChar(40)
+  login_destacado_icono_3               String         @default("award") @db.VarChar(40)
+  login_texto_comunidad                 String?        @db.VarChar(120)
+  login_bienvenida_titulo               String?        @db.VarChar(80)
+  login_bienvenida_subtitulo            String?        @db.VarChar(160)
+  login_pie                             String?        @db.VarChar(160)
+  correo_remitente_nombre               String?
+  correo_remitente_direccion            String?
+  cabecera_impresion                    String?
+  soporte_correo                        String?        @db.VarChar(120)
+  soporte_telefono                      String?        @db.VarChar(30)
+  soporte_whatsapp                      String?        @db.VarChar(30)
+  fid_parametros_idioma                 String         @db.Uuid
+  fid_zonas_horarias                    String         @db.Uuid
+  latitud                               Decimal?       @db.Decimal(10, 8)
+  longitud                              Decimal?       @db.Decimal(11, 8)
+  fid_parametros_moneda                 String         @db.Uuid
+  fid_parametros_tipo_persona_fiscal    String?        @db.Uuid
+  fid_parametros_tipo_documento_fiscal  String?        @db.Uuid
+  fiscal_numero_documento               String?        @db.VarChar(30)
+  fiscal_razon_social                   String?        @db.VarChar(150)
+  fid_parametros_responsabilidad_fiscal String?        @db.Uuid
+  fiscal_afecto_igv                     Boolean        @default(false)
+  fiscal_direccion                      String?        @db.VarChar(250)
+  fiscal_telefono                       String?        @db.VarChar(30)
+  fiscal_correo                         String?        @db.VarChar(120)
+  estado                                Int            @default(1)
+  created_at                            DateTime       @default(now()) @db.Timestamptz(3)
+  created_by                            String?
+  updated_at                            DateTime       @default(now()) @db.Timestamptz(3)
+  updated_by                            String?
+  organizacion                          organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  pais                                  admin_level_0? @relation("perfil_organizacion_pais", fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
+  admin_level_3                         admin_level_3? @relation("perfil_organizacion_admin_level_3", fields: [fid_admin_level_3], references: [id_admin_level_3], onDelete: Restrict)
+  idioma                                parametros     @relation("perfil_idioma", fields: [fid_parametros_idioma], references: [id_parametros], onDelete: Restrict, map: "perfil_organizacion_idioma_fk")
+  zona_horaria                          zonas_horarias @relation(fields: [fid_zonas_horarias], references: [id_zonas_horarias], onDelete: Restrict, map: "perfil_organizacion_zona_horaria_fk")
+  moneda                                parametros     @relation("perfil_moneda", fields: [fid_parametros_moneda], references: [id_parametros], onDelete: Restrict, map: "perfil_organizacion_moneda_fk")
+  tipo_persona_fiscal                   parametros?    @relation("perfil_tipo_persona_fiscal", fields: [fid_parametros_tipo_persona_fiscal], references: [id_parametros], onDelete: Restrict, map: "perfil_organizacion_tipo_persona_fiscal_fk")
+  tipo_documento_fiscal                 parametros?    @relation("perfil_tipo_documento_fiscal", fields: [fid_parametros_tipo_documento_fiscal], references: [id_parametros], onDelete: Restrict, map: "perfil_organizacion_tipo_documento_fiscal_fk")
+  responsabilidad_fiscal                parametros?    @relation("perfil_responsabilidad_fiscal", fields: [fid_parametros_responsabilidad_fiscal], references: [id_parametros], onDelete: Restrict, map: "perfil_organizacion_responsabilidad_fiscal_fk")
 
   @@index([fid_admin_level_0])
   @@index([fid_admin_level_3])
+  @@index([fid_parametros_idioma])
+  @@index([fid_zonas_horarias])
+  @@index([fid_parametros_moneda])
+  @@index([fid_parametros_tipo_persona_fiscal])
+  @@index([fid_parametros_tipo_documento_fiscal])
+  @@index([fid_parametros_responsabilidad_fiscal])
   @@schema("nucleo")
+}
+
+model organizaciones_especies_atendidas {
+  id_organizaciones_especies_atendidas String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fid_organizaciones                   String         @db.Uuid
+  fid_parametros                       String         @db.Uuid
+  estado                               Int            @default(1)
+  created_at                           DateTime       @default(now()) @db.Timestamptz(3)
+  created_by                           String?
+  updated_at                           DateTime       @default(now()) @db.Timestamptz(3)
+  updated_by                           String?
+  organizacion                         organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade, map: "organizaciones_especies_atendidas_organizacion_fk")
+  parametro                            parametros     @relation(fields: [fid_parametros], references: [id_parametros], onDelete: Restrict, map: "organizaciones_especies_atendidas_parametro_fk")
+
+  @@unique([fid_organizaciones, fid_parametros], map: "organizaciones_especies_atendidas_unique")
+  @@index([fid_organizaciones, estado], map: "organizaciones_especies_atendidas_organizacion_estado_idx")
+  @@index([fid_parametros], map: "organizaciones_especies_atendidas_parametro_idx")
+  @@schema("nucleo")
+}
+
+model servicios_veterinaria {
+  id_servicios_veterinaria String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fid_organizaciones       String         @db.Uuid
+  nombre                   String         @db.VarChar(120)
+  descripcion              String?        @db.VarChar(500)
+  precio                   Decimal?       @db.Decimal(10, 2)
+  estado                   Int            @default(1)
+  created_at               DateTime       @default(now()) @db.Timestamptz(3)
+  created_by               String?
+  updated_at               DateTime       @default(now()) @db.Timestamptz(3)
+  updated_by               String?
+  eliminado_en             DateTime?      @db.Timestamptz(3)
+  eliminado_por            String?        @db.Uuid
+  organizacion             organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade, onUpdate: Cascade, map: "servicios_veterinaria_fid_organizaciones_fkey")
+
+  @@index([fid_organizaciones, estado], map: "servicios_veterinaria_organizacion_estado_idx")
+  @@index([fid_organizaciones, eliminado_en], map: "servicios_veterinaria_organizacion_eliminado_idx")
+  @@schema("nucleo")
+}
+
+model propietarios {
+  id_propietarios               String         @id @default(uuid()) @db.Uuid
+  fid_organizaciones            String         @db.Uuid
+  fid_parametros_tipo_documento String         @db.Uuid
+  numero_documento              String         @db.VarChar(40)
+  nombre_completo               String         @db.VarChar(150)
+  celular                       String?        @db.VarChar(30)
+  celular_verificado_en         DateTime?      @db.Timestamptz(3)
+  sin_correo                    Boolean        @default(false)
+  correo                        String?        @db.VarChar(254)
+  correo_verificado_en          DateTime?      @db.Timestamptz(3)
+  telefono_fijo                 String?        @db.VarChar(30)
+  direccion                     String?        @db.VarChar(200)
+  fid_admin_level_0             String?        @db.Uuid
+  fid_admin_level_3             String?        @db.Uuid
+  contacto_alternativo_nombre   String?        @db.VarChar(150)
+  contacto_alternativo_telefono String?        @db.VarChar(30)
+  fid_parametros_como_conocio   String?        @db.Uuid
+  como_conocio_otro             String?        @db.VarChar(150)
+  estado                        Int            @default(1)
+  created_at                    DateTime       @default(now()) @db.Timestamptz(3)
+  created_by                    String?
+  updated_at                    DateTime       @default(now()) @db.Timestamptz(3)
+  updated_by                    String?
+  eliminado_en                  DateTime?      @db.Timestamptz(3)
+  eliminado_por                 String?        @db.Uuid
+  organizacion                  organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  tipo_documento                parametros     @relation("propietario_tipo_documento", fields: [fid_parametros_tipo_documento], references: [id_parametros], onDelete: Restrict)
+  como_conocio                  parametros?    @relation("propietario_como_conocio", fields: [fid_parametros_como_conocio], references: [id_parametros], onDelete: Restrict)
+  pais                          admin_level_0? @relation(fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
+  admin_level_3                 admin_level_3? @relation(fields: [fid_admin_level_3], references: [id_admin_level_3], onDelete: Restrict)
+  mascotas                      mascotas[]
+  atenciones                    atenciones[]
+
+  @@unique([id_propietarios, fid_organizaciones])
+  @@index([fid_organizaciones, eliminado_en, nombre_completo])
+  @@index([fid_organizaciones, eliminado_en, created_at], map: "propietarios_organizacion_eliminado_creado_idx")
+  @@index([fid_parametros_tipo_documento])
+  @@index([fid_parametros_como_conocio])
+  @@index([fid_admin_level_0])
+  @@index([fid_admin_level_3])
+  @@schema("personas")
+}
+
+model especies_animales {
+  id_especies_animales String                 @id @default(uuid()) @db.Uuid
+  codigo               String                 @unique @db.VarChar(60)
+  nombre_es            String                 @db.VarChar(100)
+  nombre_en            String                 @db.VarChar(100)
+  nombre_cientifico    String?                @db.VarChar(140)
+  orden                Int                    @default(0)
+  estado               Int                    @default(1)
+  created_at           DateTime               @default(now()) @db.Timestamptz(3)
+  created_by           String?
+  updated_at           DateTime               @default(now()) @db.Timestamptz(3)
+  updated_by           String?
+  subespecies          subespecies_animales[]
+  razas                razas_animales[]
+  mascotas             mascotas[]
+
+  @@schema("configuracion")
+}
+
+model subespecies_animales {
+  id_subespecies_animales String            @id @default(uuid()) @db.Uuid
+  fid_especies_animales   String            @db.Uuid
+  codigo                  String            @db.VarChar(60)
+  nombre_es               String            @db.VarChar(120)
+  nombre_en               String            @db.VarChar(120)
+  nombre_cientifico       String?           @db.VarChar(140)
+  orden                   Int               @default(0)
+  estado                  Int               @default(1)
+  created_at              DateTime          @default(now()) @db.Timestamptz(3)
+  created_by              String?
+  updated_at              DateTime          @default(now()) @db.Timestamptz(3)
+  updated_by              String?
+  especie                 especies_animales @relation(fields: [fid_especies_animales], references: [id_especies_animales], onDelete: Restrict)
+  mascotas                mascotas[]
+
+  @@unique([fid_especies_animales, codigo])
+  @@unique([id_subespecies_animales, fid_especies_animales])
+  @@index([fid_especies_animales, estado, orden])
+  @@schema("configuracion")
+}
+
+model tipos_registro_atencion {
+  id_tipos_registro_atencion String               @id @default(uuid()) @db.Uuid
+  codigo                     String               @unique @db.VarChar(60)
+  nombre_es                  String               @db.VarChar(100)
+  nombre_en                  String               @db.VarChar(100)
+  descripcion_es             String               @db.VarChar(250)
+  descripcion_en             String               @db.VarChar(250)
+  icono                      String               @db.VarChar(40)
+  color_hex                  String               @db.VarChar(7)
+  campos                     Json
+  acepta_adjuntos            Boolean              @default(false)
+  max_adjuntos               Int?                 @db.SmallInt
+  orden                      Int                  @default(0)
+  estado                     Int                  @default(1)
+  created_at                 DateTime             @default(now()) @db.Timestamptz(3)
+  created_by                 String?
+  updated_at                 DateTime             @default(now()) @db.Timestamptz(3)
+  updated_by                 String?
+  registros                  registros_atencion[]
+
+  @@index([estado, orden])
+  @@schema("configuracion")
+}
+
+model razas_animales {
+  id_razas_animales     String            @id @default(uuid()) @db.Uuid
+  fid_especies_animales String            @db.Uuid
+  codigo                String            @db.VarChar(80)
+  nombre_es             String            @db.VarChar(120)
+  nombre_en             String            @db.VarChar(120)
+  orden                 Int               @default(0)
+  estado                Int               @default(1)
+  created_at            DateTime          @default(now()) @db.Timestamptz(3)
+  created_by            String?
+  updated_at            DateTime          @default(now()) @db.Timestamptz(3)
+  updated_by            String?
+  especie               especies_animales @relation(fields: [fid_especies_animales], references: [id_especies_animales], onDelete: Restrict)
+  mascotas              mascotas[]
+
+  @@unique([fid_especies_animales, codigo])
+  @@unique([id_razas_animales, fid_especies_animales])
+  @@index([fid_especies_animales, estado, orden])
+  @@schema("configuracion")
+}
+
+model mascotas {
+  id_mascotas                        String                @id @default(uuid()) @db.Uuid
+  fid_organizaciones                 String                @db.Uuid
+  fid_propietarios                   String?               @db.Uuid
+  foto_url                           String?
+  animal_servicio                    Boolean               @default(false)
+  apoyo_emocional                    Boolean               @default(false)
+  nombre                             String                @db.VarChar(120)
+  codigo_chip                        String?               @db.VarChar(50)
+  fid_especies_animales              String                @db.Uuid
+  fid_subespecies_animales           String?               @db.Uuid
+  fid_razas_animales                 String?               @db.Uuid
+  fid_parametros_genero              String                @db.Uuid
+  fid_parametros_color               String?               @db.Uuid
+  fecha_nacimiento                   DateTime?             @db.Date
+  peso                               Decimal?              @db.Decimal(8, 3)
+  fid_parametros_unidad_peso         String?               @db.Uuid
+  fid_parametros_talla               String?               @db.Uuid
+  fid_parametros_estado_reproductivo String?               @db.Uuid
+  fid_parametros_temperamento        String?               @db.Uuid
+  alimento                           String?               @db.VarChar(250)
+  estado                             Int                   @default(1)
+  created_at                         DateTime              @default(now()) @db.Timestamptz(3)
+  created_by                         String?
+  updated_at                         DateTime              @default(now()) @db.Timestamptz(3)
+  updated_by                         String?
+  eliminado_en                       DateTime?             @db.Timestamptz(3)
+  eliminado_por                      String?               @db.Uuid
+  organizacion                       organizaciones        @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  propietario                        propietarios?         @relation(fields: [fid_propietarios, fid_organizaciones], references: [id_propietarios, fid_organizaciones], onDelete: Restrict)
+  especie                            especies_animales     @relation(fields: [fid_especies_animales], references: [id_especies_animales], onDelete: Restrict)
+  subespecie                         subespecies_animales? @relation(fields: [fid_subespecies_animales, fid_especies_animales], references: [id_subespecies_animales, fid_especies_animales], onDelete: Restrict)
+  raza                               razas_animales?       @relation(fields: [fid_razas_animales, fid_especies_animales], references: [id_razas_animales, fid_especies_animales], onDelete: Restrict)
+  genero                             parametros            @relation("mascota_genero", fields: [fid_parametros_genero], references: [id_parametros], onDelete: Restrict)
+  color                              parametros?           @relation("mascota_color", fields: [fid_parametros_color], references: [id_parametros], onDelete: Restrict)
+  unidad_peso                        parametros?           @relation("mascota_unidad_peso", fields: [fid_parametros_unidad_peso], references: [id_parametros], onDelete: Restrict)
+  talla                              parametros?           @relation("mascota_talla", fields: [fid_parametros_talla], references: [id_parametros], onDelete: Restrict)
+  estado_reproductivo                parametros?           @relation("mascota_estado_reproductivo", fields: [fid_parametros_estado_reproductivo], references: [id_parametros], onDelete: Restrict)
+  temperamento                       parametros?           @relation("mascota_temperamento", fields: [fid_parametros_temperamento], references: [id_parametros], onDelete: Restrict)
+  atenciones                         atenciones[]
+
+  @@unique([id_mascotas, fid_organizaciones])
+  @@index([fid_organizaciones, eliminado_en, nombre])
+  @@index([fid_organizaciones, eliminado_en, created_at], map: "mascotas_organizacion_eliminado_creado_idx")
+  @@index([fid_propietarios])
+  @@index([fid_especies_animales])
+  @@index([fid_subespecies_animales])
+  @@index([fid_razas_animales])
+  @@index([fid_parametros_genero])
+  @@index([fid_parametros_color])
+  @@index([fid_parametros_unidad_peso])
+  @@index([fid_parametros_talla])
+  @@index([fid_parametros_estado_reproductivo])
+  @@index([fid_parametros_temperamento])
+  @@schema("personas")
+}
+
+model atenciones {
+  id_atenciones            String               @id @default(uuid()) @db.Uuid
+  fid_organizaciones       String               @db.Uuid
+  fid_mascotas             String               @db.Uuid
+  fid_propietarios         String?              @db.Uuid
+  fid_usuarios_responsable String               @db.Uuid
+  fid_parametros_estado    String               @db.Uuid
+  fecha_atencion           DateTime             @db.Date
+  llegada_en               DateTime             @default(now()) @db.Timestamptz(3)
+  inicio_en                DateTime?            @db.Timestamptz(3)
+  finalizada_en            DateTime?            @db.Timestamptz(3)
+  estado                   Int                  @default(1)
+  created_at               DateTime             @default(now()) @db.Timestamptz(3)
+  created_by               String?
+  updated_at               DateTime             @default(now()) @db.Timestamptz(3)
+  updated_by               String?
+  eliminado_en             DateTime?            @db.Timestamptz(3)
+  eliminado_por            String?              @db.Uuid
+  organizacion             organizaciones       @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  mascota                  mascotas             @relation(fields: [fid_mascotas, fid_organizaciones], references: [id_mascotas, fid_organizaciones], onDelete: Restrict)
+  propietario              propietarios?        @relation(fields: [fid_propietarios, fid_organizaciones], references: [id_propietarios, fid_organizaciones], onDelete: Restrict)
+  responsable              usuarios             @relation("atencion_responsable", fields: [fid_usuarios_responsable, fid_organizaciones], references: [id_usuarios, fid_organizaciones], onDelete: Restrict)
+  estado_atencion          parametros           @relation("atencion_estado", fields: [fid_parametros_estado], references: [id_parametros], onDelete: Restrict)
+  registros                registros_atencion[]
+
+  @@unique([id_atenciones, fid_organizaciones])
+  @@index([fid_organizaciones, fecha_atencion, eliminado_en, llegada_en])
+  @@index([fid_mascotas])
+  @@index([fid_propietarios])
+  @@index([fid_usuarios_responsable])
+  @@index([fid_parametros_estado])
+  @@schema("personas")
+}
+
+model registros_atencion {
+  id_registros_atencion                        String                         @id @default(uuid()) @db.Uuid
+  fid_organizaciones                           String                         @db.Uuid
+  fid_atenciones                               String                         @db.Uuid
+  fid_tipos_registro_atencion                  String                         @db.Uuid
+  fid_motivos_consulta                         String?                        @db.Uuid
+  fid_vacunas                                  String?                        @db.Uuid
+  fid_parametros_tipo_desparasitacion          String?                        @db.Uuid
+  fid_tipos_hospitalizacion                    String?                        @db.Uuid
+  fid_parametros_motivo_salida_hospitalizacion String?                        @db.Uuid
+  fid_procedimientos_veterinarios              String?                        @db.Uuid
+  resumen                                      String                         @db.VarChar(160)
+  detalle                                      Json
+  fecha_programada                             DateTime?                      @db.Date
+  programado_para                              DateTime?                      @db.Timestamptz(3)
+  estado                                       Int                            @default(1)
+  created_at                                   DateTime                       @default(now()) @db.Timestamptz(3)
+  created_by                                   String?
+  updated_at                                   DateTime                       @default(now()) @db.Timestamptz(3)
+  updated_by                                   String?
+  eliminado_en                                 DateTime?                      @db.Timestamptz(3)
+  eliminado_por                                String?                        @db.Uuid
+  atencion                                     atenciones                     @relation(fields: [fid_atenciones, fid_organizaciones], references: [id_atenciones, fid_organizaciones], onDelete: Restrict)
+  tipo                                         tipos_registro_atencion        @relation(fields: [fid_tipos_registro_atencion], references: [id_tipos_registro_atencion], onDelete: Restrict)
+  organizacion                                 organizaciones                 @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  motivo_consulta                              motivos_consulta?              @relation(fields: [fid_motivos_consulta, fid_organizaciones], references: [id_motivos_consulta, fid_organizaciones], onDelete: Restrict)
+  vacuna                                       vacunas?                       @relation(fields: [fid_vacunas, fid_organizaciones], references: [id_vacunas, fid_organizaciones], onDelete: Restrict)
+  tipo_desparasitacion                         parametros?                    @relation("registro_tipo_desparasitacion", fields: [fid_parametros_tipo_desparasitacion], references: [id_parametros], onDelete: Restrict)
+  tipo_hospitalizacion                         tipos_hospitalizacion?         @relation(fields: [fid_tipos_hospitalizacion, fid_organizaciones], references: [id_tipos_hospitalizacion, fid_organizaciones], onDelete: Restrict)
+  motivo_salida_hospitalizacion                parametros?                    @relation("registro_motivo_salida_hospitalizacion", fields: [fid_parametros_motivo_salida_hospitalizacion], references: [id_parametros], onDelete: Restrict)
+  procedimiento_veterinario                    procedimientos_veterinarios?   @relation(fields: [fid_procedimientos_veterinarios, fid_organizaciones], references: [id_procedimientos_veterinarios, fid_organizaciones], onDelete: Restrict)
+  adjuntos                                     adjuntos_registro_atencion[]
+  pruebas_laboratorio                          pruebas_registro_laboratorio[]
+
+  @@unique([id_registros_atencion, fid_organizaciones])
+  @@index([fid_atenciones, eliminado_en, created_at])
+  @@index([fid_organizaciones, created_at])
+  @@index([fid_tipos_registro_atencion])
+  @@index([fid_motivos_consulta])
+  @@index([fid_vacunas])
+  @@index([fid_parametros_tipo_desparasitacion])
+  @@index([fid_tipos_hospitalizacion])
+  @@index([fid_parametros_motivo_salida_hospitalizacion])
+  @@index([fid_procedimientos_veterinarios])
+  @@index([fecha_programada])
+  @@index([programado_para])
+  @@schema("personas")
+}
+
+model motivos_consulta {
+  id_motivos_consulta String               @id @default(uuid()) @db.Uuid
+  fid_organizaciones  String               @db.Uuid
+  nombre              String               @db.VarChar(120)
+  descripcion         String?              @db.VarChar(500)
+  estado              Int                  @default(1)
+  created_at          DateTime             @default(now()) @db.Timestamptz(3)
+  created_by          String?
+  updated_at          DateTime             @default(now()) @db.Timestamptz(3)
+  updated_by          String?
+  eliminado_en        DateTime?            @db.Timestamptz(3)
+  eliminado_por       String?              @db.Uuid
+  organizacion        organizaciones       @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  registros           registros_atencion[]
+
+  @@unique([id_motivos_consulta, fid_organizaciones])
+  @@index([fid_organizaciones, eliminado_en, estado, nombre])
+  @@schema("nucleo")
+}
+
+model vacunas {
+  id_vacunas         String               @id @default(uuid()) @db.Uuid
+  fid_organizaciones String               @db.Uuid
+  nombre             String               @db.VarChar(120)
+  estado             Int                  @default(1)
+  created_at         DateTime             @default(now()) @db.Timestamptz(3)
+  created_by         String?
+  updated_at         DateTime             @default(now()) @db.Timestamptz(3)
+  updated_by         String?
+  eliminado_en       DateTime?            @db.Timestamptz(3)
+  eliminado_por      String?              @db.Uuid
+  organizacion       organizaciones       @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  registros          registros_atencion[]
+
+  @@unique([id_vacunas, fid_organizaciones])
+  @@index([fid_organizaciones, eliminado_en, estado, nombre])
+  @@schema("nucleo")
+}
+
+model tipos_hospitalizacion {
+  id_tipos_hospitalizacion String               @id @default(uuid()) @db.Uuid
+  fid_organizaciones       String               @db.Uuid
+  nombre                   String               @db.VarChar(120)
+  estado                   Int                  @default(1)
+  created_at               DateTime             @default(now()) @db.Timestamptz(3)
+  created_by               String?
+  updated_at               DateTime             @default(now()) @db.Timestamptz(3)
+  updated_by               String?
+  eliminado_en             DateTime?            @db.Timestamptz(3)
+  eliminado_por            String?              @db.Uuid
+  organizacion             organizaciones       @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  registros                registros_atencion[]
+
+  @@unique([id_tipos_hospitalizacion, fid_organizaciones])
+  @@index([fid_organizaciones, eliminado_en, estado, nombre])
+  @@schema("nucleo")
+}
+
+model procedimientos_veterinarios {
+  id_procedimientos_veterinarios String               @id @default(uuid()) @db.Uuid
+  fid_organizaciones             String               @db.Uuid
+  nombre                         String               @db.VarChar(160)
+  descripcion_guia               String               @db.VarChar(1000)
+  estado                         Int                  @default(1)
+  created_at                     DateTime             @default(now()) @db.Timestamptz(3)
+  created_by                     String?
+  updated_at                     DateTime             @default(now()) @db.Timestamptz(3)
+  updated_by                     String?
+  eliminado_en                   DateTime?            @db.Timestamptz(3)
+  eliminado_por                  String?              @db.Uuid
+  organizacion                   organizaciones       @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  registros                      registros_atencion[]
+
+  @@unique([id_procedimientos_veterinarios, fid_organizaciones])
+  @@index([fid_organizaciones, eliminado_en, estado, nombre])
+  @@schema("nucleo")
+}
+
+model categorias_pruebas_laboratorio {
+  id_categorias_pruebas_laboratorio String                              @id @default(uuid()) @db.Uuid
+  codigo                            String                              @unique @db.VarChar(80)
+  nombre                            String                              @db.VarChar(140)
+  orden                             Int                                 @default(0)
+  estado                            Int                                 @default(1)
+  created_at                        DateTime                            @default(now()) @db.Timestamptz(3)
+  created_by                        String?
+  updated_at                        DateTime                            @default(now()) @db.Timestamptz(3)
+  updated_by                        String?
+  pruebas                           pruebas_laboratorio[]
+  pruebas_base                      catalogo_pruebas_laboratorio_base[]
+
+  @@index([estado, orden, nombre])
+  @@schema("configuracion")
+}
+
+model catalogo_pruebas_laboratorio_base {
+  id_catalogo_pruebas_laboratorio_base String                         @id @default(uuid()) @db.Uuid
+  fid_categorias_pruebas_laboratorio   String                         @db.Uuid
+  nombre                               String                         @db.VarChar(220)
+  orden                                Int                            @default(0)
+  estado                               Int                            @default(1)
+  created_at                           DateTime                       @default(now()) @db.Timestamptz(3)
+  created_by                           String?
+  updated_at                           DateTime                       @default(now()) @db.Timestamptz(3)
+  updated_by                           String?
+  categoria                            categorias_pruebas_laboratorio @relation(fields: [fid_categorias_pruebas_laboratorio], references: [id_categorias_pruebas_laboratorio], onDelete: Restrict)
+
+  @@index([fid_categorias_pruebas_laboratorio, estado, orden])
+  @@schema("configuracion")
+}
+
+model pruebas_laboratorio {
+  id_pruebas_laboratorio             String                         @id @default(uuid()) @db.Uuid
+  fid_organizaciones                 String                         @db.Uuid
+  fid_categorias_pruebas_laboratorio String                         @db.Uuid
+  nombre                             String                         @db.VarChar(220)
+  estado                             Int                            @default(1)
+  created_at                         DateTime                       @default(now()) @db.Timestamptz(3)
+  created_by                         String?
+  updated_at                         DateTime                       @default(now()) @db.Timestamptz(3)
+  updated_by                         String?
+  eliminado_en                       DateTime?                      @db.Timestamptz(3)
+  eliminado_por                      String?                        @db.Uuid
+  organizacion                       organizaciones                 @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  categoria                          categorias_pruebas_laboratorio @relation(fields: [fid_categorias_pruebas_laboratorio], references: [id_categorias_pruebas_laboratorio], onDelete: Restrict)
+  registros                          pruebas_registro_laboratorio[]
+
+  @@unique([id_pruebas_laboratorio, fid_organizaciones])
+  @@index([fid_organizaciones, eliminado_en, estado, created_at])
+  @@index([fid_categorias_pruebas_laboratorio, estado, nombre])
+  @@schema("nucleo")
+}
+
+model pruebas_registro_laboratorio {
+  id_pruebas_registro_laboratorio String                       @id @default(uuid()) @db.Uuid
+  fid_organizaciones              String                       @db.Uuid
+  fid_registros_atencion          String                       @db.Uuid
+  fid_pruebas_laboratorio         String                       @db.Uuid
+  fid_usuarios_profesional        String                       @db.Uuid
+  cantidad                        Int                          @default(1)
+  orden                           Int                          @default(0)
+  estado                          Int                          @default(1)
+  created_at                      DateTime                     @default(now()) @db.Timestamptz(3)
+  created_by                      String?
+  updated_at                      DateTime                     @default(now()) @db.Timestamptz(3)
+  updated_by                      String?
+  registro                        registros_atencion           @relation(fields: [fid_registros_atencion, fid_organizaciones], references: [id_registros_atencion, fid_organizaciones], onDelete: Restrict)
+  prueba                          pruebas_laboratorio          @relation(fields: [fid_pruebas_laboratorio, fid_organizaciones], references: [id_pruebas_laboratorio, fid_organizaciones], onDelete: Restrict)
+  profesional                     usuarios                     @relation("prueba_laboratorio_profesional", fields: [fid_usuarios_profesional, fid_organizaciones], references: [id_usuarios, fid_organizaciones], onDelete: Restrict)
+  adjuntos                        adjuntos_registro_atencion[]
+  organizaciones                  organizaciones?              @relation(fields: [organizacionesId_organizaciones], references: [id_organizaciones])
+  organizacionesId_organizaciones String?                      @db.Uuid
+
+  @@unique([id_pruebas_registro_laboratorio, fid_organizaciones])
+  @@index([fid_registros_atencion, orden])
+  @@index([fid_pruebas_laboratorio])
+  @@index([fid_usuarios_profesional])
+  @@schema("personas")
+}
+
+model adjuntos_registro_atencion {
+  id_adjuntos_registro_atencion    String                        @id @default(uuid()) @db.Uuid
+  fid_organizaciones               String                        @db.Uuid
+  fid_registros_atencion           String                        @db.Uuid
+  fid_pruebas_registro_laboratorio String?                       @db.Uuid
+  clave_objeto                     String                        @unique @db.VarChar(500)
+  nombre_original                  String                        @db.VarChar(180)
+  tipo_mime                        String                        @db.VarChar(80)
+  bytes                            Int
+  checksum_sha256                  String                        @db.Char(64)
+  estado                           Int                           @default(1)
+  created_at                       DateTime                      @default(now()) @db.Timestamptz(3)
+  created_by                       String?
+  updated_at                       DateTime                      @default(now()) @db.Timestamptz(3)
+  updated_by                       String?
+  eliminado_en                     DateTime?                     @db.Timestamptz(3)
+  eliminado_por                    String?                       @db.Uuid
+  organizacion                     organizaciones                @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  registro                         registros_atencion            @relation(fields: [fid_registros_atencion, fid_organizaciones], references: [id_registros_atencion, fid_organizaciones], onDelete: Restrict)
+  prueba_laboratorio               pruebas_registro_laboratorio? @relation(fields: [fid_pruebas_registro_laboratorio, fid_organizaciones], references: [id_pruebas_registro_laboratorio, fid_organizaciones], onDelete: Restrict)
+
+  @@index([fid_registros_atencion, eliminado_en, created_at])
+  @@index([fid_organizaciones, eliminado_en])
+  @@index([fid_pruebas_registro_laboratorio, eliminado_en])
+  @@schema("personas")
 }
 
 model horarios_atencion_organizacion {
   id_horarios_atencion_organizacion String         @id @default(uuid()) @db.Uuid
   fid_organizaciones                String         @db.Uuid
   dia_semana                        Int
+  turno                             Int            @default(1)
   cerrado                           Boolean        @default(false)
   hora_apertura                     String?        @db.Char(5)
   hora_cierre                       String?        @db.Char(5)
@@ -506,7 +1086,7 @@ model horarios_atencion_organizacion {
   updated_by                        String?
   organizacion                      organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
 
-  @@unique([fid_organizaciones, dia_semana])
+  @@unique([fid_organizaciones, dia_semana, turno])
   @@index([fid_organizaciones, estado, dia_semana])
   @@schema("nucleo")
 }
@@ -547,6 +1127,9 @@ model personas {
   direccion                     String?                             @db.VarChar(200)
   referencia                    String?                             @db.VarChar(200)
   foto_url                      String?
+  firma_url                     String?
+  especialidades                String[]
+  nro_tarjeta_profesional       String?                             @db.VarChar(50)
   estado                        Int                                 @default(1)
   created_at                    DateTime                            @default(now()) @db.Timestamptz(3)
   created_by                    String?
@@ -854,18 +1437,19 @@ model historial_contrasenias {
 }
 
 model permisos {
-  id_permisos    String           @id @default(uuid()) @db.Uuid
-  fid_modulos    String           @db.Uuid
-  codigo         String           @unique
-  accion         String           @db.VarChar(40)
-  descripcion    String?
-  estado         Int              @default(1)
-  created_at     DateTime         @default(now()) @db.Timestamptz(3)
-  created_by     String?
-  updated_at     DateTime         @default(now()) @db.Timestamptz(3)
-  updated_by     String?
-  modulo         modulos          @relation(fields: [fid_modulos], references: [id_modulos], onDelete: Restrict)
-  roles_permisos roles_permisos[]
+  id_permisos       String              @id @default(uuid()) @db.Uuid
+  fid_modulos       String              @db.Uuid
+  codigo            String              @unique
+  accion            String              @db.VarChar(40)
+  descripcion       String?
+  estado            Int                 @default(1)
+  created_at        DateTime            @default(now()) @db.Timestamptz(3)
+  created_by        String?
+  updated_at        DateTime            @default(now()) @db.Timestamptz(3)
+  updated_by        String?
+  modulo            modulos             @relation(fields: [fid_modulos], references: [id_modulos], onDelete: Restrict)
+  roles_permisos    roles_permisos[]
+  usuarios_permisos usuarios_permisos[]
 
   @@unique([fid_modulos, accion])
   @@index([fid_modulos, estado])
@@ -873,20 +1457,21 @@ model permisos {
 }
 
 model roles {
-  id_roles           String           @id @default(uuid()) @db.Uuid
-  codigo             String           @db.VarChar(40)
-  nombre             String           @db.VarChar(80)
-  icono              String           @default("shield-check") @db.VarChar(40)
-  descripcion        String           @db.VarChar(250)
-  estado             Int              @default(1)
-  created_at         DateTime         @default(now()) @db.Timestamptz(3)
-  created_by         String?
-  updated_at         DateTime         @default(now()) @db.Timestamptz(3)
-  updated_by         String?
-  eliminado_en       DateTime?        @db.Timestamptz(3)
-  eliminado_por      String?
-  roles_permisos     roles_permisos[]
-  usuarios_roles     usuarios_roles[]
+  id_roles              String           @id @default(uuid()) @db.Uuid
+  codigo                String           @db.VarChar(40)
+  nombre                String           @db.VarChar(80)
+  icono                 String           @default("shield-check") @db.VarChar(40)
+  descripcion           String           @db.VarChar(250)
+  asignable_por_empresa Boolean          @default(true)
+  estado                Int              @default(1)
+  created_at            DateTime         @default(now()) @db.Timestamptz(3)
+  created_by            String?
+  updated_at            DateTime         @default(now()) @db.Timestamptz(3)
+  updated_by            String?
+  eliminado_en          DateTime?        @db.Timestamptz(3)
+  eliminado_por         String?
+  roles_permisos        roles_permisos[]
+  usuarios_roles        usuarios_roles[]
 
   @@index([eliminado_en, created_at])
   @@schema("seguridad")
@@ -973,37 +1558,59 @@ model usuario_mfa {
 }
 
 model usuarios {
-  id_usuarios              String                     @id @default(uuid()) @db.Uuid
-  fid_personas             String                     @db.Uuid
-  fid_organizaciones       String                     @db.Uuid
-  usuario                  String                     @db.VarChar(20)
-  estado_cuenta            estado_usuario             @default(activo)
-  intentos_fallidos        Int                        @default(0)
-  bloqueado_hasta          DateTime?                  @db.Timestamptz(3)
-  estado                   Int                        @default(1)
-  created_at               DateTime                   @default(now()) @db.Timestamptz(3)
-  created_by               String?
-  updated_at               DateTime                   @default(now()) @db.Timestamptz(3)
-  updated_by               String?
-  eliminado_en             DateTime?                  @db.Timestamptz(3)
-  eliminado_por            String?
-  configuracion_usuario    configuracion_usuario[]
-  preferencias_usuario     preferencias_usuario?
-  codigos_recuperacion_mfa codigos_recuperacion_mfa[]
-  credenciales             credenciales[]
-  dispositivos             dispositivos[]
-  historial_contrasenias   historial_contrasenias[]
-  tokens_verificacion      tokens_verificacion[]
-  usuario_mfa              usuario_mfa[]
-  organizacion             organizaciones             @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
-  persona                  personas                   @relation(fields: [fid_personas], references: [id_personas], onDelete: Cascade)
-  usuarios_roles           usuarios_roles[]
-  acciones_requeridas      acciones_requeridas[]
+  id_usuarios                     String                         @id @default(uuid()) @db.Uuid
+  fid_personas                    String                         @db.Uuid
+  fid_organizaciones              String                         @db.Uuid
+  usuario                         String                         @db.VarChar(20)
+  estado_cuenta                   estado_usuario                 @default(activo)
+  intentos_fallidos               Int                            @default(0)
+  bloqueado_hasta                 DateTime?                      @db.Timestamptz(3)
+  estado                          Int                            @default(1)
+  created_at                      DateTime                       @default(now()) @db.Timestamptz(3)
+  created_by                      String?
+  updated_at                      DateTime                       @default(now()) @db.Timestamptz(3)
+  updated_by                      String?
+  eliminado_en                    DateTime?                      @db.Timestamptz(3)
+  eliminado_por                   String?
+  configuracion_usuario           configuracion_usuario[]
+  preferencias_usuario            preferencias_usuario?
+  codigos_recuperacion_mfa        codigos_recuperacion_mfa[]
+  credenciales                    credenciales[]
+  dispositivos                    dispositivos[]
+  historial_contrasenias          historial_contrasenias[]
+  tokens_verificacion             tokens_verificacion[]
+  usuario_mfa                     usuario_mfa[]
+  organizacion                    organizaciones                 @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  persona                         personas                       @relation(fields: [fid_personas], references: [id_personas], onDelete: Cascade)
+  usuarios_roles                  usuarios_roles[]
+  usuarios_permisos               usuarios_permisos[]
+  acciones_requeridas             acciones_requeridas[]
+  atenciones_responsable          atenciones[]                   @relation("atencion_responsable")
+  pruebas_laboratorio_profesional pruebas_registro_laboratorio[] @relation("prueba_laboratorio_profesional")
 
   // PostgreSQL conserva unicidad solo para filas no eliminadas (índice parcial).
   // Prisma no representa índices parciales, por eso aquí queda como índice normal.
+  @@unique([id_usuarios, fid_organizaciones])
   @@index([fid_organizaciones, usuario])
   @@index([fid_organizaciones, eliminado_en, created_at])
+  @@schema("seguridad")
+}
+
+model usuarios_permisos {
+  id_usuarios_permisos String                 @id @default(uuid()) @db.Uuid
+  fid_usuarios         String                 @db.Uuid
+  fid_permisos         String                 @db.Uuid
+  efecto               efecto_permiso_usuario @default(permitir)
+  estado               Int                    @default(1)
+  created_at           DateTime               @default(now()) @db.Timestamptz(3)
+  created_by           String?
+  updated_at           DateTime               @default(now()) @db.Timestamptz(3)
+  updated_by           String?
+  permiso              permisos               @relation(fields: [fid_permisos], references: [id_permisos], onDelete: Cascade)
+  usuario              usuarios               @relation(fields: [fid_usuarios], references: [id_usuarios], onDelete: Cascade)
+
+  @@unique([fid_usuarios, fid_permisos])
+  @@index([fid_usuarios, estado])
   @@schema("seguridad")
 }
 
@@ -1050,6 +1657,13 @@ enum estado_usuario {
   activo
   invitado
   suspendido
+
+  @@schema("seguridad")
+}
+
+enum efecto_permiso_usuario {
+  permitir
+  denegar
 
   @@schema("seguridad")
 }
