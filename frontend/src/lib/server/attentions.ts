@@ -193,8 +193,75 @@ export async function createAttentionLaboratoryTest(event: RequestEvent) {
   };
 }
 
+export async function createAttentionDiagnosticStudy(event: RequestEvent) {
+  if (
+    !(await attentionPermission(
+      event,
+      "administrator.diagnostic_studies.create",
+    ))
+  )
+    return fail(403, {
+      diagnosticStudyMessage: "diagnosticStudies.permissionDenied",
+    });
+  const nombre = formText(await event.request.formData(), "nombre");
+  if (nombre.length < 2 || nombre.length > 160)
+    return fail(400, {
+      diagnosticStudyMessage: "diagnosticStudies.invalidData",
+    });
+  const response = await companyRequest(event, "/company/diagnostic-studies", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ nombre }),
+  });
+  if (!response.ok)
+    return fail(response.status, {
+      diagnosticStudyMessage: await companyMessage(
+        response,
+        "diagnosticStudies.saveError",
+      ),
+    });
+  return {
+    diagnosticStudyMessage: "diagnosticStudies.createdInline",
+    diagnosticStudy: await response.json(),
+  };
+}
+
+export async function createAttentionGroomingService(event: RequestEvent) {
+  if (
+    !(await attentionPermission(
+      event,
+      "administrator.grooming_services.create",
+    ))
+  )
+    return fail(403, {
+      groomingServiceMessage: "groomingServices.permissionDenied",
+    });
+  const nombre = formText(await event.request.formData(), "nombre");
+  if (nombre.length < 2 || nombre.length > 160)
+    return fail(400, {
+      groomingServiceMessage: "groomingServices.invalidData",
+    });
+  const response = await companyRequest(event, "/company/grooming-services", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ nombre }),
+  });
+  if (!response.ok)
+    return fail(response.status, {
+      groomingServiceMessage: await companyMessage(
+        response,
+        "groomingServices.saveError",
+      ),
+    });
+  return {
+    groomingServiceMessage: "groomingServices.createdInline",
+    groomingService: await response.json(),
+  };
+}
+
 function recordPayload(form: FormData) {
   const type = formText(form, "fid_tipos_registro_atencion");
+  const origin = formText(form, "fid_registros_atencion_origen");
   let detail: unknown;
   try {
     detail = JSON.parse(formText(form, "detalle"));
@@ -210,6 +277,7 @@ function recordPayload(form: FormData) {
     return null;
   return {
     fid_tipos_registro_atencion: type,
+    ...(origin ? { fid_registros_atencion_origen: origin } : {}),
     detalle: detail as Record<string, unknown>,
   };
 }
@@ -218,6 +286,8 @@ function recordForm(form: FormData, record: ReturnType<typeof recordPayload>) {
   if (!record) return null;
   const body = new FormData();
   body.set("fid_tipos_registro_atencion", record.fid_tipos_registro_atencion);
+  const origin = record.fid_registros_atencion_origen;
+  if (origin) body.set("fid_registros_atencion_origen", origin);
   body.set("detalle", JSON.stringify(record.detalle));
   const files = form
     .getAll("adjuntos")
@@ -277,6 +347,55 @@ export async function addAttentionRecord(event: RequestEvent, id: string) {
   return { attentionMessage: "attentions.recordSaved" };
 }
 
+export async function updateAttentionRecord(event: RequestEvent, id: string) {
+  const form = await event.request.formData();
+  const recordId = formText(form, "id_registros_atencion");
+  const registro = recordPayload(form);
+  let retainedAttachments: unknown;
+  try {
+    retainedAttachments = JSON.parse(
+      formText(form, "adjuntos_conservados") || "[]",
+    );
+  } catch {
+    retainedAttachments = null;
+  }
+  const body = recordForm(form, registro);
+  if (!(await attentionPermission(event, "clinic.attentions.update")))
+    return fail(403, { attentionMessage: "attentions.permissionDenied" });
+  if (
+    !UUID.test(id) ||
+    !UUID.test(recordId) ||
+    !registro ||
+    !body ||
+    !Array.isArray(retainedAttachments) ||
+    retainedAttachments.some(
+      (group) =>
+        !Array.isArray(group) ||
+        group.some((attachment) =>
+          typeof attachment !== "string" || !UUID.test(attachment)
+        ),
+    )
+  )
+    return fail(400, { attentionMessage: "attentions.invalidData" });
+  body.set("adjuntos_conservados", JSON.stringify(retainedAttachments));
+  const response = await companyRequest(
+    event,
+    `/clinic/attentions/${id}/records/${recordId}`,
+    {
+      method: "PATCH",
+      body,
+    },
+  );
+  if (!response.ok)
+    return fail(response.status, {
+      attentionMessage: await companyMessage(
+        response,
+        "attentions.updateError",
+      ),
+    });
+  return { attentionMessage: "attentions.recordUpdated" };
+}
+
 export async function changeAttentionStatus(
   event: RequestEvent,
   routeId?: string,
@@ -333,7 +452,10 @@ export async function removeAttentionRecord(event: RequestEvent, id: string) {
 }
 
 export async function removeAttention(event: RequestEvent) {
-  const id = formText(await event.request.formData(), "id_atenciones");
+  const form = await event.request.formData();
+  const id = formText(form, "id_atenciones");
+  const confirmarEliminacionProtegida =
+    form.get("confirmar_eliminacion_protegida") === "true";
   if (
     !UUID.test(id) ||
     !(await attentionPermission(event, "clinic.attentions.delete"))
@@ -341,14 +463,30 @@ export async function removeAttention(event: RequestEvent) {
     return fail(403, { attentionMessage: "attentions.permissionDenied" });
   const response = await companyRequest(event, `/clinic/attentions/${id}`, {
     method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(
+      confirmarEliminacionProtegida
+        ? { confirmar_eliminacion_protegida: true }
+        : {},
+    ),
   });
-  if (!response.ok)
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      codigo?: unknown;
+      message?: unknown;
+      data?: unknown;
+    } | null;
     return fail(response.status, {
-      attentionMessage: await companyMessage(
-        response,
-        "attentions.deleteError",
-      ),
+      attentionMessage:
+        typeof body?.message === "string"
+          ? body.message
+          : "attentions.deleteError",
+      ...(body?.codigo === "attentions.protectedDeletionConfirmationRequired" &&
+      body.data
+        ? { attentionImpact: body.data }
+        : {}),
     });
+  }
   return { attentionMessage: "attentions.deleted" };
 }
 

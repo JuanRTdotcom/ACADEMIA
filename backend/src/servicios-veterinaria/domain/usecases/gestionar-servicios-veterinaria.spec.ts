@@ -3,6 +3,24 @@ import { RepositorioServiciosVeterinaria } from "../repositories/repositorio-ser
 import { CasoUsoGestionarServiciosVeterinaria } from "./gestionar-servicios-veterinaria";
 
 describe("CasoUsoGestionarServiciosVeterinaria", () => {
+  it("delega listado paginado y búsqueda dentro del tenant", async () => {
+    const listar = jest.fn().mockResolvedValue({ servicios: [] });
+    const buscar = jest.fn().mockResolvedValue([]);
+    const repositorio = {
+      listar,
+      buscar,
+    } as unknown as RepositorioServiciosVeterinaria;
+    const casoUso = new CasoUsoGestionarServiciosVeterinaria(repositorio);
+
+    await casoUso.listar("veterinaria", { despues_de: "cursor" });
+    await casoUso.buscar("veterinaria", "consulta");
+
+    expect(listar).toHaveBeenCalledWith("veterinaria", {
+      despues_de: "cursor",
+    });
+    expect(buscar).toHaveBeenCalledWith("veterinaria", "consulta");
+  });
+
   it("delega la eliminación con el tenant y actor de la sesión", async () => {
     const eliminar = jest.fn().mockResolvedValue(undefined);
     const repositorio = {

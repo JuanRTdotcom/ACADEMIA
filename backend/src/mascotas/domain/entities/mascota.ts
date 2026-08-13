@@ -26,4 +26,10 @@ export interface DatosMascota {
 
 export interface FiltrosMascotas {
   q?: string;
+  despues_de?: string;
+  antes_de?: string;
+}
+
+export interface EliminacionMascota {
+  confirmar_desvinculacion?: boolean;
 }

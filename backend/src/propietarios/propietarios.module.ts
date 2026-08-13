@@ -4,8 +4,10 @@ import { RepositorioPropietariosDatos } from "./data/repositories/repositorio-pr
 import { RepositorioPropietarios } from "./domain/repositories/repositorio-propietarios";
 import { CasoUsoGestionarPropietarios } from "./domain/usecases/gestionar-propietarios";
 import { ControladorPropietarios } from "./presentation/controllers/propietarios.controller";
+import { ModuloTokenOpaco } from "../comun/seguridad/token-opaco.module";
 
 @Module({
+  imports: [ModuloTokenOpaco],
   controllers: [ControladorPropietarios],
   providers: [
     FuenteDatosPropietariosPrisma,

@@ -3,6 +3,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import * as argon2 from "argon2";
 import { PrismaClient } from "./generated/client/client";
 import { PROCEDIMIENTOS_VETERINARIOS_INICIALES } from "../src/comun/catalogos/procedimientos-veterinarios-iniciales";
+import { ESTUDIOS_DIAGNOSTICOS_INICIALES } from "../src/comun/catalogos/estudios-diagnosticos-iniciales";
+import { SERVICIOS_PELUQUERIA_SPA_INICIALES } from "../src/comun/catalogos/servicios-peluqueria-spa-iniciales";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: exigirVariable("DATABASE_URL") }),
@@ -309,6 +311,26 @@ async function main() {
         WHERE eliminado_en IS NULL
       DO UPDATE SET estado = 1, updated_at = CURRENT_TIMESTAMP, updated_by = 'seed'
     `;
+
+    await tx.estudios_diagnosticos.createMany({
+      data: ESTUDIOS_DIAGNOSTICOS_INICIALES.map((nombre) => ({
+        fid_organizaciones: organizacion.id_organizaciones,
+        nombre,
+        created_by: "seed",
+        updated_by: "seed",
+      })),
+      skipDuplicates: true,
+    });
+
+    await tx.servicios_peluqueria_spa.createMany({
+      data: SERVICIOS_PELUQUERIA_SPA_INICIALES.map((nombre) => ({
+        fid_organizaciones: organizacion.id_organizaciones,
+        nombre,
+        created_by: "seed",
+        updated_by: "seed",
+      })),
+      skipDuplicates: true,
+    });
 
     const [idiomaPredeterminado, zonaPredeterminada, monedaPredeterminada] =
       await Promise.all([
@@ -1121,6 +1143,24 @@ async function main() {
         orden: 40,
       },
       {
+        grupo: "sedacion_imagen_diagnostica",
+        codigo: "si",
+        etiqueta: "Sí",
+        orden: 10,
+      },
+      {
+        grupo: "sedacion_imagen_diagnostica",
+        codigo: "no",
+        etiqueta: "No",
+        orden: 20,
+      },
+      {
+        grupo: "sedacion_imagen_diagnostica",
+        codigo: "no_aplica",
+        etiqueta: "No aplica",
+        orden: 30,
+      },
+      {
         grupo: "temperamentos_mascota",
         codigo: "muy_docil",
         etiqueta: "Muy dócil",
@@ -1294,6 +1334,9 @@ async function main() {
           ('tipos_desparasitacion', 'externa', 'Externa', 'External'),
           ('tipos_desparasitacion', 'mixta_amplio_espectro', 'Mixta / amplio espectro', 'Combined / broad-spectrum'),
           ('tipos_desparasitacion', 'otro', 'Otro', 'Other'),
+          ('sedacion_imagen_diagnostica', 'si', 'Sí', 'Yes'),
+          ('sedacion_imagen_diagnostica', 'no', 'No', 'No'),
+          ('sedacion_imagen_diagnostica', 'no_aplica', 'No aplica', 'Not applicable'),
           ('temperamentos_mascota', 'muy_docil', 'Muy dócil', 'Very docile'),
           ('temperamentos_mascota', 'docil', 'Dócil', 'Docile'),
           ('temperamentos_mascota', 'reservado', 'Reservado', 'Reserved'),
@@ -1559,6 +1602,9 @@ async function main() {
         permiso.codigo.startsWith("administrator.hospitalization_types.") ||
         permiso.codigo.startsWith("administrator.procedures.") ||
         permiso.codigo.startsWith("administrator.laboratory_tests.") ||
+        permiso.codigo.startsWith("administrator.diagnostic_studies.") ||
+        permiso.codigo.startsWith("administrator.grooming_services.") ||
+        permiso.codigo.startsWith("operations.") ||
         permiso.codigo.startsWith("clinic."),
     );
     const administradorExistente = await tx.roles.findFirst({

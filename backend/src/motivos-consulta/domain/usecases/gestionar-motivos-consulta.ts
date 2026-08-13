@@ -1,13 +1,19 @@
 import { Injectable } from "@nestjs/common";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { DatosMotivoConsulta } from "../entities/motivo-consulta";
+import type {
+  DatosMotivoConsulta,
+  FiltrosMotivosConsulta,
+} from "../entities/motivo-consulta";
 import { RepositorioMotivosConsulta } from "../repositories/repositorio-motivos-consulta";
 
 @Injectable()
 export class CasoUsoGestionarMotivosConsulta {
   constructor(private motivos: RepositorioMotivosConsulta) {}
-  listar(organizacion: string) {
-    return this.motivos.listar(organizacion);
+  listar(organizacion: string, filtros: FiltrosMotivosConsulta) {
+    return this.motivos.listar(organizacion, filtros);
+  }
+  buscar(organizacion: string, consulta: string) {
+    return this.motivos.buscar(organizacion, consulta);
   }
   crear(
     organizacion: string,

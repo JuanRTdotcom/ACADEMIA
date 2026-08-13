@@ -18,9 +18,14 @@ export interface CampoRegistroAtencion {
     | "tipos_desparasitacion"
     | "tipos_hospitalizacion"
     | "motivos_salida_hospitalizacion"
+    | "tipos_estancia_guarderia"
+    | "tipos_seguimiento_atencion"
     | "procedimientos_veterinarios"
     | "usuarios_organizacion"
-    | "pruebas_laboratorio";
+    | "pruebas_laboratorio"
+    | "estudios_diagnosticos"
+    | "sedacion_imagen_diagnostica"
+    | "servicios_peluqueria_spa";
   precarga?: "fecha_ultimo_registro";
   ayuda_precarga_es?: string;
   ayuda_precarga_en?: string;
@@ -46,7 +51,12 @@ export interface AdjuntoAtencionGuardado {
 
 export interface DatosRegistroAtencion {
   fid_tipos_registro_atencion: string;
+  fid_registros_atencion_origen?: string;
   detalle: Record<string, unknown>;
+}
+
+export interface DatosEditarRegistroAtencion extends DatosRegistroAtencion {
+  adjuntos_conservados?: string[][];
 }
 
 export interface DatosCrearAtencion {
@@ -57,6 +67,12 @@ export interface DatosCrearAtencion {
 export interface FiltrosAtenciones {
   q?: string;
   incluir_ayer?: boolean;
+  despues_de?: string;
+  antes_de?: string;
+}
+
+export interface EliminacionAtencion {
+  confirmar_eliminacion_protegida?: boolean;
 }
 
 export interface RegistroAtencionValidado {
@@ -106,9 +122,14 @@ export function camposRegistroAtencion(
           "tipos_desparasitacion",
           "tipos_hospitalizacion",
           "motivos_salida_hospitalizacion",
+          "tipos_estancia_guarderia",
+          "tipos_seguimiento_atencion",
           "procedimientos_veterinarios",
           "usuarios_organizacion",
           "pruebas_laboratorio",
+          "estudios_diagnosticos",
+          "sedacion_imagen_diagnostica",
+          "servicios_peluqueria_spa",
         ].includes(campo.fuente ?? "")) ||
       (campo.precarga !== undefined &&
         (campo.tipo !== "date" ||

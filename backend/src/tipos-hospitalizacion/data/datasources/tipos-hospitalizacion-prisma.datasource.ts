@@ -8,7 +8,7 @@ import { Prisma } from "../../../../prisma/generated/client/client";
 import { ServicioAuditoria } from "../../../comun/auditoria/servicio-auditoria";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
 import { PrismaService } from "../../../comun/prisma.service";
-import type { DatosTipoHospitalizacion } from "../../domain/entities/tipo-hospitalizacion";
+import type { DatosTipoHospitalizacion, FiltrosTiposHospitalizacion } from "../../domain/entities/tipo-hospitalizacion";
 
 type Tx = Prisma.TransactionClient;
 
@@ -56,26 +56,25 @@ export class FuenteDatosTiposHospitalizacionPrisma {
     return tipo;
   }
 
-  async listar(organizacion: string) {
-    const tipos = await this.prisma.tipos_hospitalizacion.findMany({
-      where: {
-        fid_organizaciones: organizacion,
-        eliminado_en: null,
-        organizacion: { estado: 1, eliminado_en: null },
-      },
-      orderBy: [
-        { created_at: "desc" },
-        { id_tipos_hospitalizacion: "desc" },
-      ],
-      select: {
-        id_tipos_hospitalizacion: true,
-        nombre: true,
-        estado: true,
-        created_at: true,
-        updated_at: true,
-      },
-    });
-    return { tipos, total: tipos.length };
+  private readonly seleccion = { id_tipos_hospitalizacion: true, nombre: true, estado: true, created_at: true, updated_at: true } satisfies Prisma.tipos_hospitalizacionSelect;
+
+  async listar(organizacion: string, filtros: FiltrosTiposHospitalizacion) {
+    const base = { fid_organizaciones: organizacion, eliminado_en: null, organizacion: { estado: 1, eliminado_en: null }, ...(filtros.consulta ? { nombre: { contains: filtros.consulta, mode: Prisma.QueryMode.insensitive } } : {}) };
+    const cursorId = filtros.despues_de ?? filtros.antes_de;
+    const cursor = cursorId ? await this.prisma.tipos_hospitalizacion.findFirst({ where: { ...base, id_tipos_hospitalizacion: cursorId }, select: { id_tipos_hospitalizacion: true, created_at: true } }) : null;
+    if (cursorId && !cursor) throw new BadRequestException("hospitalizationTypes.invalidCursor");
+    const atras = Boolean(filtros.antes_de);
+    const condicion = cursor ? { OR: atras ? [{ created_at: { gt: cursor.created_at } }, { created_at: cursor.created_at, id_tipos_hospitalizacion: { gt: cursor.id_tipos_hospitalizacion } }] : [{ created_at: { lt: cursor.created_at } }, { created_at: cursor.created_at, id_tipos_hospitalizacion: { lt: cursor.id_tipos_hospitalizacion } }] } : {};
+    const [tipos, total] = await Promise.all([
+      this.prisma.tipos_hospitalizacion.findMany({ where: { ...base, ...condicion }, orderBy: atras ? [{ created_at: "asc" }, { id_tipos_hospitalizacion: "asc" }] : [{ created_at: "desc" }, { id_tipos_hospitalizacion: "desc" }], take: 11, select: this.seleccion }),
+      this.prisma.tipos_hospitalizacion.count({ where: base }),
+    ]);
+    const hayMas = tipos.length > 10; if (hayMas) tipos.pop(); if (atras) tipos.reverse();
+    return { tipos, total, paginacion: { anterior: tipos.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? tipos[0]!.id_tipos_hospitalizacion : null, siguiente: tipos.length && (atras || hayMas) ? tipos.at(-1)!.id_tipos_hospitalizacion : null } };
+  }
+
+  async buscar(organizacion: string, consulta: string) {
+    return this.prisma.tipos_hospitalizacion.findMany({ where: { fid_organizaciones: organizacion, eliminado_en: null, organizacion: { estado: 1, eliminado_en: null }, nombre: { contains: consulta, mode: Prisma.QueryMode.insensitive } }, orderBy: [{ created_at: "desc" }, { id_tipos_hospitalizacion: "desc" }], take: 6, select: this.seleccion });
   }
 
   async crear(

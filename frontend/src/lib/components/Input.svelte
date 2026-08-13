@@ -4,12 +4,17 @@
 	import Icon from './Icon.svelte';
 	import { i18n } from '../i18n/index.svelte';
 
-	interface Props extends HTMLInputAttributes {
+	interface Props extends Omit<HTMLInputAttributes, 'min' | 'max' | 'step' | 'minlength' | 'maxlength'> {
 		label?: string;
 		icon?: string;
 		error?: string;
 		value?: string;
 		suffix?: string;
+		min?: string | number;
+		max?: string | number;
+		step?: string | number;
+		minlength?: string | number;
+		maxlength?: string | number;
 	}
 
 	let {
@@ -20,6 +25,11 @@
 		type = 'text',
 		value = $bindable(''),
 		suffix,
+		min,
+		max,
+		step,
+		minlength,
+		maxlength,
 		required = false,
 		oninput,
 		oninvalid,
@@ -53,8 +63,13 @@
 			type={inputType}
 			bind:value
 			{required}
+			{min}
+			{max}
+			{step}
+			minlength={minlength === undefined ? undefined : Number(minlength)}
+			maxlength={maxlength === undefined ? undefined : Number(maxlength)}
 			aria-invalid={visibleError ? 'true' : undefined}
-			oninvalid={(event) => { const input = event.currentTarget; nativeError = input.validity.valueMissing ? i18n.t('forms.required') : input.validationMessage; oninvalid?.(event); }}
+			oninvalid={(event) => { oninvalid?.(event); const input = event.currentTarget; nativeError = input.validity.valueMissing ? i18n.t('forms.required') : input.validationMessage; }}
 			oninput={(event) => { nativeError = ''; oninput?.(event); }}
 			class="flex-1 w-full min-w-0 h-11 bg-transparent border-0 outline-none text-ink text-base placeholder:text-muted {icon
 				? 'pl-2.5 pr-3.5'

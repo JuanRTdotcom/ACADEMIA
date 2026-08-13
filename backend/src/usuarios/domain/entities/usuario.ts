@@ -51,3 +51,8 @@ export interface OpcionesUsuario {
   modulos: ModuloPermisosUsuario[];
   modulos_por_empresa: Record<string, ModuloPermisosUsuario[]>;
 }
+export interface FiltrosUsuariosEmpresa {
+  despues_de?: string;
+  antes_de?: string;
+  consulta?: string;
+}

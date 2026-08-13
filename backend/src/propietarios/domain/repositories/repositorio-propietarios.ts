@@ -1,6 +1,8 @@
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
+import type { ResultadoCatalogoPaginado } from "../../../comun/domain/entities/catalogo-paginado";
 import type {
   DatosPropietario,
+  EliminacionPropietario,
   FiltrosPropietarios,
 } from "../entities/propietario";
 
@@ -8,7 +10,7 @@ export abstract class RepositorioPropietarios {
   abstract listar(
     organizacion: string,
     filtros: FiltrosPropietarios,
-  ): Promise<unknown>;
+  ): Promise<ResultadoCatalogoPaginado>;
   abstract opciones(organizacion: string, idioma: string): Promise<unknown>;
   abstract obtener(id: string, organizacion: string): Promise<unknown>;
   abstract crear(
@@ -27,6 +29,7 @@ export abstract class RepositorioPropietarios {
   abstract eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void>;

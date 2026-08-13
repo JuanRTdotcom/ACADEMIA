@@ -23,13 +23,21 @@ async function obtenerUsuario(event: RequestEvent) {
 export const load: PageServerLoad = async (event) => {
   const { usuario } = await event.parent();
   try {
-    const response = await companyRequest(event, "/company/services");
+    const query = new URLSearchParams();
+    const position = event.url.searchParams.get("p");
+    const search = event.url.searchParams.get("q")?.trim() ?? "";
+    if (position) query.set("p", position);
+    if (search) query.set("q", search);
+    const response = await companyRequest(
+      event,
+      `/company/services${query.size ? `?${query}` : ""}`,
+    );
     if (!response.ok)
       error(
         response.status,
         await companyMessage(response, "services.loadError"),
       );
-    return { ...(await response.json()), usuario };
+    return { ...(await response.json()), usuario, busqueda: search };
   } catch (cause) {
     if (cause && typeof cause === "object" && "status" in cause) throw cause;
     error(503, "services.serviceUnavailable");

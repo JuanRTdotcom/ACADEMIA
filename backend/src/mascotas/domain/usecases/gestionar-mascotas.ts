@@ -3,6 +3,7 @@ import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-
 import type {
   ArchivoMascota,
   DatosMascota,
+  EliminacionMascota,
   FiltrosMascotas,
 } from "../entities/mascota";
 import { RepositorioMascotas } from "../repositories/repositorio-mascotas";
@@ -56,9 +57,10 @@ export class CasoUsoGestionarMascotas {
   eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionMascota,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.mascotas.eliminar(id, organizacion, usuario, contexto);
+    return this.mascotas.eliminar(id, organizacion, datos, usuario, contexto);
   }
 }

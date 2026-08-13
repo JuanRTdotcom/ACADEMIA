@@ -14,10 +14,17 @@ describe("CasoUsoGestionarPropietarios", () => {
       ip: "127.0.0.1",
       agente_usuario: "test",
     };
-    await caso.eliminar("propietario", "veterinaria", "usuario", contexto);
+    await caso.eliminar(
+      "propietario",
+      "veterinaria",
+      { confirmar_desvinculacion: true },
+      "usuario",
+      contexto,
+    );
     expect(eliminar).toHaveBeenCalledWith(
       "propietario",
       "veterinaria",
+      { confirmar_desvinculacion: true },
       "usuario",
       contexto,
     );

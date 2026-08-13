@@ -54,7 +54,7 @@ Principios DESIGN2:
 - **Un solo acento estructural**: azul Notion `#0075de` (`--primary`). Es el único color
   que pinta acciones y links. Nunca un segundo acento estructural.
 - **CTAs tipo pill** (`rounded-full`); botones de nav/utility tienen 8px (`variant="utility"`).
-- Canvas cálido `#f6f5f4` (`--surface`) de fondo de página; **cards blancas** (`--canvas`)
+- Canvas blanco `#ffffff` (`--surface`) de fondo de página; **cards blancas** (`--canvas`)
   con hairline `#e6e6e6`.
 - Indigo profundo `#213183` (`--brand-navy`): banda "night" del hero (solo en login).
 - **Paleta de colores (sky/purple/pink/orange/teal/green) = SOLO decoración**
@@ -203,6 +203,56 @@ Para agregar texto: crear la misma clave en `en.json` y `es.json`, luego usar `i
 - Las respuestas dinámicas usan `Cache-Control: no-store`; no se reutilizan páginas ni datos de usuario.
 - CSR sigue activo solo para hidratar interacciones (tema, sidebar, idioma y formularios).
 - Los assets estáticos versionados (JS, CSS, fuentes e imágenes) sí pueden usar caché.
+
+### Patrón obligatorio para tablas operativas
+
+- El ancho del `ConfirmationDialog` depende del contenido: formularios de uno o dos campos usan el tamaño normal; `size="wide"` se reserva para tres o más campos o para contenido complejo que realmente necesite distribución adicional. No ampliar un modal solo para igualarlo visualmente con otro mantenedor.
+
+Salvo que el dominio exija una presentación distinta, los listados administrativos y
+operativos nuevos deben tomar `/administrator/services` como implementación de
+referencia completa. No se replica únicamente su apariencia:
+
+- Primera página SSR y consultas posteriores en PostgreSQL; nunca cargar el catálogo
+  completo en el navegador.
+- Data Table compacta con shadcn-svelte Table y TanStack Table. Cabeceras en mayúsculas,
+  `font-bold` y `text-ink`; celdas con peso normal y `text-steel`. Filas alternadas,
+  divisores verticales suaves y ancho de columnas proporcional al contenido.
+- **Acciones** es la primera columna. **Editar** queda visible como icono Lucide con
+  `title` nativo y localizado que dice solo `Editar`; no usa tooltip flotante. Las acciones secundarias,
+  incluida **Eliminar**, viven en el menú de tres puntos. Todo se oculta o deshabilita
+  según los permisos efectivos. En móvil se ofrece la misma capacidad mediante cards
+  compactas adaptadas, no una funcionalidad recortada.
+- Estado editable mediante switch accesible cuando corresponda. Los valores ausentes
+  quedan vacíos; no escribir textos artificiales como `Sin descripción`.
+- Paginación keyset estable por `created_at DESC, UUID DESC`, de 10 en 10 y sin
+  `offset`. La posición se transmite en `p` mediante el token opaco tenant-scoped
+  existente. Anterior, Siguiente y Primera página reemplazan la entrada actual del
+  historial para que Atrás no recorra cada página visitada.
+- Buscador remoto explícito, tenant-scoped, con mínimo tres caracteres; el filtro se
+  conserva al paginar. Mientras espera, las filas permanecen visibles bajo un overlay
+  con `backdrop-blur`, indicador centrado, `aria-busy` y `role=status`; no oscurecer la
+  tabla ni sustituirla por un salto visual.
+- Tras crear, volver al inicio del resultado para mostrar el registro más reciente,
+  conservando scroll y foco del catálogo. Editar, cambiar estado o eliminar conserva
+  el contexto actual.
+- En catálogos donde pueda haber duplicados, el alta incorpora búsqueda/autocomplete
+  remoto desde tres caracteres con debounce de 400 ms, máximo seis resultados y
+  cancelación de la solicitud anterior. El autocomplete nativo del navegador queda
+  desactivado. Una coincidencia exacta bloquea el duplicado y permite abrir su edición.
+- Toda mutación conserva confirmación, loading en la acción, Sonner compartido,
+  validación backend, permisos, aislamiento tenant, baja lógica y auditoría.
+
+Antes de copiar código, extraer o reutilizar el componente compartido que corresponda;
+no crear variantes visuales locales de tabla, tooltip, confirmación o Sonner.
+
+**Criterio de terminación:** decir que un módulo “usa la misma tabla” significa aplicar
+el patrón completo de extremo a extremo. No basta con copiar colores, cabeceras o
+acciones. Deben existir simultáneamente consulta PostgreSQL paginada, índice keyset,
+token `p` opaco ligado al tenant y a la búsqueda, primera carga SSR, búsqueda remota,
+Data Table responsive, overlay con blur, navegación con `replaceState`, conservación
+de página en mutaciones y retorno al inicio tras crear. En catálogos editables también
+se exige autocomplete remoto anti-duplicados. Si falta una sola de estas piezas, el
+módulo se registra como implementación parcial y no como estándar terminado.
 
 ## 10. Qué falta / próximos pasos
 

@@ -5,11 +5,11 @@
   import { toast } from 'svelte-sonner';
   import type { PageProps } from "./$types";
   import { Breadcrumb, Button, Card, Icon, Switch, i18n } from "$lib";
+  import { MODULE_GROUP_ORDER, moduleGroupKey, type ModuleGroupKey } from '$lib/config/module-groups';
 
   type Permission = { id_permisos: string; codigo: string; accion: string; descripcion: string | null; asignado: boolean };
   type Module = { id_modulos: string; codigo: string; nombre: string; icono: string | null; ruta: string | null; permisos: Permission[] };
   type Catalog = { rol: { id_roles: string; nombre: string; alias: string; icono: string; estado: number }; modulos: Module[] };
-  type GroupKey = 'system' | 'superadmin' | 'administrator' | 'profile' | 'resources';
   type PermissionSubgroup = { key: string; modules: Module[] };
 
   const CANONICAL_ACTIONS = ['read', 'create', 'update', 'delete', 'export'] as const;
@@ -36,14 +36,7 @@
   let saving = $state(false);
   let initializedRole = $state(untrack(() => (data as Catalog).rol.id_roles));
 
-  const groupKey = (code: string): GroupKey => {
-    if (code.startsWith('superadmin.')) return 'superadmin';
-    if (code.startsWith('administrator.')) return 'administrator';
-    if (code.startsWith('profile.')) return 'profile';
-    if (code === 'resources') return 'resources';
-    return 'system';
-  };
-  const subgroupKey = (group: GroupKey, code: string) => {
+  const subgroupKey = (group: ModuleGroupKey, code: string) => {
     if (group === 'administrator') {
       if (code.startsWith('administrator.users')) return 'company_users';
       return 'company';
@@ -54,17 +47,20 @@
       if (['profile.appearance', 'profile.notifications', 'profile.activity'].includes(code)) return 'preferences';
       return 'information';
     }
+    if (group === 'clinic') return 'clinical_care';
+    if (group === 'commercial') return 'sales_inventory';
+    if (group === 'scheduling') return 'planning';
     return 'management';
   };
   const groups = $derived.by(() => {
-    const result = new Map<GroupKey, { key: GroupKey; modules: Module[] }>();
+    const result = new Map<ModuleGroupKey, { key: ModuleGroupKey; modules: Module[] }>();
     for (const module of catalog.modulos) {
-      const key = groupKey(module.codigo);
+      const key = moduleGroupKey(module.codigo);
       const group = result.get(key) ?? { key, modules: [] };
       group.modules.push(module);
       result.set(key, group);
     }
-    return [...result.values()].map((group) => {
+    return [...result.values()].sort((a, b) => MODULE_GROUP_ORDER.indexOf(a.key) - MODULE_GROUP_ORDER.indexOf(b.key)).map((group) => {
       const subgroups = new Map<string, PermissionSubgroup>();
       for (const module of group.modules) {
         const key = subgroupKey(group.key, module.codigo);
@@ -85,7 +81,7 @@
   const items = $derived([{ label: i18n.t('nav.dashboard'), href: '/dashboard' }, { label: i18n.t('nav.roles'), href: '/superadmin/roles' }, { label: catalog.rol.nombre }]);
   const dirty = $derived(selected.size !== initialSelected.size || [...selected].some((id) => !initialSelected.has(id)));
   const actionName = (action: string) => i18n.t(`permissions.actions.${action}`) || action;
-  const groupName = (key: GroupKey) => i18n.t(`permissions.groups.${key}`);
+  const groupName = (key: ModuleGroupKey) => i18n.t(`permissions.groups.${key}`);
   const subgroupName = (key: string) => i18n.t(`permissions.subgroups.${key}`);
   const idsOf = (modules: Module[]) => modules.flatMap((module) => module.permisos.map((permission) => permission.id_permisos));
   function isSelected(id: string) { return selected.has(id); }

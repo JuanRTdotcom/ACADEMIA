@@ -487,8 +487,8 @@ export class FuenteDatosUsuariosPrisma {
     });
   }
 
-  async listarDeEmpresa(empresaId: string, busqueda: string): Promise<{ usuarios: UsuarioListado[]; total: number }> {
-    const term = busqueda.trim();
+  async listarDeEmpresa(empresaId: string, filtros: import("../../domain/entities/usuario").FiltrosUsuariosEmpresa): Promise<{ usuarios: UsuarioListado[]; total: number; paginacion: { anterior: string | null; siguiente: string | null } }> {
+    const term = filtros.consulta?.trim() ?? "";
     const where: Prisma.usuariosWhereInput = {
       eliminado_en: null,
       fid_organizaciones: empresaId,
@@ -500,9 +500,15 @@ export class FuenteDatosUsuariosPrisma {
         { usuarios_roles: { some: { estado: 1, rol: { estado: 1, eliminado_en: null, OR: [{ nombre: { contains: term, mode: "insensitive" } }, { codigo: { contains: term, mode: "insensitive" } }] } } } },
       ] } : {}),
     };
-    const usuarios = await this.prisma.usuarios.findMany({
-      where,
-      orderBy: [{ created_at: "desc" }, { id_usuarios: "desc" }],
+    const cursorId = filtros.despues_de ?? filtros.antes_de;
+    const cursor = cursorId ? await this.prisma.usuarios.findFirst({ where: { ...where, id_usuarios: cursorId }, select: { id_usuarios: true, created_at: true } }) : null;
+    if (cursorId && !cursor) throw new BadRequestException("users.invalidCursor");
+    const atras = Boolean(filtros.antes_de);
+    const condicionCursor: Prisma.usuariosWhereInput = cursor ? { OR: atras ? [{ created_at: { gt: cursor.created_at } }, { created_at: cursor.created_at, id_usuarios: { gt: cursor.id_usuarios } }] : [{ created_at: { lt: cursor.created_at } }, { created_at: cursor.created_at, id_usuarios: { lt: cursor.id_usuarios } }] } : {};
+    const [usuarios, total] = await Promise.all([this.prisma.usuarios.findMany({
+      where: { AND: [where, condicionCursor] },
+      orderBy: atras ? [{ created_at: "asc" }, { id_usuarios: "asc" }] : [{ created_at: "desc" }, { id_usuarios: "desc" }],
+      take: 11,
       select: {
         id_usuarios: true, fid_organizaciones: true, usuario: true, estado: true, estado_cuenta: true, created_at: true,
         persona: { select: { nombres: true, apellido_paterno: true, apellido_materno: true, foto_url: true, correos: { where: { estado: 1 }, orderBy: { created_at: "asc" }, take: 1, select: { correo: true } } } },
@@ -510,7 +516,10 @@ export class FuenteDatosUsuariosPrisma {
         usuarios_roles: { where: { estado: 1, rol: { estado: 1, eliminado_en: null } }, select: { rol: { select: { id_roles: true, nombre: true, codigo: true, icono: true, roles_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, permiso: { select: { fid_modulos: true } } } } } } } },
         usuarios_permisos: { where: { estado: 1, permiso: { estado: 1 } }, select: { fid_permisos: true, efecto: true, permiso: { select: { fid_modulos: true } } } },
       },
-    });
+    }), this.prisma.usuarios.count({ where })]);
+    const hayMas = usuarios.length > 10;
+    if (hayMas) usuarios.pop();
+    if (atras) usuarios.reverse();
     return {
       usuarios: usuarios.map((item) => ({
         id_usuarios: item.id_usuarios, fid_organizaciones: item.fid_organizaciones, usuario: item.usuario,
@@ -519,7 +528,11 @@ export class FuenteDatosUsuariosPrisma {
         empresa: { nombre: item.organizacion.nombre, slug: item.organizacion.slug },
         roles: item.usuarios_roles.map(({ rol }) => ({ id_roles: rol.id_roles, nombre: rol.nombre, codigo: rol.codigo, icono: rol.icono })),
         permisos: this.permisosEfectivos(item),
-      })), total: usuarios.length,
+      })), total,
+      paginacion: {
+        anterior: usuarios.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? usuarios[0]!.id_usuarios : null,
+        siguiente: usuarios.length && (atras || hayMas) ? usuarios.at(-1)!.id_usuarios : null,
+      },
     };
   }
 

@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
@@ -16,6 +17,9 @@ import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/
 import { Permisos } from "../../../autenticacion/presentation/decorators/permisos.decorador";
 import { UsuarioActual } from "../../../autenticacion/presentation/decorators/usuario-actual.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
+import { DtoBuscarCatalogo, DtoListarCatalogoPaginado } from "../../../comun/presentation/dto/catalogo-paginado.dto";
+import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
+import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
 import { CasoUsoGestionarPruebasLaboratorio } from "../../domain/usecases/gestionar-pruebas-laboratorio";
 import {
   DtoCambiarEstadoPruebaLaboratorio,
@@ -24,14 +28,19 @@ import {
 
 @Controller("company/laboratory-tests")
 export class ControladorPruebasLaboratorio {
-  constructor(private pruebas: CasoUsoGestionarPruebasLaboratorio) {}
+  constructor(private pruebas: CasoUsoGestionarPruebasLaboratorio, private tokens: ServicioTokenOpaco) {}
 
   @Get()
   @Permisos("administrator.laboratory_tests.read")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  listar(@UsuarioActual() usuario: UsuarioAutenticado) {
-    return this.pruebas.listar(usuario.fid_organizaciones);
+  async listar(@Query() query: DtoListarCatalogoPaginado, @UsuarioActual() usuario: UsuarioAutenticado) {
+    const posicion = leerPosicionCatalogo(this.tokens, "laboratory-tests.pagination", query.p, usuario.fid_organizaciones, query.q, "laboratoryTests.invalidCursor");
+    const catalogo = await this.pruebas.listar(usuario.fid_organizaciones, { despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined, antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined, consulta: query.q });
+    return protegerPaginacionCatalogo(this.tokens, "laboratory-tests.pagination", catalogo, usuario.fid_organizaciones, query.q);
   }
+
+  @Get("search") @Permisos("administrator.laboratory_tests.read") @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async buscar(@Query() query: DtoBuscarCatalogo, @UsuarioActual() usuario: UsuarioAutenticado) { return { pruebas: await this.pruebas.buscar(usuario.fid_organizaciones, query.q) }; }
 
   @Post()
   @Permisos("administrator.laboratory_tests.create")

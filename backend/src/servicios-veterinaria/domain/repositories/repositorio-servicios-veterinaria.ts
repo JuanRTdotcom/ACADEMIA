@@ -2,10 +2,18 @@ import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-
 import type {
   CatalogoServiciosVeterinaria,
   DatosServicioVeterinaria,
+  FiltrosServiciosVeterinaria,
 } from "../entities/servicio-veterinaria";
 
 export abstract class RepositorioServiciosVeterinaria {
-  abstract listar(organizacion: string): Promise<CatalogoServiciosVeterinaria>;
+  abstract listar(
+    organizacion: string,
+    filtros: FiltrosServiciosVeterinaria,
+  ): Promise<CatalogoServiciosVeterinaria>;
+  abstract buscar(
+    organizacion: string,
+    consulta: string,
+  ): Promise<CatalogoServiciosVeterinaria["servicios"]>;
   abstract obtener(
     id: string,
     organizacion: string,

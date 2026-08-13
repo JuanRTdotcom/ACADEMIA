@@ -1,0 +1,14 @@
+CREATE UNIQUE INDEX archivos_organizacion_id_tenant_unique
+  ON nucleo.archivos_organizacion(id_archivos_organizacion,fid_organizaciones);
+CREATE UNIQUE INDEX servicios_veterinaria_id_tenant_unique
+  ON nucleo.servicios_veterinaria(id_servicios_veterinaria,fid_organizaciones);
+
+ALTER TABLE nucleo.detalles_venta DROP CONSTRAINT detalles_venta_fid_servicios_veterinaria_fkey;
+ALTER TABLE nucleo.detalles_venta ADD CONSTRAINT detalles_venta_servicio_tenant_fk
+  FOREIGN KEY (fid_servicios_veterinaria,fid_organizaciones)
+  REFERENCES nucleo.servicios_veterinaria(id_servicios_veterinaria,fid_organizaciones) ON DELETE RESTRICT;
+
+ALTER TABLE personas.documentos_mascota DROP CONSTRAINT documentos_mascota_fid_archivos_organizacion_fkey;
+ALTER TABLE personas.documentos_mascota ADD CONSTRAINT documentos_mascota_archivo_tenant_fk
+  FOREIGN KEY (fid_archivos_organizacion,fid_organizaciones)
+  REFERENCES nucleo.archivos_organizacion(id_archivos_organizacion,fid_organizaciones) ON DELETE RESTRICT;

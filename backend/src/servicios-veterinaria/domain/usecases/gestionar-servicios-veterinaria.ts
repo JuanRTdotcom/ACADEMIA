@@ -1,14 +1,21 @@
 import { Injectable } from "@nestjs/common";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { DatosServicioVeterinaria } from "../entities/servicio-veterinaria";
+import type {
+  DatosServicioVeterinaria,
+  FiltrosServiciosVeterinaria,
+} from "../entities/servicio-veterinaria";
 import { RepositorioServiciosVeterinaria } from "../repositories/repositorio-servicios-veterinaria";
 
 @Injectable()
 export class CasoUsoGestionarServiciosVeterinaria {
   constructor(private servicios: RepositorioServiciosVeterinaria) {}
 
-  listar(organizacion: string) {
-    return this.servicios.listar(organizacion);
+  listar(organizacion: string, filtros: FiltrosServiciosVeterinaria) {
+    return this.servicios.listar(organizacion, filtros);
+  }
+
+  buscar(organizacion: string, consulta: string) {
+    return this.servicios.buscar(organizacion, consulta);
   }
 
   obtener(id: string, organizacion: string) {

@@ -10,6 +10,9 @@ export class RepositorioVacunasDatos extends RepositorioVacunas {
   listar(...args: Parameters<RepositorioVacunas["listar"]>) {
     return this.fuente.listar(...args);
   }
+  buscar(...args: Parameters<RepositorioVacunas["buscar"]>) {
+    return this.fuente.buscar(...args);
+  }
   crear(...args: Parameters<RepositorioVacunas["crear"]>) {
     return this.fuente.crear(...args);
   }

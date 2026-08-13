@@ -8,7 +8,7 @@ import { Prisma } from "../../../../prisma/generated/client/client";
 import { ServicioAuditoria } from "../../../comun/auditoria/servicio-auditoria";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
 import { PrismaService } from "../../../comun/prisma.service";
-import type { DatosPruebaLaboratorio } from "../../domain/entities/prueba-laboratorio";
+import type { DatosPruebaLaboratorio, FiltrosPruebasLaboratorio } from "../../domain/entities/prueba-laboratorio";
 
 type Tx = Prisma.TransactionClient;
 
@@ -66,32 +66,27 @@ export class FuenteDatosPruebasLaboratorioPrisma {
     return prueba;
   }
 
-  async listar(organizacion: string) {
-    const [pruebas, categorias] = await Promise.all([
-      this.prisma.pruebas_laboratorio.findMany({
-        where: {
-          fid_organizaciones: organizacion,
-          eliminado_en: null,
-          organizacion: { estado: 1, eliminado_en: null },
-        },
-        orderBy: [{ created_at: "desc" }, { id_pruebas_laboratorio: "desc" }],
-        select: {
-          id_pruebas_laboratorio: true,
-          fid_categorias_pruebas_laboratorio: true,
-          nombre: true,
-          estado: true,
-          created_at: true,
-          updated_at: true,
-          categoria: { select: { nombre: true } },
-        },
-      }),
-      this.prisma.categorias_pruebas_laboratorio.findMany({
-        where: { estado: 1 },
-        orderBy: [{ orden: "asc" }, { nombre: "asc" }],
-        select: { id_categorias_pruebas_laboratorio: true, nombre: true },
-      }),
+  private readonly seleccion = { id_pruebas_laboratorio: true, fid_categorias_pruebas_laboratorio: true, nombre: true, estado: true, created_at: true, updated_at: true, categoria: { select: { nombre: true } } } satisfies Prisma.pruebas_laboratorioSelect;
+
+  async listar(organizacion: string, filtros: FiltrosPruebasLaboratorio) {
+    const busqueda = filtros.consulta ? { AND: [{ OR: [{ nombre: { contains: filtros.consulta, mode: Prisma.QueryMode.insensitive } }, { categoria: { nombre: { contains: filtros.consulta, mode: Prisma.QueryMode.insensitive } } }] }] } : {};
+    const base = { fid_organizaciones: organizacion, eliminado_en: null, organizacion: { estado: 1, eliminado_en: null }, ...busqueda };
+    const cursorId = filtros.despues_de ?? filtros.antes_de;
+    const cursor = cursorId ? await this.prisma.pruebas_laboratorio.findFirst({ where: { ...base, id_pruebas_laboratorio: cursorId }, select: { id_pruebas_laboratorio: true, created_at: true } }) : null;
+    if (cursorId && !cursor) throw new BadRequestException("laboratoryTests.invalidCursor");
+    const atras = Boolean(filtros.antes_de);
+    const condicion = cursor ? { OR: atras ? [{ created_at: { gt: cursor.created_at } }, { created_at: cursor.created_at, id_pruebas_laboratorio: { gt: cursor.id_pruebas_laboratorio } }] : [{ created_at: { lt: cursor.created_at } }, { created_at: cursor.created_at, id_pruebas_laboratorio: { lt: cursor.id_pruebas_laboratorio } }] } : {};
+    const [pruebas, total, categorias] = await Promise.all([
+      this.prisma.pruebas_laboratorio.findMany({ where: { ...base, ...condicion }, orderBy: atras ? [{ created_at: "asc" }, { id_pruebas_laboratorio: "asc" }] : [{ created_at: "desc" }, { id_pruebas_laboratorio: "desc" }], take: 11, select: this.seleccion }),
+      this.prisma.pruebas_laboratorio.count({ where: base }),
+      this.prisma.categorias_pruebas_laboratorio.findMany({ where: { estado: 1 }, orderBy: [{ orden: "asc" }, { nombre: "asc" }], select: { id_categorias_pruebas_laboratorio: true, nombre: true } }),
     ]);
-    return { pruebas, categorias, total: pruebas.length };
+    const hayMas = pruebas.length > 10; if (hayMas) pruebas.pop(); if (atras) pruebas.reverse();
+    return { pruebas, categorias, total, paginacion: { anterior: pruebas.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? pruebas[0]!.id_pruebas_laboratorio : null, siguiente: pruebas.length && (atras || hayMas) ? pruebas.at(-1)!.id_pruebas_laboratorio : null } };
+  }
+
+  async buscar(organizacion: string, consulta: string) {
+    return this.prisma.pruebas_laboratorio.findMany({ where: { fid_organizaciones: organizacion, eliminado_en: null, organizacion: { estado: 1, eliminado_en: null }, OR: [{ nombre: { contains: consulta, mode: Prisma.QueryMode.insensitive } }, { categoria: { nombre: { contains: consulta, mode: Prisma.QueryMode.insensitive } } }] }, orderBy: [{ created_at: "desc" }, { id_pruebas_laboratorio: "desc" }], take: 6, select: this.seleccion });
   }
 
   async crear(

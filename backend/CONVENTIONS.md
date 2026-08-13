@@ -20,6 +20,13 @@
 - `*.module.ts` es la raíz de composición de Nest y enlaza contrato/implementación con `{ provide, useExisting }`.
 - No crear carpetas vacías ni capas sin responsabilidad real.
 
+## Parámetros GET y tokens opacos
+
+- `GET` continúa siendo el método de lectura. Búsquedas, filtros, orden, fechas y páginas legibles usan query params normales; envolver todos los `GET` en JWT está prohibido porque no agrega autorización y perjudica caché, navegación y soporte.
+- Una posición interna de paginación o referencia técnica que no deba revelarse usa únicamente `?p=<token opaco>` mediante `ServicioTokenOpaco`. El token se cifra y autentica con AES-256-GCM, clave separada por HKDF, ámbito de endpoint y datos tenant; no crear cifradores ni formatos paralelos por módulo.
+- El token opaco nunca concede acceso. Después de descifrarlo, cada endpoint mantiene sesión, permiso, tenant, estado y pertenencia como validaciones autoritativas. Un token inválido o alterado responde con el código i18n específico del módulo.
+- Los parámetros de negocio que el usuario necesita comprender o compartir no se ocultan. La opacidad se usa para posiciones internas, no como seguridad por oscuridad.
+
 ## Configuración y manejo de errores
 
 - Toda variable de entorno consumida por la aplicación debe declararse como obligatoria y validarse al arrancar.

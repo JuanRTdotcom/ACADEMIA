@@ -2,14 +2,14 @@
 	import { Button, Icon, i18n } from '$lib';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 
-	type Owner = { id_propietarios: string; nombre_completo: string; numero_documento: string; celular: string | null; tipo_documento: { etiqueta: string } };
+	type Owner = { id_propietarios: string; nombre_completo: string; numero_documento: string; celular: string | null; foto_version?: string | null; tipo_documento: { etiqueta: string } };
 	let { owner = $bindable<Owner | null>(null), decided = $bindable(false), error = false }: { owner?: Owner | null; decided?: boolean; error?: boolean } = $props();
 	let open = $state(false);
 	let query = $state('');
 	let results = $state<Owner[]>([]);
 	let searching = $state(false);
 	let searched = $state(false);
-	const ownerIcon = $derived(owner ? 'contact' : decided ? 'user-x' : 'user-round');
+	const ownerIcon = $derived(owner ? 'user-round' : decided ? 'user-x' : 'user-round');
 	const ownerIconTone = $derived(owner ? 'bg-primary-soft text-primary' : decided ? 'bg-error/10 text-error' : 'bg-surface text-stone');
 
 	async function search() {

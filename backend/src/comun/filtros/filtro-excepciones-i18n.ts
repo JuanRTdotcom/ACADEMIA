@@ -32,6 +32,7 @@ export class FiltroExcepcionesI18n implements ExceptionFilter {
     let estado: number = HttpStatus.INTERNAL_SERVER_ERROR;
     let codigo = "common.internalError";
     let detalles: string[] | undefined;
+    let datos: unknown;
     // Valores para interpolar placeholders {clave} del mensaje traducido. Los
     // provee quien lanza la excepción, ej. el tope real de una colección.
     let argumentos: Record<string, string | number> | undefined;
@@ -44,13 +45,22 @@ export class FiltroExcepcionesI18n implements ExceptionFilter {
       } else if (cuerpo && typeof cuerpo === "object") {
         const mensaje = (cuerpo as { message?: unknown }).message;
         const args = (cuerpo as { args?: unknown }).args;
+        // Solo se expone información marcada explícitamente como pública por el
+        // caso de uso; nunca se reenvían propiedades arbitrarias de excepciones.
+        datos = (cuerpo as { publicData?: unknown }).publicData;
         if (args && typeof args === "object") {
           argumentos = args as Record<string, string | number>;
         }
         if (Array.isArray(mensaje)) {
-          // Errores del ValidationPipe: se conservan tal cual como detalles.
+          // Un DTO puede declarar un código i18n público como mensaje para evitar
+          // que una validación conocida se degrade al aviso genérico.
           detalles = mensaje as string[];
-          codigo = "common.validationError";
+          codigo =
+            detalles.find(
+              (detalle) =>
+                /^[a-z][\w]*(?:\.[\w]+)+$/.test(detalle) &&
+                this.traduccion.traducir(detalle, idioma) !== detalle,
+            ) ?? "common.validationError";
         } else if (typeof mensaje === "string") {
           codigo = mensaje;
         }
@@ -91,6 +101,7 @@ export class FiltroExcepcionesI18n implements ExceptionFilter {
         ? { retry_after_seconds: retryAfterSeconds }
         : {}),
       ...(detalles ? { detalles } : {}),
+      ...(typeof datos !== "undefined" ? { data: datos } : {}),
     });
   }
 }

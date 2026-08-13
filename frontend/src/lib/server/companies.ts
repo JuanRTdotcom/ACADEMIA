@@ -45,8 +45,16 @@ export async function companyRequest(
 export async function companyMessage(response: Response, fallback: string) {
   const body = (await response.json().catch(() => null)) as {
     message?: unknown;
+    detalles?: unknown;
   } | null;
-  return typeof body?.message === "string" ? body.message : fallback;
+  if (typeof body?.message === "string" && body.message.trim())
+    return body.message;
+  const detail = Array.isArray(body?.detalles)
+    ? body.detalles.find(
+        (item): item is string => typeof item === "string" && Boolean(item),
+      )
+    : null;
+  return detail ?? fallback;
 }
 
 export async function loadCompanySection<T>(

@@ -9,27 +9,28 @@ import {
 
 const texto = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim().replace(/\s+/g, " ") : value;
+const INVALIDO = { message: "procedures.invalidData" };
 
 export class DtoGuardarProcedimientoVeterinario {
-  @IsDefined()
+  @IsDefined(INVALIDO)
   @Transform(texto)
-  @IsString()
-  @MinLength(2)
-  @MaxLength(160)
+  @IsString(INVALIDO)
+  @MinLength(2, INVALIDO)
+  @MaxLength(160, INVALIDO)
   nombre!: string;
 
-  @IsDefined()
+  @IsDefined(INVALIDO)
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value,
   )
-  @IsString()
-  @MinLength(5)
-  @MaxLength(1000)
+  @IsString(INVALIDO)
+  @MinLength(5, INVALIDO)
+  @MaxLength(1000, INVALIDO)
   descripcion_guia!: string;
 }
 
 export class DtoCambiarEstadoProcedimientoVeterinario {
-  @IsDefined()
-  @IsBoolean()
+  @IsDefined(INVALIDO)
+  @IsBoolean(INVALIDO)
   activo!: boolean;
 }

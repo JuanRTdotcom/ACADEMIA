@@ -1,8 +1,10 @@
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { DatosProcedimientoVeterinario } from "../entities/procedimiento-veterinario";
+import type { ResultadoCatalogoPaginado } from "../../../comun/domain/entities/catalogo-paginado";
+import type { DatosProcedimientoVeterinario, FiltrosProcedimientosVeterinarios } from "../entities/procedimiento-veterinario";
 
 export abstract class RepositorioProcedimientosVeterinarios {
-  abstract listar(organizacion: string): Promise<unknown>;
+  abstract listar(organizacion: string, filtros: FiltrosProcedimientosVeterinarios): Promise<ResultadoCatalogoPaginado>;
+  abstract buscar(organizacion: string, consulta: string): Promise<unknown>;
   abstract crear(
     organizacion: string,
     datos: DatosProcedimientoVeterinario,

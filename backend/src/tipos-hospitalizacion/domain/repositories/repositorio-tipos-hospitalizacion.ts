@@ -1,8 +1,10 @@
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { DatosTipoHospitalizacion } from "../entities/tipo-hospitalizacion";
+import type { ResultadoCatalogoPaginado } from "../../../comun/domain/entities/catalogo-paginado";
+import type { DatosTipoHospitalizacion, FiltrosTiposHospitalizacion } from "../entities/tipo-hospitalizacion";
 
 export abstract class RepositorioTiposHospitalizacion {
-  abstract listar(organizacion: string): Promise<unknown>;
+  abstract listar(organizacion: string, filtros: FiltrosTiposHospitalizacion): Promise<ResultadoCatalogoPaginado>;
+  abstract buscar(organizacion: string, consulta: string): Promise<unknown>;
   abstract crear(
     organizacion: string,
     datos: DatosTipoHospitalizacion,

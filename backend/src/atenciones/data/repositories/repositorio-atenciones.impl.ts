@@ -28,6 +28,11 @@ export class RepositorioAtencionesDatos extends RepositorioAtenciones {
   ) {
     return this.fuente.ultimoRegistroMascota(...args);
   }
+  historialMascota(
+    ...args: Parameters<RepositorioAtenciones["historialMascota"]>
+  ) {
+    return this.fuente.historialMascota(...args);
+  }
   obtener(...args: Parameters<RepositorioAtenciones["obtener"]>) {
     return this.fuente.obtener(...args);
   }
@@ -38,6 +43,9 @@ export class RepositorioAtencionesDatos extends RepositorioAtenciones {
     ...args: Parameters<RepositorioAtenciones["agregarRegistro"]>
   ) {
     return this.fuente.agregarRegistro(...args);
+  }
+  editarRegistro(...args: Parameters<RepositorioAtenciones["editarRegistro"]>) {
+    return this.fuente.editarRegistro(...args);
   }
   cambiarEstado(...args: Parameters<RepositorioAtenciones["cambiarEstado"]>) {
     return this.fuente.cambiarEstado(...args);

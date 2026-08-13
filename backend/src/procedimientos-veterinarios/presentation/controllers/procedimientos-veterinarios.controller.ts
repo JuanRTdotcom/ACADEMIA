@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
@@ -16,6 +17,9 @@ import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/
 import { Permisos } from "../../../autenticacion/presentation/decorators/permisos.decorador";
 import { UsuarioActual } from "../../../autenticacion/presentation/decorators/usuario-actual.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
+import { DtoBuscarCatalogo, DtoListarCatalogoPaginado } from "../../../comun/presentation/dto/catalogo-paginado.dto";
+import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
+import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
 import { CasoUsoGestionarProcedimientosVeterinarios } from "../../domain/usecases/gestionar-procedimientos-veterinarios";
 import {
   DtoCambiarEstadoProcedimientoVeterinario,
@@ -24,14 +28,19 @@ import {
 
 @Controller("company/procedures")
 export class ControladorProcedimientosVeterinarios {
-  constructor(private tipos: CasoUsoGestionarProcedimientosVeterinarios) {}
+  constructor(private tipos: CasoUsoGestionarProcedimientosVeterinarios, private tokens: ServicioTokenOpaco) {}
 
   @Get()
   @Permisos("administrator.procedures.read")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  listar(@UsuarioActual() usuario: UsuarioAutenticado) {
-    return this.tipos.listar(usuario.fid_organizaciones);
+  async listar(@Query() query: DtoListarCatalogoPaginado, @UsuarioActual() usuario: UsuarioAutenticado) {
+    const posicion = leerPosicionCatalogo(this.tokens, "procedures.pagination", query.p, usuario.fid_organizaciones, query.q, "procedures.invalidCursor");
+    const catalogo = await this.tipos.listar(usuario.fid_organizaciones, { despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined, antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined, consulta: query.q });
+    return protegerPaginacionCatalogo(this.tokens, "procedures.pagination", catalogo, usuario.fid_organizaciones, query.q);
   }
+
+  @Get("search") @Permisos("administrator.procedures.read") @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async buscar(@Query() query: DtoBuscarCatalogo, @UsuarioActual() usuario: UsuarioAutenticado) { return { procedimientos: await this.tipos.buscar(usuario.fid_organizaciones, query.q) }; }
 
   @Post()
   @Permisos("administrator.procedures.create")

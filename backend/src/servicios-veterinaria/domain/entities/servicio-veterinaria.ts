@@ -21,4 +21,14 @@ export interface CatalogoServiciosVeterinaria {
   servicios: ServicioVeterinaria[];
   moneda: MonedaServicioVeterinaria;
   total: number;
+  paginacion: {
+    anterior: string | null;
+    siguiente: string | null;
+  };
+}
+
+export interface FiltrosServiciosVeterinaria {
+  despues_de?: string;
+  antes_de?: string;
+  consulta?: string;
 }

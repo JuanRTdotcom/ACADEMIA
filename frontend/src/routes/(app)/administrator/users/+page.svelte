@@ -6,6 +6,7 @@
   import type { PageProps } from './$types';
   import { Badge, Breadcrumb, Button, Card, ConfirmationDialog, Icon, Input, Switch, i18n, tienePermiso } from '$lib';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import CatalogSearch from '$lib/components/CatalogSearch.svelte'; import CatalogLoadingOverlay from '$lib/components/CatalogLoadingOverlay.svelte'; import CatalogPagination from '$lib/components/CatalogPagination.svelte';
 
   let { data }: PageProps = $props();
   type User = (typeof data.usuarios)[number];
@@ -54,14 +55,12 @@
     {#if canCreate}<Button href="/administrator/users/new"><Icon name="plus" size={18} />{i18n.t('users.new')}</Button>{/if}
   </div>
 
-  <div class="flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
-    <form method="GET" class="w-full max-w-md">
-      <Input name="q" value={data.q} icon="search" aria-label={i18n.t('users.search')} placeholder={i18n.t('users.searchPlaceholder')} maxlength={120} />
-    </form>
+  <div class="flex items-end justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
+    <CatalogSearch value={data.q} route="/administrator/users" maxLength={120} />
     <Badge variant="outline-sky">{i18n.t('users.count', { count: data.total })}</Badge>
   </div>
 
-  <Card padding="none" class="overflow-hidden">
+  <Card padding="none" class="relative overflow-hidden"><CatalogLoadingOverlay />
     {#if data.usuarios.length === 0}
       <div class="flex flex-col items-center px-4 py-16 text-center">
         <Icon name="user-cog" size={34} class="mb-4 text-stone" />
@@ -69,19 +68,26 @@
         <p class="mt-1 text-sm text-steel">{i18n.t(data.q ? 'users.noResultsDescription' : 'users.emptyDescription')}</p>
       </div>
     {:else}
-      <div class="overflow-x-auto">
-        <table class="w-full min-w-[860px] border-collapse text-left">
-          <thead class="bg-surface/70">
-            <tr class="border-b border-hairline text-[11px] font-semibold uppercase tracking-[0.05em] text-stone">
+      <div class="hidden overflow-x-auto md:block">
+        <table class="w-full min-w-[860px] table-fixed border-collapse text-left text-sm">
+          <colgroup>{#if canAny}<col class="w-[92px]" />{/if}<col /><col class="w-[28%]" /><col class="w-[16%]" /></colgroup>
+          <thead class="bg-canvas">
+            <tr class="border-b border-hairline text-[11px] font-bold uppercase tracking-[0.04em] text-ink">
+              {#if canAny}<th class="h-10 border-r border-hairline px-3 text-center">{i18n.t('users.actions')}</th>{/if}
               <th class="px-5 py-3.5">{i18n.t('users.user')}</th>
               <th class="px-4 py-3.5">{i18n.t('users.roles')}</th>
               <th class="px-4 py-3.5 text-center">{i18n.t('users.status')}</th>
-              {#if canAny}<th class="w-12 px-5 py-3.5 text-right">{i18n.t('users.actions')}</th>{/if}
             </tr>
           </thead>
           <tbody class="divide-y divide-hairline">
             {#each data.usuarios as user (user.id_usuarios)}
-              <tr class="transition-colors hover:bg-surface/55">
+              <tr class="border-b border-hairline odd:bg-surface/55 even:bg-canvas hover:bg-primary-soft/35">
+                {#if canAny}
+                  <td class="border-r border-hairline px-2 py-2.5"><div class="flex items-center justify-center gap-1">
+                    {#if canUpdate}<a href={`/administrator/users/${user.id_usuarios}/edit`} title={i18n.t('users.edit')} aria-label={`${i18n.t('users.edit')}: ${user.usuario}`} class="grid size-7 place-items-center rounded-md text-steel hover:bg-canvas hover:text-primary"><Icon name="pencil" size={15} /></a>{/if}
+                    <DropdownMenu.Root><DropdownMenu.Trigger disabled={processing} aria-label={`${i18n.t('users.actions')}: ${user.usuario}`} class="grid size-7 place-items-center rounded-md text-steel hover:bg-canvas"><Icon name="ellipsis" size={18} /></DropdownMenu.Trigger><DropdownMenu.Content align="start" class="min-w-[190px]">{#if canUpdate}<DropdownMenu.Item disabled={processing || user.estado !== 1} onSelect={() => { target = user; nuevaContrasenia = ''; resetPasswordOpen = true; }}><Icon name="lock-open" size={15} />{i18n.t('users.resetPassword')}</DropdownMenu.Item>{/if}{#if canDelete}<DropdownMenu.Item disabled={processing} class="text-error focus:bg-error/10 focus:text-error" onSelect={() => { target = user; deleteOpen = true; }}><Icon name="trash-2" size={15} />{i18n.t('users.delete')}</DropdownMenu.Item>{/if}</DropdownMenu.Content></DropdownMenu.Root>
+                  </div></td>
+                {/if}
                 <!-- Avatar + nombre -->
                 <td class="px-5 py-4">
                   <div class="flex min-w-0 items-center gap-3.5">
@@ -108,58 +114,26 @@
                     <span class="text-xs text-steel">{i18n.t(user.estado === 1 ? 'users.active' : 'users.inactive')}</span>
                   </div>
                 </td>
-                <!-- Menú de 3 puntos -->
-                {#if canAny}
-                  <td class="px-5 py-4">
-                    <div class="flex justify-end">
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger
-                          disabled={processing}
-                          aria-label={`${i18n.t('users.actions')}: ${user.usuario}`}
-                          class="grid size-8 place-items-center rounded-md border border-transparent text-stone transition-colors hover:border-hairline hover:bg-surface hover:text-ink disabled:pointer-events-none disabled:opacity-40"
-                        >
-                          <Icon name="ellipsis" size={18} />
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Content align="end" class="min-w-[190px]">
-                          {#if canUpdate}
-                            <DropdownMenu.Item
-                              disabled={processing || user.estado !== 1}
-                              onSelect={() => void (window.location.href = `/administrator/users/${user.id_usuarios}/edit`)}
-                            >
-                              <Icon name="pencil" size={15} />
-                              <span>{i18n.t('users.edit')}</span>
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item
-                              disabled={processing || user.estado !== 1}
-                              onSelect={() => { target = user; nuevaContrasenia = ''; resetPasswordOpen = true; }}
-                            >
-                              <Icon name="lock-open" size={15} />
-                              <span>{i18n.t('users.resetPassword')}</span>
-                            </DropdownMenu.Item>
-                          {/if}
-                          {#if canDelete}
-                            {#if canUpdate}<DropdownMenu.Separator />{/if}
-                            <DropdownMenu.Item
-                              disabled={processing}
-                              class="text-error focus:bg-error/10 focus:text-error"
-                              onSelect={() => { target = user; deleteOpen = true; }}
-                            >
-                              <Icon name="trash-2" size={15} />
-                              <span>{i18n.t('users.delete')}</span>
-                            </DropdownMenu.Item>
-                          {/if}
-                        </DropdownMenu.Content>
-                      </DropdownMenu.Root>
-                    </div>
-                  </td>
-                {/if}
               </tr>
             {/each}
           </tbody>
         </table>
       </div>
+      <div class="divide-y divide-hairline md:hidden">
+        {#each data.usuarios as user (user.id_usuarios)}
+          <article class="p-4">
+            <div class="flex items-center gap-3">
+              <span class="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-hairline bg-primary-soft font-semibold text-primary">{user.nombres.slice(0, 1).toUpperCase()}{#if avatarSrc(user)}<img src={avatarSrc(user) ?? ''} alt="" class="absolute inset-0 size-full bg-canvas object-cover" loading="lazy" decoding="async" />{/if}</span>
+              <div class="min-w-0 flex-1"><strong class="block truncate text-sm text-ink">{user.nombres} {user.apellido_paterno}</strong><p class="truncate text-xs text-steel">{user.usuario} · {user.correo ?? '—'}</p></div>
+              {#if canAny}<div class="flex gap-1">{#if canUpdate}<a href={`/administrator/users/${user.id_usuarios}/edit`} title={i18n.t('users.edit')} class="grid size-8 place-items-center rounded-md border border-hairline text-steel"><Icon name="pencil" size={16} /></a>{/if}<DropdownMenu.Root><DropdownMenu.Trigger class="grid size-8 place-items-center rounded-md border border-hairline text-steel"><Icon name="ellipsis" size={18} /></DropdownMenu.Trigger><DropdownMenu.Content align="end">{#if canUpdate}<DropdownMenu.Item disabled={processing || user.estado !== 1} onSelect={() => { target = user; nuevaContrasenia = ''; resetPasswordOpen = true; }}><Icon name="lock-open" size={15} />{i18n.t('users.resetPassword')}</DropdownMenu.Item>{/if}{#if canDelete}<DropdownMenu.Item class="text-error focus:bg-error/10 focus:text-error" onSelect={() => { target = user; deleteOpen = true; }}><Icon name="trash-2" size={15} />{i18n.t('users.delete')}</DropdownMenu.Item>{/if}</DropdownMenu.Content></DropdownMenu.Root></div>{/if}
+            </div>
+            <div class="mt-3 flex items-center justify-between gap-3 border-t border-hairline pt-3"><div class="flex min-w-0 flex-wrap gap-1">{#each user.roles as role (role.id_roles)}<Badge variant="outline-sky">{role.nombre}</Badge>{/each}</div><Switch checked={user.estado === 1} disabled={processing || !canUpdate} label={`${i18n.t('users.status')}: ${user.usuario}`} onchange={(active) => status(user, active)} /></div>
+          </article>
+        {/each}
+      </div>
     {/if}
   </Card>
+  <CatalogPagination route="/administrator/users" search={data.q} current={data.usuarios.length} total={data.total} previous={data.paginacion.anterior} next={data.paginacion.siguiente} />
 </section>
 
 <!-- Modal: reiniciar contraseña -->

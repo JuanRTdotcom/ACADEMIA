@@ -1,13 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
 import type { DatosUsuario } from "../entities/usuario";
+import type { FiltrosUsuariosEmpresa } from "../entities/usuario";
 import { RepositorioUsuarios } from "../repositories/repositorio-usuarios";
 
 @Injectable()
 export class CasoUsoGestionarUsuarios {
   constructor(private readonly usuarios: RepositorioUsuarios) {}
   listar(busqueda: string) { return this.usuarios.listar(busqueda); }
-  listarDeEmpresa(empresaId: string, busqueda: string) { return this.usuarios.listarDeEmpresa(empresaId, busqueda); }
+  listarDeEmpresa(empresaId: string, filtros: FiltrosUsuariosEmpresa) { return this.usuarios.listarDeEmpresa(empresaId, filtros); }
   obtener(id: string, actor: string) { return this.usuarios.obtener(id, actor); }
   opciones() { return this.usuarios.opciones(); }
   opcionesDeEmpresa(empresaId: string) { return this.usuarios.opcionesDeEmpresa(empresaId); }

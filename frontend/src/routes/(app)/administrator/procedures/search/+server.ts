@@ -1,0 +1,3 @@
+import { error, json, type RequestHandler } from '@sveltejs/kit';
+import { companyMessage, companyRequest } from '$lib/server/companies';
+export const GET: RequestHandler = async (event) => { const q = event.url.searchParams.get('q')?.trim() ?? ''; if (q.length < 3 || q.length > 220) return json({ procedimientos: [] }, { headers: { 'cache-control': 'private, no-store' } }); const response = await companyRequest(event, `/company/procedures/search?q=${encodeURIComponent(q)}`); if (!response.ok) error(response.status, await companyMessage(response, 'procedures.loadError')); return json(await response.json(), { headers: { 'cache-control': 'private, no-store' } }); };

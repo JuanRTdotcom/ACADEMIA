@@ -8,7 +8,11 @@ import { Prisma } from "../../../../prisma/generated/client/client";
 import { ServicioAuditoria } from "../../../comun/auditoria/servicio-auditoria";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
 import { PrismaService } from "../../../comun/prisma.service";
-import type { DatosMotivoConsulta } from "../../domain/entities/motivo-consulta";
+import type {
+  CatalogoMotivosConsulta,
+  DatosMotivoConsulta,
+  FiltrosMotivosConsulta,
+} from "../../domain/entities/motivo-consulta";
 
 type Tx = Prisma.TransactionClient;
 
@@ -37,6 +41,7 @@ export class FuenteDatosMotivosConsultaPrisma {
         estado: 1,
         estado_cuenta: "activo",
         eliminado_en: null,
+        organizacion: { estado: 1, eliminado_en: null },
       },
       select: { id_usuarios: true },
     });
@@ -56,24 +61,122 @@ export class FuenteDatosMotivosConsultaPrisma {
     return motivo;
   }
 
-  async listar(organizacion: string) {
-    const motivos = await this.prisma.motivos_consulta.findMany({
+  private readonly seleccion = {
+    id_motivos_consulta: true,
+    nombre: true,
+    descripcion: true,
+    estado: true,
+    created_at: true,
+    updated_at: true,
+  } satisfies Prisma.motivos_consultaSelect;
+
+  async listar(
+    organizacion: string,
+    filtros: FiltrosMotivosConsulta,
+  ): Promise<CatalogoMotivosConsulta> {
+    const organizacionActiva = await this.prisma.organizaciones.findFirst({
+      where: { id_organizaciones: organizacion, estado: 1, eliminado_en: null },
+      select: { id_organizaciones: true },
+    });
+    if (!organizacionActiva)
+      throw new NotFoundException("consultationReasons.unavailable");
+
+    const cursorId = filtros.despues_de ?? filtros.antes_de;
+    const filtroNombre = filtros.consulta
+      ? {
+          nombre: {
+            contains: filtros.consulta,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        }
+      : {};
+    const cursor = cursorId
+      ? await this.prisma.motivos_consulta.findFirst({
+          where: {
+            id_motivos_consulta: cursorId,
+            fid_organizaciones: organizacion,
+            eliminado_en: null,
+            ...filtroNombre,
+          },
+          select: { id_motivos_consulta: true, created_at: true },
+        })
+      : null;
+    if (cursorId && !cursor)
+      throw new BadRequestException("consultationReasons.invalidCursor");
+
+    const haciaAtras = Boolean(filtros.antes_de);
+    const limite = 10;
+    const condicionBase = {
+      fid_organizaciones: organizacion,
+      eliminado_en: null,
+      ...filtroNombre,
+    };
+    const condicionCursor = cursor
+      ? {
+          OR: haciaAtras
+            ? [
+                { created_at: { gt: cursor.created_at } },
+                {
+                  created_at: cursor.created_at,
+                  id_motivos_consulta: { gt: cursor.id_motivos_consulta },
+                },
+              ]
+            : [
+                { created_at: { lt: cursor.created_at } },
+                {
+                  created_at: cursor.created_at,
+                  id_motivos_consulta: { lt: cursor.id_motivos_consulta },
+                },
+              ],
+        }
+      : {};
+    const [filas, total] = await Promise.all([
+      this.prisma.motivos_consulta.findMany({
+        where: { ...condicionBase, ...condicionCursor },
+        orderBy: haciaAtras
+          ? [{ created_at: "asc" }, { id_motivos_consulta: "asc" }]
+          : [{ created_at: "desc" }, { id_motivos_consulta: "desc" }],
+        take: limite + 1,
+        select: this.seleccion,
+      }),
+      this.prisma.motivos_consulta.count({ where: condicionBase }),
+    ]);
+    const hayMas = filas.length > limite;
+    if (hayMas) filas.pop();
+    if (haciaAtras) filas.reverse();
+    return {
+      motivos: filas,
+      total,
+      paginacion: {
+        anterior:
+          filas.length && (haciaAtras ? hayMas : Boolean(filtros.despues_de))
+            ? filas[0]!.id_motivos_consulta
+            : null,
+        siguiente:
+          filas.length && (haciaAtras ? true : hayMas)
+            ? filas.at(-1)!.id_motivos_consulta
+            : null,
+      },
+    };
+  }
+
+  async buscar(organizacion: string, consulta: string) {
+    const organizacionActiva = await this.prisma.organizaciones.findFirst({
+      where: { id_organizaciones: organizacion, estado: 1, eliminado_en: null },
+      select: { id_organizaciones: true },
+    });
+    if (!organizacionActiva)
+      throw new NotFoundException("consultationReasons.unavailable");
+    return this.prisma.motivos_consulta.findMany({
       where: {
         fid_organizaciones: organizacion,
         eliminado_en: null,
-        organizacion: { estado: 1, eliminado_en: null },
+        nombre: { contains: consulta, mode: Prisma.QueryMode.insensitive },
       },
       orderBy: [{ created_at: "desc" }, { id_motivos_consulta: "desc" }],
-      select: {
-        id_motivos_consulta: true,
-        nombre: true,
-        descripcion: true,
-        estado: true,
-        created_at: true,
-        updated_at: true,
-      },
+      take: 6,
+      select: this.seleccion,
     });
-    return { motivos, total: motivos.length };
   }
 
   async crear(

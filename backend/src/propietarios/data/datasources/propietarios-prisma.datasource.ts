@@ -10,6 +10,7 @@ import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-
 import { PrismaService } from "../../../comun/prisma.service";
 import type {
   DatosPropietario,
+  EliminacionPropietario,
   FiltrosPropietarios,
 } from "../../domain/entities/propietario";
 
@@ -131,6 +132,7 @@ export class FuenteDatosPropietariosPrisma {
       fid_parametros_tipo_documento: true,
       numero_documento: true,
       nombre_completo: true,
+      foto_url: true,
       celular: true,
       celular_verificado_en: true,
       sin_correo: true,
@@ -161,13 +163,22 @@ export class FuenteDatosPropietariosPrisma {
           mascotas: { where: { estado: 1, eliminado_en: null } },
         },
       },
+      mascotas: {
+        where: { estado: 1, eliminado_en: null },
+        orderBy: [{ created_at: "desc" }, { id_mascotas: "desc" }],
+        take: 4,
+        select: {
+          id_mascotas: true,
+          nombre: true,
+          foto_url: true,
+        },
+      },
     } satisfies Prisma.propietariosSelect;
   }
 
   async listar(organizacion: string, filtros: FiltrosPropietarios) {
     const q = filtros.q?.trim();
-    const propietarios = await this.prisma.propietarios.findMany({
-      where: {
+    const base: Prisma.propietariosWhereInput = {
         fid_organizaciones: organizacion,
         eliminado_en: null,
         organizacion: { estado: 1, eliminado_en: null },
@@ -181,18 +192,47 @@ export class FuenteDatosPropietariosPrisma {
               ],
             }
           : {}),
-      },
-      orderBy: [{ created_at: "desc" }, { id_propietarios: "desc" }],
-      select: this.seleccion(),
-    });
+    };
+    const atras = Boolean(filtros.antes_de);
+    const cursorId = filtros.antes_de ?? filtros.despues_de;
+    const cursor = cursorId
+      ? await this.prisma.propietarios.findFirst({ where: { AND: [base, { id_propietarios: cursorId }] }, select: { created_at: true, id_propietarios: true } })
+      : null;
+    if (cursorId && !cursor) throw new BadRequestException("owners.invalidCursor");
+    const condicion: Prisma.propietariosWhereInput = cursor ? { OR: atras
+      ? [{ created_at: { gt: cursor.created_at } }, { created_at: cursor.created_at, id_propietarios: { gt: cursor.id_propietarios } }]
+      : [{ created_at: { lt: cursor.created_at } }, { created_at: cursor.created_at, id_propietarios: { lt: cursor.id_propietarios } }]
+    } : {};
+    const [filas, total] = await Promise.all([
+      this.prisma.propietarios.findMany({
+        where: { AND: [base, condicion] },
+        orderBy: atras ? [{ created_at: "asc" }, { id_propietarios: "asc" }] : [{ created_at: "desc" }, { id_propietarios: "desc" }],
+        take: 11,
+        select: this.seleccion(),
+      }),
+      this.prisma.propietarios.count({ where: base }),
+    ]);
+    const hayMas = filas.length > 10;
+    if (hayMas) filas.pop();
+    if (atras) filas.reverse();
+    const propietarios = filas;
     return {
-      propietarios: propietarios.map(({ _count, ...item }) => ({
+      propietarios: propietarios.map(({ _count, mascotas, foto_url, ...item }) => ({
         ...item,
+        foto_version: foto_url?.split("/").at(-1) ?? null,
         cantidad_mascotas: _count.mascotas,
+        mascotas: mascotas.map(({ foto_url, ...mascota }) => ({
+          ...mascota,
+          foto_version: foto_url?.split("/").at(-1) ?? null,
+        })),
         celular_verificado: Boolean(item.celular_verificado_en),
         correo_verificado: Boolean(item.correo_verificado_en),
       })),
-      total: propietarios.length,
+      total,
+      paginacion: {
+        anterior: propietarios.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? propietarios[0]!.id_propietarios : null,
+        siguiente: propietarios.length && (atras || hayMas) ? propietarios.at(-1)!.id_propietarios : null,
+      },
     };
   }
 
@@ -321,9 +361,11 @@ export class FuenteDatosPropietariosPrisma {
       select: this.seleccion(),
     });
     if (!propietario) throw new NotFoundException("owners.notFound");
+    const { foto_url, ...datos } = propietario;
     return {
       propietario: {
-        ...propietario,
+        ...datos,
+        foto_version: foto_url?.split("/").at(-1) ?? null,
         celular_verificado: Boolean(propietario.celular_verificado_en),
         correo_verificado: Boolean(propietario.correo_verificado_en),
       },
@@ -495,13 +537,58 @@ export class FuenteDatosPropietariosPrisma {
   async eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     await this.prisma.$transaction(async (tx) => {
       await this.validarContexto(tx, organizacion, usuario);
       await this.existente(tx, id, organizacion);
-      await tx.$executeRaw`UPDATE personas.propietarios SET estado = 0, eliminado_en = CURRENT_TIMESTAMP, eliminado_por = ${usuario}::uuid, updated_by = ${usuario} WHERE id_propietarios = ${id}::uuid AND fid_organizaciones = ${organizacion}::uuid`;
+      const mascotas = await tx.$queryRaw<
+        Array<{ id_mascotas: string; nombre: string; foto_url: string | null }>
+      >`SELECT id_mascotas, nombre, foto_url FROM personas.mascotas WHERE fid_organizaciones = ${organizacion}::uuid AND fid_propietarios = ${id}::uuid AND eliminado_en IS NULL ORDER BY id_mascotas FOR UPDATE`;
+
+      if (mascotas.length && !datos.confirmar_desvinculacion) {
+        throw new ConflictException({
+          message: "owners.petsResolutionRequired",
+          publicData: {
+            mascotas: mascotas.map(({ foto_url, ...mascota }) => ({
+              ...mascota,
+              foto_version: foto_url?.split("/").at(-1) ?? null,
+            })),
+            cantidad_mascotas: mascotas.length,
+          },
+        });
+      }
+      if (mascotas.length) {
+        await tx.$executeRaw`
+          UPDATE personas.mascotas
+          SET fid_propietarios = NULL,
+              updated_by = ${usuario},
+              updated_at = CURRENT_TIMESTAMP
+          WHERE fid_organizaciones = ${organizacion}::uuid
+            AND fid_propietarios = ${id}::uuid
+            AND eliminado_en IS NULL`;
+        for (const mascota of mascotas) {
+          await this.auditoria.registrar(
+            {
+              accion: "mascotas.propietario_retirado",
+              entidad: "mascotas",
+              id_entidad: mascota.id_mascotas,
+              fid_organizaciones: organizacion,
+              fid_usuarios: usuario,
+              peticion: contexto,
+              metadatos: {
+                motivo: "eliminacion_propietario",
+                propietario_anterior: id,
+                propietario_nuevo: null,
+              },
+            },
+            tx,
+          );
+        }
+      }
+      await tx.$executeRaw`UPDATE personas.propietarios SET estado = 0, eliminado_en = CURRENT_TIMESTAMP, eliminado_por = ${usuario}::uuid, updated_at = CURRENT_TIMESTAMP, updated_by = ${usuario} WHERE id_propietarios = ${id}::uuid AND fid_organizaciones = ${organizacion}::uuid`;
       await this.auditoria.registrar(
         {
           accion: "propietarios.eliminado",
@@ -510,6 +597,12 @@ export class FuenteDatosPropietariosPrisma {
           fid_organizaciones: organizacion,
           fid_usuarios: usuario,
           peticion: contexto,
+          metadatos: {
+            resolucion_mascotas: mascotas.length
+              ? "sin_propietario"
+              : "sin_mascotas",
+            cantidad_mascotas: mascotas.length,
+          },
         },
         tx,
       );

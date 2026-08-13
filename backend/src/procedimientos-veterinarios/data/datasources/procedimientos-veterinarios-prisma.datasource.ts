@@ -8,7 +8,7 @@ import { Prisma } from "../../../../prisma/generated/client/client";
 import { ServicioAuditoria } from "../../../comun/auditoria/servicio-auditoria";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
 import { PrismaService } from "../../../comun/prisma.service";
-import type { DatosProcedimientoVeterinario } from "../../domain/entities/procedimiento-veterinario";
+import type { DatosProcedimientoVeterinario, FiltrosProcedimientosVeterinarios } from "../../domain/entities/procedimiento-veterinario";
 
 type Tx = Prisma.TransactionClient;
 
@@ -56,27 +56,26 @@ export class FuenteDatosProcedimientosVeterinariosPrisma {
     return tipo;
   }
 
-  async listar(organizacion: string) {
-    const procedimientos = await this.prisma.procedimientos_veterinarios.findMany({
-      where: {
-        fid_organizaciones: organizacion,
-        eliminado_en: null,
-        organizacion: { estado: 1, eliminado_en: null },
-      },
-      orderBy: [
-        { created_at: "desc" },
-        { id_procedimientos_veterinarios: "desc" },
-      ],
-      select: {
-        id_procedimientos_veterinarios: true,
-        nombre: true,
-        descripcion_guia: true,
-        estado: true,
-        created_at: true,
-        updated_at: true,
-      },
-    });
-    return { procedimientos, total: procedimientos.length };
+  private readonly seleccion = { id_procedimientos_veterinarios: true, nombre: true, descripcion_guia: true, estado: true, created_at: true, updated_at: true } satisfies Prisma.procedimientos_veterinariosSelect;
+
+  async listar(organizacion: string, filtros: FiltrosProcedimientosVeterinarios) {
+    const texto = filtros.consulta ? { AND: [{ OR: [{ nombre: { contains: filtros.consulta, mode: Prisma.QueryMode.insensitive } }, { descripcion_guia: { contains: filtros.consulta, mode: Prisma.QueryMode.insensitive } }] }] } : {};
+    const base = { fid_organizaciones: organizacion, eliminado_en: null, organizacion: { estado: 1, eliminado_en: null }, ...texto };
+    const cursorId = filtros.despues_de ?? filtros.antes_de;
+    const cursor = cursorId ? await this.prisma.procedimientos_veterinarios.findFirst({ where: { ...base, id_procedimientos_veterinarios: cursorId }, select: { id_procedimientos_veterinarios: true, created_at: true } }) : null;
+    if (cursorId && !cursor) throw new BadRequestException("procedures.invalidCursor");
+    const atras = Boolean(filtros.antes_de);
+    const condicion = cursor ? { OR: atras ? [{ created_at: { gt: cursor.created_at } }, { created_at: cursor.created_at, id_procedimientos_veterinarios: { gt: cursor.id_procedimientos_veterinarios } }] : [{ created_at: { lt: cursor.created_at } }, { created_at: cursor.created_at, id_procedimientos_veterinarios: { lt: cursor.id_procedimientos_veterinarios } }] } : {};
+    const [procedimientos, total] = await Promise.all([
+      this.prisma.procedimientos_veterinarios.findMany({ where: { ...base, ...condicion }, orderBy: atras ? [{ created_at: "asc" }, { id_procedimientos_veterinarios: "asc" }] : [{ created_at: "desc" }, { id_procedimientos_veterinarios: "desc" }], take: 11, select: this.seleccion }),
+      this.prisma.procedimientos_veterinarios.count({ where: base }),
+    ]);
+    const hayMas = procedimientos.length > 10; if (hayMas) procedimientos.pop(); if (atras) procedimientos.reverse();
+    return { procedimientos, total, paginacion: { anterior: procedimientos.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? procedimientos[0]!.id_procedimientos_veterinarios : null, siguiente: procedimientos.length && (atras || hayMas) ? procedimientos.at(-1)!.id_procedimientos_veterinarios : null } };
+  }
+
+  async buscar(organizacion: string, consulta: string) {
+    return this.prisma.procedimientos_veterinarios.findMany({ where: { fid_organizaciones: organizacion, eliminado_en: null, organizacion: { estado: 1, eliminado_en: null }, OR: [{ nombre: { contains: consulta, mode: Prisma.QueryMode.insensitive } }, { descripcion_guia: { contains: consulta, mode: Prisma.QueryMode.insensitive } }] }, orderBy: [{ created_at: "desc" }, { id_procedimientos_veterinarios: "desc" }], take: 6, select: this.seleccion });
   }
 
   async crear(

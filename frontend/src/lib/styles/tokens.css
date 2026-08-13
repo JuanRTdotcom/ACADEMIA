@@ -1,6 +1,6 @@
 /* ==========================================================================
    Design tokens — Academia (DESIGN2: Notion "daylight")
-   Warm paper canvas · single blue accent · sticker palette = decoration only.
+   White page canvas · single blue accent · sticker palette = decoration only.
    Source of truth: frontend/DESIGN2.md
    ========================================================================== */
 
@@ -41,7 +41,7 @@
 
   /* --- Surfaces --- */
   --canvas: #ffffff; /* cards, fields, nav */
-  --surface: #f6f5f4; /* warm paper page canvas */
+  --surface: #ffffff; /* white page canvas */
   --surface-soft: #fbfaf9;
   --hairline: #e6e6e6;
   --hairline-soft: #eeeeed;

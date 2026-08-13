@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
 import type {
   DatosPropietario,
+  EliminacionPropietario,
   FiltrosPropietarios,
 } from "../entities/propietario";
 import { RepositorioPropietarios } from "../repositories/repositorio-propietarios";
@@ -44,9 +45,16 @@ export class CasoUsoGestionarPropietarios {
   eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.propietarios.eliminar(id, organizacion, usuario, contexto);
+    return this.propietarios.eliminar(
+      id,
+      organizacion,
+      datos,
+      usuario,
+      contexto,
+    );
   }
 }

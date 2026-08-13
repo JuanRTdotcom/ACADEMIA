@@ -4,6 +4,8 @@ import {
   attentionRequest,
   createAttention,
   createAttentionConsultationReason,
+  createAttentionDiagnosticStudy,
+  createAttentionGroomingService,
   createAttentionHospitalizationType,
   createAttentionLaboratoryTest,
   createAttentionProcedure,
@@ -64,4 +66,6 @@ export const actions: Actions = {
   procedure: createAttentionProcedure,
   consultationReason: createAttentionConsultationReason,
   laboratoryTest: createAttentionLaboratoryTest,
+  diagnosticStudy: createAttentionDiagnosticStudy,
+  groomingService: createAttentionGroomingService,
 };

@@ -19,6 +19,8 @@ import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/
 import { Permisos } from "../../../autenticacion/presentation/decorators/permisos.decorador";
 import { UsuarioActual } from "../../../autenticacion/presentation/decorators/usuario-actual.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
+import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
+import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
 import { PrismaService } from "../../../comun/prisma.service";
 import { CasoUsoGestionarUsuarios } from "../../domain/usecases/gestionar-usuarios";
 import { DtoCambiarEstadoUsuario } from "../dto/cambiar-estado-usuario.dto";
@@ -33,6 +35,7 @@ export class ControladorEmpresaUsuarios {
   constructor(
     private readonly usuarios: CasoUsoGestionarUsuarios,
     private readonly prisma: PrismaService,
+    private readonly tokens: ServicioTokenOpaco,
   ) {}
 
   private async validarRolesAsignables(roles: string[]): Promise<void> {
@@ -50,11 +53,13 @@ export class ControladorEmpresaUsuarios {
     "administrator.users.delete",
   )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  listar(
+  async listar(
     @Query() query: DtoListarUsuarios,
     @UsuarioActual() actor: UsuarioAutenticado,
   ) {
-    return this.usuarios.listarDeEmpresa(actor.fid_organizaciones, query.q ?? "");
+    const posicion = leerPosicionCatalogo(this.tokens, "company-users.pagination", query.p, actor.fid_organizaciones, query.q, "users.invalidCursor");
+    const catalogo = await this.usuarios.listarDeEmpresa(actor.fid_organizaciones, { despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined, antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined, consulta: query.q });
+    return protegerPaginacionCatalogo(this.tokens, "company-users.pagination", catalogo, actor.fid_organizaciones, query.q);
   }
 
   @Get("creation-options")

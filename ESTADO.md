@@ -3,6 +3,50 @@
 > Documento vivo. Qué está hecho y qué falta. Última actualización: 2026-08-06.
 > Plataforma educativa (colegios / academia SERUM). Multi-tenant, web + móvil a futuro.
 
+### ✅ Data Table paginada en Atenciones, Propietarios y Mascotas (2026-08-13)
+
+- Los tres listados pasaron de cargar todos los registros a SSR inicial y keyset pagination de 10 filas, con orden estable y conteo PostgreSQL.
+- La búsqueda exige al menos tres caracteres y se ejecuta dentro del tenant. La posición `p` es opaca y está ligada a organización, consulta y rango hoy/ayer; UUID, dirección y contexto no quedan expuestos.
+- Se agregaron los índices `propietarios_cursor_idx`, `mascotas_cursor_idx` y `atenciones_listado_cursor_idx` mediante la migración `20260813090000_clinic_lists_cursor_pagination`, aplicada correctamente.
+- UI: tabla compacta TanStack, encabezados fuertes, contenido normal, Acciones primero, edición/vista visible, secundarios en tres puntos, loading por blur y navegación Anterior/Siguiente con `replaceState`. Los cards móviles y los flujos especiales de eliminación se conservaron.
+- Seguridad preservada: permisos por endpoint, rate limit, tenant desde sesión, token anti-reutilización, validación DTO e i18n. Verificado con build Nest, Prisma validate, Svelte check 0/0, 26 unit tests y 16 E2E de los tres módulos.
+
+### ✅ Sugerencias informativas y precio vacío en Servicios (2026-08-13)
+
+- Los servicios sin precio dejan vacía la celda de escritorio y omiten la línea de precio en móvil.
+- El autocomplete de nombre ya no muestra “Servicios existentes similares”, iconos, precio, estado ni la acción “Editar”; presenta únicamente el nombre y resalta la coincidencia escrita.
+- Una coincidencia exacta no marca el campo en rojo ni deshabilita Guardar. Se permiten nombres repetidos por decisión funcional; la migración `20260813091000_allow_duplicate_veterinary_services` reemplaza el índice único activo por un índice normal de búsqueda tenant. Seleccionar una sugerencia conserva la acción de abrir su edición.
+- El dropdown no renderiza un contenedor vacío ni skeleton mientras espera la búsqueda. Solo aparece al terminar con resultados y mientras el campo Nombre conserva el foco; al perderlo se oculta y al enfocarlo nuevamente reutiliza las coincidencias ya obtenidas.
+
+### ✅ Recomendador informativo común en todos los mantenedores (2026-08-13)
+
+- `CatalogDuplicateHints` centraliza el patrón aprobado: debounce remoto de 400 ms, solo nombre, coincidencia resaltada, sin título/metadata/error visible y selección para editar.
+- Se aplica a Motivos de consulta, Vacunas, Tipos de hospitalización, Cirugías/procedimientos, Pruebas de laboratorio, Estudios diagnósticos y Peluquería/spa; Servicios conserva la misma interacción especializada.
+- El recuadro no existe mientras carga y CSS `:has(input:focus)` lo muestra únicamente con resultados y foco en el input precedente. Motivos y Vacunas eliminaron sus implementaciones duplicadas y el bloqueo por coincidencia exacta.
+- La migración `20260813092000_informative_catalog_suggestions` reemplaza los siete índices únicos de nombres activos por índices normales tenant-scoped. Las sugerencias son informativas y no impiden nombres repetidos; permisos, validación de formato, tenant y auditoría permanecen.
+- Corrección de interacción: `pointerdown` del dropdown evita que el input pierda foco antes del `onSelect`; pulsar una coincidencia ejecuta siempre el callback existente y abre su edición en los siete mantenedores compartidos.
+
+### ✅ Avatares de mascotas en el listado de Propietarios (2026-08-13)
+
+- La columna Mascotas reemplaza el contador por un grupo circular de hasta cuatro avatares; usa foto privada versionada o `paw-print` cuando falta.
+- Cada avatar tiene nombre accesible, foco visible y abre la ficha completa `/clinic/pets/:id/summary` cuando el usuario posee `clinic.pets.read`. Sin permiso se conserva como indicador no interactivo.
+- Si el propietario tiene más de cuatro mascotas, `+N` comunica las restantes. PostgreSQL sigue calculando el total, pero la relación selecciona únicamente cuatro filas activas ordenadas por creación descendente para evitar cargas amplias.
+- El mismo grupo se muestra en desktop y móvil. Backend Nest y pruebas unitarias de Propietarios pasan; Svelte check queda 0/0.
+- Cada avatar interactivo muestra un popup inmediato con el nombre al pasar el cursor o enfocar; al pulsarlo abre la ficha completa de esa mascota. La navegación continúa condicionada por `clinic.pets.read`.
+
+### ✅ Base de avatar para propietarios (2026-08-13)
+
+- La migración `20260813103000_owner_avatar_foundation` añadió `personas.propietarios.foto_url` nullable, sin crear todavía endpoints ni controles web para subir la imagen; queda reservada para la futura aplicación móvil.
+- Los contratos de Propietarios y Mascotas exponen `foto_version` sin filtrar la clave interna. Los listados de Propietarios y Mascotas muestran a la izquierda del nombre/documento un avatar circular predeterminado `user-round` en escritorio y móvil; sin propietario usa `user-x`.
+- Migración aplicada, build Nest correcto, DTO de Mascotas/Propietarios 8/8 y `svelte-check` 0 errores/0 advertencias.
+
+### ✅ Actividad clínica resumida en el listado de Mascotas (2026-08-13)
+
+- Cada mascota presenta la cantidad total de atenciones activas y la fecha/hora de su última atención; cuando no existe ninguna se muestra `Sin atenciones`.
+- Prisma usa `_count` filtrado y una relación `take: 1`, ordenada por fecha clínica, llegada y UUID descendentes. No descarga registros clínicos ni adjuntos para resolver el resumen.
+- Desktop incorpora una columna Atenciones; móvil muestra el mismo resumen debajo del propietario. Las fechas se localizan con idioma activo.
+- Backend compila y las 4 pruebas unitarias de Mascotas pasan; Svelte check queda 0 errores/0 advertencias.
+
 ### ✅ UI Planes/Permisos: dropdown, iconos, compactación y marcado responsive (2026-08-06)
 
 - **Lista de planes**: acciones migradas a **menú de 3 puntos** (`DropdownMenu` + `ellipsis`), patrón espejo de roles (Gestionar módulos / Editar / Eliminar). "Gestionar módulos" navega con `window.location.href`.
@@ -2500,7 +2544,308 @@ Docs relacionados: `backend/ARCHITECTURE.md` · `backend/CONVENTIONS.md` · `bac
 
 - Se añadieron 15 categorías y las 208 pruebas entregadas como catálogo base, sin límite artificial para altas posteriores.
 - Cada veterinaria administra su copia desde `/administrator/laboratory-tests`; nuevas veterinarias reciben automáticamente el catálogo inicial.
-- El registro `laboratorio` guarda fecha, diagnóstico presuntivo y múltiples filas normalizadas con prueba, profesional tenant, cantidad y resultados adjuntos (máximo 5 por prueba y 10 por registro).
+- El registro `laboratorio` se implementó inicialmente con fecha, diagnóstico presuntivo y múltiples filas normalizadas con prueba, profesional tenant, cantidad y resultados adjuntos (máximo 5 por prueba y 10 por registro).
 - Los resultados reutilizan R2 privado, cuota tenant, firmas/MIME, caché y trazabilidad existentes; cada adjunto referencia además su fila de laboratorio.
+- Ajuste posterior: cada prueba admite como máximo un archivo de resultado; el límite se aplica en el esquema de base, el backend y el selector de la interfaz.
+- Ajuste posterior: se eliminó la fecha manual del esquema y del modal; Laboratorio usa exclusivamente `created_at` como fecha/hora efectiva y oculta el dato redundante de registros históricos al presentarlos.
 - Se agregaron permisos `administrator.laboratory_tests.read/create/update/delete`, planes/roles, menú ES/EN, alta rápida alineada al label, confirmaciones y Sonner.
-- Verificación: Prisma format/validate/generate, migraciones `20260811050000` y `20260811051000`, seed, backend build, frontend check 0/0, unitarias 6/6 y E2E Atenciones 7/7.
+- Verificación actual: Prisma validate y migraciones `20260811052000`/`20260811053000`, backend build, frontend check 0/0, unitarias 6/6 y E2E Atenciones 7/7.
+
+## 2026-08-11 — Imágenes diagnósticas normalizadas
+
+- Se reemplazó el icono anterior por `image`, disponible en la librería Lucide del proyecto.
+- Se creó `nucleo.estudios_diagnosticos` con catálogo independiente por veterinaria, diez valores iniciales, alta/edición, estado reversible, baja lógica, orden por creación descendente y ruta `/administrator/diagnostic-studies`.
+- El mantenedor dispone de permisos `administrator.diagnostic_studies.read/create/update/delete`, asociación a planes/roles, aislamiento tenant, bloqueo transaccional y auditoría.
+- El registro clínico relaciona estudio y sedación mediante UUID/FK; `Sí`, `No` y `No aplica` viven en el grupo `sedacion_imagen_diagnostica` de `configuracion.parametros`, con traducciones ES/EN.
+- El modal registra signos clínicos y diagnósticos presuntivos separados por comas, tipo de estudio, observaciones y hasta diez adjuntos de 10 MB; reutiliza validación de archivos, calidad JPEG 75 %, cuota tenant, R2 privado, confirmación, loading y Sonner.
+- El alta rápida del estudio sigue el patrón aprobado de acción textual primaria alineada al label y exige permiso de creación tanto en SSR como en backend.
+- Las nuevas veterinarias y el seed reciben el catálogo inicial; durante el uso todas las opciones se consultan desde PostgreSQL.
+- Verificación: migración `20260811060000`, Prisma format/generate/validate, seed correcto, backend build, unitarias 6/6, E2E Atenciones 8/8 y `svelte-check` 0 errores/0 advertencias.
+
+## 2026-08-11 — Peluquería y spa normalizada
+
+- La migración aplicada `20260811070000_grooming_spa_record` creó `nucleo.servicios_peluqueria_spa`, aislada por veterinaria, con diez servicios iniciales, unicidad activa y baja lógica. El seed y la creación de nuevas veterinarias reutilizan el mismo catálogo compartido.
+- `/administrator/grooming-services` permite listar por creación descendente, crear, editar, activar/desactivar y eliminar con permisos propios `administrator.grooming_services.read/create/update/delete`, asociación a planes/roles, tenant de sesión, CSRF, rate limit, transacción y auditoría.
+- Cada registro clínico admite múltiples servicios. `personas.servicios_registro_peluqueria_spa` conserva por fila las FK tenant del servicio y encargado, motivo, detalle/observaciones y orden; el backend rechaza servicios o usuarios inactivos, ajenos o inexistentes.
+- El modal clínico permite alta rápida desde el label solo con permiso de creación, múltiples filas, observaciones generales y próxima cita. Mantiene cabecera/footer fijos, confirmación, loading, Sonner, mensajes e i18n ES/EN.
+- Fotos Antes y Después se seleccionan por separado, con máximo cinco por grupo y diez por registro. Solo se admiten JPG/JPEG, PNG o WebP de hasta 10 MB; R2 conserva validación de firma/MIME, normalización JPEG al 75 %, cuota tenant, privacidad y compensación ante fallos.
+- La etapa de cada foto se guarda mediante `fid_parametros_etapa_foto_peluqueria` y los maestros `antes`/`despues` de `configuracion.parametros`; no existe un código textual libre en la relación.
+- Verificación sin abrir puertos: migración aplicada, Prisma format/generate/validate, seed idempotente, build Nest, unitarias 6/6, E2E Atenciones 9/9 —incluye 401, CSRF, CRUD/auditoría, opciones tenant, fila normalizada y rechazo de PDF como foto— y `svelte-check` 0 errores/0 advertencias.
+
+### Reorganización visual del modal de Peluquería y spa
+
+- Cada servicio se presenta en un bloque separado y numerado. Tipo, motivo y encargado comparten una fila equilibrada en escritorio; Detalle/observaciones ocupa debajo todo el ancho, y Eliminar se mantiene visible en la cabecera del bloque.
+- La zona inferior se dividió en Información general y Registro fotográfico. Observaciones y próxima cita quedan agrupadas a la izquierda; fotos Antes y Después se apilan a la derecha con separación propia y hasta cinco miniaturas por fila.
+- Se aumentaron padding, separación entre secciones y espacios responsive sin alterar cabecera/footer fijos, validaciones, alta rápida ni flujo de guardado.
+- Verificación: `svelte-check` 0 errores y 0 advertencias.
+
+- Ajuste posterior: se retiró la línea horizontal que separaba innecesariamente los bloques de servicios de la zona inferior. Registro fotográfico pasó a la columna izquierda e Información general a la derecha; en móvil conservan lectura apilada y separación suficiente.
+
+### Requeridos mínimos de Peluquería y spa
+
+- La migración aplicada `20260811071000_optional_grooming_service_details` mantuvo obligatorio un mínimo de una fila y el UUID del servicio, pero convirtió Encargado y Motivo en columnas opcionales. Detalle/observaciones ya era opcional.
+- El esquema dinámico de `configuracion.tipos_registro_atencion`, Prisma, backend y UI aplican la misma regla. Un encargado informado sigue validándose como usuario activo de la veterinaria; si no se informa se guarda `NULL`.
+- Verificación: migración aplicada, Prisma format/generate/validate, build Nest, E2E Atenciones 9/9 guardando una fila que contiene únicamente el servicio y `svelte-check` 0 errores/0 advertencias.
+
+### Identificación visual de fotos
+
+- Las miniaturas del modal y las fotos persistidas en la línea de tiempo muestran una etiqueta superpuesta pequeña con su etapa: `Antes` o `Ahora`.
+- El código normalizado `despues` se conserva como identificador estable; solo su etiqueta traducible visible cambió a `Ahora`/`Now` mediante la migración `20260811072000_grooming_photo_now_label`.
+- Verificación: migración aplicada, JSON ES/EN válido y `svelte-check` con 0 errores y 0 advertencias.
+
+## 2026-08-11 — Guardería / hotel normalizada
+
+- La migración aplicada `20260811080000_daycare_hotel_record` actualizó el tipo clínico `guarderia` sin crear mantenedores ni endpoints administrativos.
+- `Guardería` y `Hotel` viven en el grupo `tipos_estancia_guarderia` de `configuracion.parametros`, con traducciones ES/EN. El registro conserva su UUID mediante la FK `fid_parametros_tipo_estancia_guarderia`; el backend rechaza UUID de otros grupos o inactivos.
+- El formulario registra fecha de ingreso obligatoria, fecha de salida opcional, tipo obligatorio, tipo/cantidad de comida, objetos de la mascota y observaciones/recomendaciones. UI y backend impiden que la salida sea anterior al ingreso; la migración `20260811081000_daycare_calendar_dates` conserva ambos campos como fechas civiles sin inventar una hora.
+- El modal usa cabecera y footer fijos y divide el contenido en Datos de estancia y Alimentación y cuidados. No admite adjuntos y reutiliza confirmación, loading, Sonner e i18n del flujo común.
+- Seguridad: sesión, permisos efectivos de Atenciones, plan/rol/usuario, tenant, CSRF, rate limit, esquema declarado desde base, transacción y auditoría permanecen en los endpoints existentes.
+- Verificación: migración al día, Prisma format/generate/validate, build Nest, unitarias 6/6, E2E Atenciones 9/9 y `svelte-check` 0 errores/0 advertencias.
+
+## 2026-08-11 — Remisiones normalizadas
+
+- La migración aplicada `20260811082000_referral_record` reemplazó el esquema genérico de `remision` por usuario remitente, clínica veterinaria de destino, razón/procedimiento y observaciones; únicamente la clínica es obligatoria.
+- `fid_usuarios_remitente` es una FK tenant compuesta hacia `seguridad.usuarios`. Las opciones se cargan desde usuarios activos de la veterinaria y el backend rechaza UUID externos, inactivos o inexistentes; si se omite se guarda `NULL`.
+- El modal reutiliza el diseño estructurado aprobado, con Datos de remisión a la izquierda y Razón y observaciones a la derecha. No agrega mantenedor ni adjuntos.
+- El registro conserva permisos efectivos y plan de Atenciones, sesión, tenant, CSRF, rate limit, validación desde esquema de base, transacción, auditoría, confirmación, loading, Sonner e i18n ES/EN.
+- Verificación: migración al día, Prisma format/generate/validate, build Nest, unitarias 6/6, E2E Atenciones 9/9 —incluye destino como único requerido y rechazo de remitente ajeno— y `svelte-check` 0 errores/0 advertencias.
+
+### Selector completo de tipos de atención
+
+- Los dropdowns de tipos en Nueva atención y Detalle de atención dejaron de limitar altura y usar scroll interno. Las catorce opciones se distribuyen en dos columnas dentro del ancho disponible, por lo que Remisión y Cita permanecen visibles sin desplazamiento.
+
+### Icono de Remisión
+
+- La migración `20260811083000_referral_truck_icon` reemplazó `send` por el icono oficial Lucide `truck`; el catálogo visual reutiliza exactamente los nodos publicados por `@lucide/svelte`.
+
+## 2026-08-11 — Edición de registros y seguimientos clínicos anidados
+
+- Todos los registros activos de una atención abierta incorporaron Editar. `PATCH /clinic/attentions/:id/records/:record` exige `clinic.attentions.update`, sesión, CSRF, tenant y atención abierta; tipo y origen son inmutables.
+- La edición reutiliza la validación declarativa y semántica del alta para todas las modalidades implementadas, reconstruye sus filas normalizadas dentro de una transacción y conserva objetos R2 y metadata de adjuntos existentes.
+- La migración `20260811084000_record_editing_followups` añadió a los tipos clínicos `permite_registro_raiz` y `requiere_registro_origen`; Seguimiento dejó de mostrarse en los menús de creación raíz.
+- `personas.registros_atencion.fid_registros_atencion_origen` es una FK tenant compuesta al registro clínico raíz. El backend exige mismo tenant y atención, origen activo y sin padre, por lo que rechaza seguimientos de segundo nivel.
+- Los doce tipos deduplicados viven en `configuracion.parametros.tipos_seguimiento_atencion`, con traducciones ES/EN. El registro relaciona la selección mediante `fid_parametros_tipo_seguimiento` y admite motivo, detalle obligatorio, próximo control y hasta diez adjuntos privados.
+- La línea de tiempo agrupa cada seguimiento debajo de su origen con una rama visual compacta y acciones propias. Eliminar un registro raíz elimina lógicamente también sus seguimientos directos y adjuntos.
+- Ajuste visual posterior: el bloque muestra título y contador; cada seguimiento adoptó la misma distribución compacta de una atención, con tipo/fecha y acciones separadas a la izquierda, contenido y adjuntos reducidos al centro y el próximo control siempre como bloque trailing a la derecha en escritorio. Padding, interlineado y miniaturas se redujeron sin comprimir los botones; la rama primaria conserva la relación visual con el registro origen.
+- Verificación sin abrir puertos: migración aplicada, Prisma generado, build Nest, unitarias 6/6, E2E Atenciones 9/9 —edición, auditoría, origen obligatorio, agrupación y conservación de adjunto al editar—, `svelte-check` 0/0 y build SvelteKit.
+
+### Documento y Cita retirados de Atenciones
+
+- La migración `20260811085000_hide_document_and_appointment_from_attentions` marcó `documento` y `cita` como no disponibles para registros raíz y sin origen clínico.
+- Los menús ya los excluyen mediante metadata de PostgreSQL. El backend aplica la misma capacidad antes de almacenar archivos y nuevamente dentro de la transacción, evitando que un cliente directo los cree por API.
+- No se eliminaron tablas ni definiciones históricas; podrán reutilizarse posteriormente en el módulo apropiado sin reconstruir avances.
+- Verificación: migración aplicada, build Nest correcto y E2E Atenciones 9/9, incluyendo rechazo explícito de Documento y Cita.
+
+## 2026-08-11 — Baja segura de propietarios con mascotas
+
+- La eliminación de un propietario consulta en PostgreSQL sus mascotas no eliminadas. No elimina mascotas ni altera el propietario histórico guardado en atenciones anteriores.
+- La UI abre primero la confirmación común y envía el primer `DELETE` sin consulta previa. El `409` devuelve únicamente las mascotas vinculadas —id, nombre y versión privada de foto—; el modal muestra su avatar, el estado informativo **Sin propietario** y el acceso a `/clinic/pets/{id}/edit` para cambiar su dueño.
+- No existe buscador, transferencia masiva ni selección repetitiva en la baja del propietario. **Eliminar de todas formas** envía una confirmación booleana explícita y el backend, bajo bloqueo, desvincula todas las mascotas que sigan asociadas en ese momento.
+- Desvinculación y baja lógica del propietario son atómicas. Se registra la auditoría de la baja y una auditoría independiente por cada mascota desvinculada.
+- La baja exige `clinic.owners.delete`, sesión y tenant; abrir la edición de mascota se muestra únicamente con `clinic.pets.update`. El alta/edición de mascotas bloquea en lectura al propietario para evitar una asignación concurrente. No existe endpoint separado de impacto.
+- Verificación sin abrir puertos: build Nest, unitarias de Propietarios 5/5, E2E Propietarios 3/3 —incluye confirmación tipada, desvinculación conjunta y auditoría—, `svelte-check` 0/0 y build SvelteKit.
+- Flujo final: el dropdown conserva el comportamiento simple anterior. La carga aparece en el botón de la confirmación mientras se intenta la baja; sin mascotas se completa normalmente y con mascotas el mismo modal presenta las opciones devueltas por el backend.
+- La salida del modal ya no limpia `deleteImpact` antes de cerrarse: conserva el ancho y contenido visibles durante el `zoom-out` y reinicia esos valores al comenzar la siguiente eliminación, evitando el encogimiento previo a la animación.
+- Los textos visibles de confirmaciones y ayudas dejaron de explicar auditoría o trazabilidad interna. La auditoría técnica permanece intacta en backend, pero no se presenta como información operativa al usuario.
+- La acción **Eliminar** del dropdown de Propietarios usa ahora `variant="destructive"` en escritorio y móvil. El estado hover/focus conserva el icono y texto rojos mediante el componente compartido, sin clases locales que compitan con su estilo interno.
+
+### Baja segura de mascotas con propietario
+
+- La acción **Eliminar** de Mascotas usa `variant="destructive"` en escritorio y móvil, conservando icono y texto rojos durante hover/focus.
+- El frontend mantiene la confirmación común. El primer `DELETE` llega al backend sin una consulta previa; si la mascota todavía tiene propietario, PostgreSQL responde `409` con la información pública mínima de esa relación y el mismo modal explica el impacto.
+- **Eliminar de todas formas** envía `confirmar_desvinculacion: true`. Bajo la misma transacción y bloqueo tenant, el backend asigna `fid_propietarios = NULL`, ejecuta la baja lógica y registra por separado la desvinculación y la eliminación.
+- El permiso efectivo `clinic.pets.delete`, sesión, tenant, CSRF, rate limit y DTO booleano se validan en backend. Los registros clínicos históricos permanecen conservados; lo que desaparece es el acceso mediante la relación activa propietario–mascota.
+- Verificación sin abrir puertos: build Nest, E2E Mascotas 4/4 —incluye `409`, rechazo de confirmación no booleana, desvinculación y ambas auditorías—, `svelte-check` 0/0, build SvelteKit y `git diff --check`.
+- Ajuste visual posterior: el `409` devuelve también el celular después de validar nuevamente que el propietario relacionado pertenece al tenant. La segunda confirmación amplía el modal y presenta un único card con icono, nombre, tipo/número de documento y celular del propietario; no agrega consultas frontend ni acciones secundarias.
+
+### Baja reconfirmada de atenciones iniciadas o cerradas
+
+- **Eliminar** aparece en el dropdown de todas las atenciones, en escritorio y móvil, siempre condicionado al permiso efectivo `clinic.attentions.delete`; usa la variante destructiva compartida.
+- El primer `DELETE` conserva el flujo normal para una atención en espera. Si el estado vigente en PostgreSQL es `en_atencion`, `finalizada` o `cancelada`, responde `409` con el código de estado y la cantidad de registros activos.
+- El mismo modal permanece abierto, informa que una atención ya iniciada o cerrada no debería eliminarse normalmente, muestra paciente, estado y cantidad de registros, y exige **Eliminar de todas formas**. La segunda solicitud envía `confirmar_eliminacion_protegida: true`, validado como booleano estricto por DTO.
+- Backend vuelve a bloquear y validar atención, tenant y estado dentro de la transacción; luego da de baja lógica atención, registros y adjuntos, audita el estado anterior y retira los objetos privados después del commit. No se relajaron sesión, permiso, CSRF ni scoping tenant.
+- Verificación sin abrir puertos: build Nest, unitarias de Atenciones 14/14, E2E Atenciones 9/9 —incluye `409`, confirmación booleana estricta, baja relacionada y auditoría—, `svelte-check` 0/0 y build SvelteKit.
+
+### Corrección de Consulta inicial con adjuntos multipart
+
+- Se reprodujo el mensaje `Algunos campos son inválidos`: no correspondía al peso de la foto. `DtoCrearAtencion` convertía el texto JSON de `registro`, pero la validación anidada recibía un objeto plano y lo rechazaba como valor desconocido antes de ejecutar el caso de uso.
+- El DTO ahora transforma explícitamente ese objeto a `DtoRegistroAtencion`. Se conservan la validación anidada, el esquema clínico desde base, permisos, tenant, CSRF, transacción, auditoría y manejo privado de adjuntos.
+- Una prueba nueva cubre el payload multipart de creación y otra procesa una PNG real de poco más de 4 MB: queda por debajo del máximo de 10 MB, valida contenido y se normaliza a JPEG al 75 %.
+- Verificación sin abrir puertos: build Nest correcto, unitarias de Atenciones 17/17 y E2E Atenciones 9/9.
+
+### Revisión transversal de modales y mensajes de Atenciones
+
+- Se trazaron creación inicial, alta de registros, edición, seguimientos y altas rápidas compartidas. Los formularios ocultos de creación y detalle que transportan archivos tienen `enctype="multipart/form-data"`; los modales validan requeridos, límites, fechas, listas y adjuntos antes de confirmar.
+- El filtro global conserva ahora un código i18n público emitido por `class-validator` cuando el DTO lo declara. Ya no reemplaza errores conocidos por `Algunos campos son inválidos`.
+- Los DTO de vacuna, motivo de consulta, tipo de hospitalización, procedimiento, prueba de laboratorio, estudio diagnóstico y servicio de peluquería declaran mensajes propios ES/EN. La validación de Atención distingue mascota, tipo de registro, origen, detalle y estado.
+- La acción Svelte de edición ya no devuelve `403` por UUID o payload inválido: reserva `403` para permisos y usa `400` para datos incorrectos. El proxy de mensajes conserva respuestas backend y dispone de fallback para detalles públicos.
+- Se amplió el E2E para exigir códigos concretos en las siete altas rápidas, un error específico de mascota y una creación inicial multipart válida. El mismo recorrido cubre Consulta, Vacunación, Fórmula médica, Desparasitación, Hospitalización, Cirugía, Laboratorio, Imagen diagnóstica, Peluquería/Spa, Guardería, Remisión y Seguimiento.
+- Verificación sin abrir puertos: build Nest, unitarias afectadas 17/17, E2E Atenciones 9/9, `svelte-check` 0 errores/0 advertencias y build SvelteKit correcto.
+
+### Fechas humanizadas en la línea de tiempo de Atenciones
+
+- La presentación consulta el tipo de cada campo en el esquema de registro proveniente de base. Todo valor `date` se muestra como fecha larga localizada y todo `datetime` como fecha larga con hora, tanto en registros principales como en seguimientos.
+- Las fechas civiles se interpretan en UTC para impedir cambios de día; los instantes usan la zona horaria IANA configurada por el usuario. También se unificaron nacimiento de la mascota, creación de registros y próximas fechas.
+- No se agregaron códigos ni nombres de campo estáticos, ni se alteró persistencia, permisos, tenant, auditoría o validación.
+- Verificación sin abrir puertos: `svelte-check` 0 errores/0 advertencias y build SvelteKit correcto.
+
+### Prueba visual de canvas blanco
+
+- Por solicitud explícita, el fondo general del tema claro cambió de `#f6f5f4` a blanco `#ffffff` mediante el token global `--surface`; no se modificaron páginas ni componentes individualmente.
+- `#dddddd` permanece como `--hairline-strong`, porque corresponde a bordes y no al fondo. Cards, campos, contraste, tema oscuro y estructura visual se conservaron.
+
+### Edición integral de adjuntos clínicos
+
+- La edición de registros dejó de ocultar los archivos existentes tras el texto «se conservarán». El diálogo compartido ahora presenta imágenes y documentos existentes con miniatura o icono, permite retirarlos y mantiene disponible la carga de reemplazos o archivos adicionales.
+- El mismo contrato cubre todos los tipos con adjuntos: Consulta, Desparasitación, Cirugía/procedimiento, Imagen diagnóstica y Seguimiento usan el selector común; Peluquería/Spa conserva grupos independientes Antes/Después; Laboratorio conserva un resultado asociado a cada prueba.
+- `PATCH` usa `multipart/form-data` y recibe grupos de UUID conservados más archivos nuevos. Backend vuelve a consultar y bloquear el registro, rechaza UUID ajenos o duplicados, valida la distribución y el límite combinado, reconstruye filas normalizadas y adjuntos dentro de la transacción y audita cantidades agregadas/retiradas. Solo después del commit retira de R2 y del ledger los objetos eliminados; ante fallo compensa las nuevas cargas.
+- No cambiaron permisos efectivos, sesión, tenant, CSRF, rate limit, estado cerrado, validación de firma/MIME, cuota ni caché privada.
+- Verificación sin abrir puertos: backend build, unidades de Atenciones/adjuntos 15/15, E2E Atenciones 9/9 —incluye conservar, reemplazar, UUID ajeno, resultado de Laboratorio y grupos Antes/Después—, `svelte-check` 0/0 y build SvelteKit correcto.
+
+### Agrupación diaria de la línea de tiempo
+
+- La fecha completa dejó de repetirse en la creación de cada registro y seguimiento: ahora se presenta únicamente la hora en la zona horaria IANA configurada.
+- Al comenzar el primer registro de ayer aparece un separador horizontal punteado **Ayer**; si se consulta una atención más antigua, el mismo separador usa su fecha larga localizada. Los registros del mismo día continúan mostrando solo sus horas.
+- El cambio es exclusivamente de presentación; no altera fechas clínicas, orden, persistencia, permisos, tenant, validación ni auditoría.
+
+### Jerarquía visual de la línea de tiempo sobre fondo blanco
+
+- Cada registro principal se distribuye en tres columnas: hora alineada a la derecha con cifras tabulares, hito circular coloreado por el tipo clínico y card de contenido.
+- La hora dejó de repetirse dentro del card. El título y las acciones ocupan una franja neutra suave; el borde definido y la sombra mínima separan el registro del lienzo blanco sin agregar ruido visual.
+- Los separadores diarios conservan la línea punteada y ahora abarcan las tres columnas. El cambio es responsive y no modifica datos ni lógica clínica.
+- El nombre del tipo clínico quedó alineado arriba y con mayor peso tipográfico. **Agregar seguimiento** pasó de ser un botón textual al pie a un icono con etiqueta accesible junto a Editar y Eliminar; si todavía no hay seguimientos, ya no se renderiza un pie vacío.
+
+## 2026-08-12 — Historial clínico completo por mascota
+
+- El dropdown de Mascotas incorporó **Historial clínico** en escritorio y móvil, visible únicamente con el permiso efectivo `clinic.attentions.read`.
+- La ruta `/clinic/pets/:id/history` presenta la ficha actual de la mascota y todas sus atenciones activas de la veterinaria, ordenadas por fecha y hora descendentes. Cada visita conserva estado, propietario y contacto históricos, registros raíz, seguimientos, próximas fechas y adjuntos privados.
+- La vista reutiliza la jerarquía visual aprobada de la línea de tiempo, pero es estrictamente de lectura: no contiene acciones de agregar seguimiento, editar, eliminar ni cambiar estado.
+- El endpoint `GET /clinic/attentions/pets/:pet/history` exige sesión, `clinic.attentions.read`, UUID v4 y rate limit. Primero valida que la mascota esté activa dentro del tenant y luego filtra todas las atenciones y registros por organización y baja lógica. La FK ya dispone de índice por `fid_mascotas`; no se añadieron tablas ni límites arbitrarios.
+- Los esquemas declarativos de campos viajan con cada tipo clínico para resolver etiquetas y fechas localizadas sin listas hardcodeadas en la nueva página. La descarga de adjuntos continúa usando el endpoint privado existente con permiso, tenant y caché inmutable.
+- Verificación sin abrir puertos: build Nest correcto, E2E Atenciones 9/9 —incluye sesión obligatoria, mascota inexistente y seguimiento anidado—, `svelte-check` 0 errores/0 advertencias, build SvelteKit correcto y `git diff --check`.
+
+### Consulta progresiva del historial
+
+- La ficha del historial muestra toda la información vigente de la mascota: foto, especie/clasificación, chip, género, color, nacimiento, peso/unidad, talla, estado reproductivo, temperamento, alimento, condiciones de servicio/apoyo emocional y propietario/contacto.
+- Cada atención aparece primero como un resumen legible con su fecha completa, hora, estado, propietario/contacto, dirección y cantidad de registros. **Ver** despliega únicamente esa atención y **Ocultar** vuelve al resumen; no se incorporaron rutas ni acciones de edición.
+- La fecha permanece dentro de cada atención incluso cuando cambia el día, evitando depender de un separador externo para comprender la cronología.
+- El despliegue de **Ver/Ocultar** usa una transición vertical breve. Dentro de la cronología, cada servicio presenta día y mes abreviados sobre su hora (`13 Ago`), y los seguimientos conservan ambas referencias temporales.
+- En el detalle operativo de Atenciones, Agregar seguimiento, Editar y Eliminar ocupan una fila superior alineada a la izquierda; el nombre del registro queda debajo sin competir por ancho. Los seguimientos aplican el mismo orden con sus acciones disponibles.
+- La línea de tiempo operativa muestra `13 Ago` en negrita y mayor contraste encima de la hora de cada servicio; los seguimientos presentan la misma referencia para no confundir su fecha con la apertura de la atención.
+- Los iconos de Agregar seguimiento, Editar y Eliminar muestran su nombre localizado mediante el tooltip flotante de Bits UI en hover y foco de teclado; las acciones de los seguimientos usan el mismo patrón. El contenido se porta fuera del card y este conserva `overflow-hidden`, restaurando el recorte continuo de bordes y esquinas.
+
+## 2026-08-12 — Operación mínima completa alrededor de la mascota
+
+- Se añadió la ficha integral de mascota con resumen, historial clínico, compras, documentos históricos y recordatorios. Accesorios/juguetes se representan como productos y compras.
+- Las migraciones `20260812120000_veterinary_operations_foundation` y `20260812123000_operations_tenant_composite_keys` crean productos, lotes, Kardex, ventas, detalles, pagos, citas, recordatorios, documentos de mascota y el esquema `facturacion` con series, comprobantes, detalles e intentos.
+- Tipos, estados y métodos de pago viven en `configuracion.parametros`; las relaciones usan UUID. Servicios, archivos, propietarios, mascotas, atenciones y usuarios se validan también por veterinaria.
+- El módulo Clean Architecture `operaciones` expone ficha/catálogos, productos, lotes, movimientos, ventas, pagos, citas, recordatorios, documentos, resumen operativo y preparación de comprobantes. Las mutaciones validan actor/tenant activos, permisos, pertenencia, catálogos, rangos, saldos y stock, y registran auditoría.
+- La UI agregó Inventario, Ventas, Agenda y citas, Recordatorios, Facturación electrónica y Reportes, con formularios SSR, confirmación/carga y Sonner comunes. La ficha permite registrar documentos históricos.
+- Facturación crea borradores y snapshots preparados para un adaptador UBL 2.1 futuro. No firma ni transmite a SUNAT hasta configurar certificado digital/proveedor. No se implementó historial de microchips.
+- Se delegó a PostgreSQL la interpretación de instantes/zonas horarias. Operaciones sensibles usan transacciones serializables y bloqueos para evitar stock o saldos inválidos.
+- Verificaciones: Prisma format/validate/generate; `migrate deploy` con 150 migraciones y sin pendientes; build backend; DTO 3/3; `svelte-check` 0/0; build frontend; `git diff --check`.
+
+## 2026-08-12 — Iconografía operativa corregida
+
+- Se registraron en el componente compartido los iconos oficiales de Lucide usados por navegación, ficha de mascota, ventas, inventario, agenda, recordatorios, facturación y reportes. Antes, los nombres ausentes caían silenciosamente en el círculo genérico de respaldo.
+- Se mantuvo el sistema visual existente: iconografía lineal, `currentColor`, tamaños heredados y compatibilidad con tema claro/oscuro, sin incorporar otra librería ni SVG inventados.
+- Verificación sin abrir puertos: los 92 nombres literales usados por `<Icon>` están registrados, `svelte-check` reporta 0 errores y 0 advertencias, build SvelteKit correcto y `git diff --check` correcto.
+
+## 2026-08-12 — Edición de mascota sin ficha duplicada
+
+- La cabecera-resumen heredada y las pestañas de la ficha dejaron de renderizarse en `/clinic/pets/:id/edit`; el formulario inferior sigue siendo la única fuente editable y las vistas Resumen, Historial, Compras, Documentos y Recordatorios conservan su cabecera.
+- Verificación: `svelte-check` con 0 errores y 0 advertencias; `git diff --check` correcto.
+
+## 2026-08-12 — Navegación, permisos y módulos por área funcional
+
+- El menú tenant dejó de mezclar la operación comercial dentro de Consultorio. Ahora separa Consultorio, Gestión comercial, Agenda y seguimiento y Análisis; Administrador conserva configuración, usuarios y mantenedores.
+- La misma clasificación compartida organiza la matriz de permisos de Roles y la asignación de módulos de Planes, evitando que `clinic.*` y `operations.*` vuelvan a aparecer bajo Sistema. Se añadieron etiquetas ES/EN.
+- La migración `20260812130000_align_operational_module_order` alinea `configuracion.modulos.orden` con el menú: Atenciones → Propietarios → Mascotas; Ventas → Inventario → Facturación; Agenda → Recordatorios; Reportes.
+- Migración aplicada: 151 migraciones y esquema actualizado. PostgreSQL confirmó los diez módulos en la secuencia esperada. `svelte-check` 0/0, build SvelteKit correcto, diccionarios válidos y `git diff --check` correcto.
+
+## 2026-08-12 — Detección de servicios existentes durante el alta
+
+- El formulario Nuevo servicio incorpora un combobox accesible. Desde tres caracteres espera 400 ms sin nueva escritura y presenta hasta seis coincidencias existentes con nombre, precio y estado; nuevas pulsaciones cancelan la espera o petición anterior.
+- El formulario y su campo Nombre declaran `autocomplete="off"`; el navegador no debe superponer su historial de entradas sobre las coincidencias remotas del sistema.
+- Seleccionar una coincidencia convierte el mismo modal en edición del servicio encontrado. Una coincidencia exacta muestra un mensaje específico y deshabilita Crear, evitando duplicados accidentales; la protección backend transaccional contra nombres activos duplicados continúa siendo la autoridad.
+- El patrón es responsive, usa iconos Lucide y tokens del tema, incluye etiquetas ES/EN y reutiliza el catálogo ya cargado sin nuevas peticiones. Verificación: `svelte-check` 0 errores/0 advertencias, build SvelteKit correcto y `git diff --check` correcto.
+
+## 2026-08-12 — Servicios con consulta progresiva
+
+- El catálogo dejó de enviar todos los servicios al navegador. La primera página conserva SSR y las siguientes usan paginación keyset de 10 registros mediante cursores UUID validados, orden estable `created_at DESC, id DESC` e índice tenant específico; no existe `offset`.
+- La tabla se compone con shadcn-svelte Table y TanStack Table. Durante cada cambio de cursor muestra diez filas skeleton; los controles Anterior/Siguiente conservan URLs navegables y el diseño responsive.
+- El alta ahora usa un autocomplete real: espera 250 ms desde la escritura, consulta PostgreSQL dentro de la veterinaria activa y retorna como máximo seis coincidencias. El proxy no almacena respuestas; API y UI exigen permiso de lectura y el backend mantiene la restricción de duplicados.
+- Migración `20260812131000_service_cursor_pagination` aplicada. Verificación sin abrir puertos: build Nest, unitarias Servicios 14/14, `svelte-check` 0 errores/0 advertencias, build SvelteKit y `git diff --check` correctos.
+
+### Posición de página opaca
+
+- Servicios sustituyó `after=<UUID>` y `before=<UUID>` por un único `p=<token opaco>`. AES-256-GCM cifra y autentica UUID, dirección y veterinaria; el ámbito impide reutilizar el token en otro endpoint y cualquier alteración devuelve cursor inválido.
+- La clave AES se deriva por HKDF del secreto de acceso con separación de dominio; no se agregó dependencia ni secreto duplicado. El token sigue sin conceder acceso: sesión, permiso, tenant, estado y pertenencia se validan en cada petición.
+- Quedó como convención transversal usar tokens opacos solo para posiciones/referencias internas de `GET`; búsquedas y filtros legibles conservan query params normales. No se envuelven todos los `GET` en JWT.
+- Verificación sin abrir puertos: token alterado, ámbito distinto y tenant ajeno rechazados, unitarias afectadas 16/16, build Nest, `svelte-check` 0/0, build SvelteKit y `git diff --check`. Benchmark local de 10,000 pares cifrar+descifrar: 0.009 ms por par; el costo es despreciable frente a PostgreSQL.
+
+### Buscador del catálogo de Servicios
+
+- El listado incorpora una búsqueda SSR explícita por nombre. No consulta por cada pulsación: exige entre 3 y 120 caracteres y ejecuta al presionar Buscar; Limpiar restaura el catálogo completo.
+- PostgreSQL filtra nombre, organización y baja lógica antes de contar y paginar. La búsqueda conserva páginas de 10 mediante keyset; el token opaco queda ligado también al texto consultado para impedir reutilizar una posición con otro filtro.
+- La interfaz distingue el catálogo vacío de una búsqueda sin coincidencias, muestra el total filtrado y conserva responsive, permisos e i18n ES/EN.
+- Crear un servicio desde una página posterior o un resultado filtrado navega a la primera página tras el éxito, donde el orden descendente permite ver el registro nuevo. Editar, activar, desactivar y eliminar conservan la página actual.
+- Anterior, Siguiente y Primera página navegan con reemplazo de historial. Llegar a una página distante no crea decenas de pasos para el botón Atrás del navegador; este regresa al estado anterior a la navegación paginada.
+
+### Tooltip de edición de Servicios
+
+- La acción visible de edición usa la etiqueta breve `Editar` en escritorio y móvil, sin retraso. El título del modal conserva `Editar servicio` mediante una clave i18n independiente.
+- Verificación: `svelte-check` con 0 errores y 0 advertencias.
+
+### Patrón transversal de tablas operativas
+
+- Se promovió la implementación final de Servicios a estándar obligatorio para futuros listados administrativos y operativos. `frontend/frontend.md` registra diseño compacto, jerarquía tipográfica, acciones, responsive, SSR, búsqueda remota, keyset de 10 registros, token opaco, loading con blur, historial de navegación, foco, autocomplete anti-duplicados, permisos, confirmaciones, Sonner, tenant y auditoría.
+- `PROJECT_STATE.md` enlaza esa especificación para que nuevas IA no interpreten la tabla de Servicios como una decisión aislada ni reconstruyan variantes redundantes.
+
+### Cierre del tooltip al editar Servicios
+
+- El tooltip inmediato de Editar pasó a estado controlado por registro. Al activar la acción se cierra antes del modal y se suprime mientras el diálogo restaura el foco; al abandonar y volver a enfocar el botón recupera su comportamiento normal.
+- El mismo ciclo de foco quedó incorporado al patrón transversal de tablas. Verificación: `svelte-check` con 0 errores y 0 advertencias.
+
+### Edición de Servicios sin tooltip flotante
+
+- La decisión anterior quedó reemplazada: Editar ya no usa el popup de Bits UI ni estado de apertura. Escritorio y móvil conservan el icono, el nombre accesible y únicamente el `title` nativo localizado `Editar`, por lo que ningún popup permanece después de cerrar el modal.
+- El estándar transversal de tablas se actualizó con esta decisión final.
+
+## 2026-08-12 — Motivos de consulta adopta el estándar completo de tablas
+
+- `/administrator/consultation-reasons` dejó la tabla HTML y el diálogo local anteriores. Ahora replica la composición Data Table de Servicios: acciones al inicio, Editar visible con `title` nativo, Eliminar en tres puntos, columnas compactas, valores sin texto artificial, switch accesible, versión móvil, búsqueda explícita y overlay de carga con blur.
+- La primera página continúa SSR y PostgreSQL pagina de 10 en 10 mediante `created_at DESC, UUID DESC`, respaldado por `motivos_consulta_cursor_idx`. La posición viaja cifrada y autenticada en `p`, ligada a veterinaria, ámbito y búsqueda; Anterior/Siguiente reemplazan el historial.
+- El backend añadió DTO estricto para búsqueda/página, endpoint remoto limitado a seis coincidencias y reutilización de `ServicioTokenOpaco`. Conserva permisos, tenant, rate limit, baja lógica, transacciones y auditoría; la migración `20260812132000_consultation_reason_cursor_pagination` quedó aplicada.
+- Alta y edición usan el mismo `ConfirmationDialog` amplio de Servicios. El nombre consulta coincidencias después de 400 ms, bloquea duplicados exactos y permite abrir su edición; descripción continúa opcional. Se separó `Guardar cambios` de la clave `Guardar` usada por el alta rápida dentro de Atenciones.
+- Verificación sin abrir puertos: DTO 5/5, Prisma format/validate/generate, 153 migraciones al día, build Nest, `svelte-check` 0/0 y build SvelteKit correctos.
+
+## 2026-08-12 — Vacunas adopta el estándar completo de tablas
+
+- `/administrator/vaccines` ahora usa la misma Data Table aprobada para Servicios y Motivos de consulta: acciones al inicio, Editar visible con `title` nativo, Eliminar en tres puntos, filas compactas, switch accesible, cards móviles, búsqueda explícita y overlay de carga con blur.
+- La primera página permanece SSR. PostgreSQL busca por nombre y pagina de 10 en 10 con `created_at DESC, id_vacunas DESC`; `p` cifra y autentica la posición ligada a veterinaria y búsqueda. La migración aplicada `20260812133000_vaccine_cursor_pagination` añadió `vacunas_cursor_idx`.
+- El alta y edición usan el `ConfirmationDialog` normal por contener un único campo; el nombre incorpora autocomplete remoto con espera de 400 ms, seis coincidencias máximas y bloqueo de duplicados exactos. Crear vuelve al inicio con foco; editar, estado y eliminar conservan la página.
+- Se mantuvieron permisos, tenant activo, rate limit, baja lógica, transacciones y auditoría. Verificación sin abrir puertos: DTO 3/3, Prisma validate/generate, 154 migraciones aplicadas, build Nest y `svelte-check` 0/0.
+
+## 2026-08-12 — Ancho de modales según cantidad de campos
+
+- Los mantenedores con uno o dos campos usan el tamaño normal de `ConfirmationDialog`: Motivos de consulta, Vacunas, Tipos de hospitalización, Cirugías/procedimientos, Pruebas de laboratorio, Estudios diagnósticos y Peluquería/Spa.
+- `size="wide"` queda reservado para formularios con tres o más campos o contenido complejo. Servicios conserva el ancho amplio por sus tres campos. La regla quedó registrada en `frontend/frontend.md`.
+# 2026-08-12 — Estándar Data Table en mantenedores clínicos y usuarios
+
+- Se completó —no solo visualmente— el estándar de Servicios en Tipos de hospitalización, Cirugías/procedimientos, Pruebas de laboratorio, Estudios diagnósticos, Peluquería/spa y Usuarios de la veterinaria.
+- Backend y PostgreSQL ahora entregan 10 filas por keyset estable, búsqueda tenant-scoped y tokens opacos ligados a organización y consulta; se agregaron índices compuestos y validación del cursor.
+- Frontend conserva la primera carga SSR, filtro al paginar, overlay con blur, `replaceState`, página actual en mutaciones y retorno al inicio tras crear. Los catálogos clínicos buscan coincidencias remotamente antes del alta.
+- Cirugías combina nombre y descripción guía en una única línea truncada con elipsis.
+- Se aclaró en `frontend/frontend.md` que copiar solamente el aspecto visual nunca cuenta como aplicar el estándar completo.
+# 2026-08-13 — Columnas de Cirugías y procedimientos
+
+- El listado separa Nombre y Descripción guía en dos columnas independientes. Cada valor permanece en una sola línea y usa elipsis cuando excede el ancho disponible; móvil conserva ambos datos de forma compacta.
+
+# 2026-08-13 — Gestión comercial adopta el estándar completo de tablas
+
+- Inventario, Ventas y Facturación electrónica dejaron de cargar listados completos o cards aislados. Los tres presentan tablas compactas con búsqueda explícita, primera página SSR, 10 registros, resumen y navegación Anterior/Siguiente/Primera.
+- PostgreSQL pagina mediante keyset estable `created_at DESC + UUID DESC`; la migración `20260813100000_commercial_tables_cursor_pagination` añadió índices tenant específicos y quedó aplicada. La posición `p` se cifra y autentica por ámbito, veterinaria y consulta.
+- El overlay conserva las filas y aplica solo blur durante navegación. Las cabeceras usan mayúsculas y mayor peso; el contenido mantiene peso normal y color uniforme. Ventas ubica Registrar pago al inicio y preselecciona la venta elegida.
+- Se preservaron permisos `operations.inventory.*`, `operations.sales.*` y `operations.billing.*`, tenant de sesión, rate limiting, validaciones, transacciones y auditoría de las mutaciones existentes. Series continúa como opción de formulario porque aún no existe un listado independiente que paginar.
+- Verificación sin abrir puertos: migración aplicada, Prisma válido, build Nest correcto, DTO Operaciones 3/3 y `svelte-check` 0 errores/0 advertencias.

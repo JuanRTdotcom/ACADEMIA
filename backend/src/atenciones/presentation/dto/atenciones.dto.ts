@@ -1,6 +1,8 @@
-import { Transform, Type } from "class-transformer";
+import { plainToInstance, Transform } from "class-transformer";
 import {
   IsBoolean,
+  IsArray,
+  IsDefined,
   IsObject,
   IsOptional,
   IsString,
@@ -9,6 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
+import { DtoListarCatalogoPaginado } from "../../../comun/presentation/dto/catalogo-paginado.dto";
 
 const limpiar = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
@@ -27,13 +30,7 @@ const json = ({ value }: { value: unknown }) => {
   }
 };
 
-export class DtoListarAtenciones {
-  @IsOptional()
-  @Transform(limpiar)
-  @IsString()
-  @MaxLength(120)
-  q?: string;
-
+export class DtoListarAtenciones extends DtoListarCatalogoPaginado {
   @IsOptional()
   @Transform(booleano)
   @IsBoolean()
@@ -49,25 +46,50 @@ export class DtoBuscarPropietariosAtencion {
 }
 
 export class DtoRegistroAtencion {
-  @IsUUID("4")
+  @IsUUID("4", { message: "attentions.invalidRecordType" })
   fid_tipos_registro_atencion!: string;
 
+  @IsOptional()
+  @IsUUID("4", { message: "attentions.invalidFollowUpOrigin" })
+  fid_registros_atencion_origen?: string;
+
   @Transform(json)
-  @IsObject()
+  @IsObject({ message: "attentions.invalidRecord" })
   detalle!: Record<string, unknown>;
 }
 
+export class DtoEditarRegistroAtencion extends DtoRegistroAtencion {
+  @IsOptional()
+  @Transform(json)
+  @IsArray({ message: "attentions.invalidAttachments" })
+  adjuntos_conservados?: string[][];
+}
+
 export class DtoCrearAtencion {
-  @IsUUID("4")
+  @IsUUID("4", { message: "attentions.invalidPet" })
   fid_mascotas!: string;
 
-  @Transform(json)
-  @ValidateNested()
-  @Type(() => DtoRegistroAtencion)
+  @Transform(({ value }: { value: unknown }) => {
+    const parsed = json({ value });
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? plainToInstance(DtoRegistroAtencion, parsed)
+      : parsed;
+  })
+  @IsDefined({ message: "attentions.invalidRecord" })
+  @IsObject({ message: "attentions.invalidRecord" })
+  @ValidateNested({ message: "attentions.invalidRecord" })
   registro!: DtoRegistroAtencion;
 }
 
 export class DtoCambiarEstadoAtencion {
-  @IsUUID("4")
+  @IsUUID("4", { message: "attentions.invalidStatus" })
   fid_parametros_estado!: string;
+}
+
+export class DtoEliminarAtencion {
+  @IsOptional()
+  @IsBoolean({
+    message: "attentions.protectedDeletionConfirmationRequired",
+  })
+  confirmar_eliminacion_protegida?: boolean;
 }

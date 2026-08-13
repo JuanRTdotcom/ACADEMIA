@@ -1,7 +1,9 @@
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
+import type { ResultadoCatalogoPaginado } from "../../../comun/domain/entities/catalogo-paginado";
 import type {
   ArchivoMascota,
   DatosMascota,
+  EliminacionMascota,
   FiltrosMascotas,
 } from "../entities/mascota";
 
@@ -10,7 +12,7 @@ export abstract class RepositorioMascotas {
     organizacion: string,
     filtros: FiltrosMascotas,
     idioma: string,
-  ): Promise<unknown>;
+  ): Promise<ResultadoCatalogoPaginado>;
   abstract opciones(idioma: string): Promise<unknown>;
   abstract buscarPropietarios(
     organizacion: string,
@@ -41,6 +43,7 @@ export abstract class RepositorioMascotas {
   abstract eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionMascota,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void>;

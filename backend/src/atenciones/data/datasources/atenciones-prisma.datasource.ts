@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -11,7 +12,9 @@ import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-
 import { PrismaService } from "../../../comun/prisma.service";
 import type {
   DatosCrearAtencion,
+  DatosEditarRegistroAtencion,
   DatosRegistroAtencion,
+  EliminacionAtencion,
   ArchivoAdjuntoAtencion,
   AdjuntoAtencionGuardado,
   FiltrosAtenciones,
@@ -42,9 +45,16 @@ export class FuenteDatosAtencionesPrisma {
   ) {
     const tipo = await this.prisma.tipos_registro_atencion.findFirst({
       where: { id_tipos_registro_atencion: tipoId, estado: 1 },
-      select: { acepta_adjuntos: true, max_adjuntos: true },
+      select: {
+        acepta_adjuntos: true,
+        max_adjuntos: true,
+        permite_registro_raiz: true,
+        requiere_registro_origen: true,
+      },
     });
     if (!tipo) throw new BadRequestException("attentions.invalidRecordType");
+    if (!tipo.permite_registro_raiz && !tipo.requiere_registro_origen)
+      throw new BadRequestException("attentions.invalidRecordType");
     if (archivos.length && !tipo.acepta_adjuntos)
       throw new BadRequestException("attentions.attachmentsNotAllowed");
     const maximo = this.maximoAdjuntos(tipo.max_adjuntos);
@@ -167,6 +177,28 @@ export class FuenteDatosAtencionesPrisma {
       },
     });
     if (!tipo) throw new BadRequestException("attentions.invalidRecordType");
+    if (!tipo.permite_registro_raiz && !tipo.requiere_registro_origen)
+      throw new BadRequestException("attentions.invalidRecordType");
+    let registroOrigen: { id_registros_atencion: string } | null = null;
+    if (tipo.requiere_registro_origen) {
+      if (!datos.fid_registros_atencion_origen)
+        throw new BadRequestException("attentions.followUpOriginRequired");
+      registroOrigen = await tx.registros_atencion.findFirst({
+        where: {
+          id_registros_atencion: datos.fid_registros_atencion_origen,
+          fid_atenciones: atencion,
+          fid_organizaciones: organizacion,
+          fid_registros_atencion_origen: null,
+          estado: 1,
+          eliminado_en: null,
+        },
+        select: { id_registros_atencion: true },
+      });
+      if (!registroOrigen)
+        throw new BadRequestException("attentions.invalidFollowUpOrigin");
+    } else if (datos.fid_registros_atencion_origen) {
+      throw new BadRequestException("attentions.invalidFollowUpOrigin");
+    }
     if (archivos.length && !tipo.acepta_adjuntos)
       throw new BadRequestException("attentions.attachmentsNotAllowed");
     const maximoAdjuntos = this.maximoAdjuntos(tipo.max_adjuntos);
@@ -191,10 +223,31 @@ export class FuenteDatosAtencionesPrisma {
       id_parametros: string;
       etiqueta: string;
     } | null = null;
+    let tipoEstanciaGuarderia: {
+      id_parametros: string;
+      etiqueta: string;
+    } | null = null;
+    let usuarioRemitente: { id_usuarios: string } | null = null;
+    let tipoSeguimiento: { id_parametros: string; etiqueta: string } | null =
+      null;
     let procedimiento: {
       id_procedimientos_veterinarios: string;
       nombre: string;
     } | null = null;
+    let estudioDiagnostico: {
+      id_estudios_diagnosticos: string;
+      nombre: string;
+    } | null = null;
+    let sedacionImagen: { id_parametros: string; etiqueta: string } | null =
+      null;
+    let serviciosPeluqueria: Array<{
+      fid_servicios_peluqueria_spa: string;
+      fid_usuarios_encargado?: string;
+      motivo?: string;
+      detalle_observaciones?: string;
+      nombre: string;
+    }> = [];
+    let etapasFotosPeluqueria: { antes: string; despues: string } | null = null;
     let pruebasLaboratorio: Array<{
       fid_pruebas_laboratorio: string;
       fid_usuarios_profesional: string;
@@ -278,6 +331,65 @@ export class FuenteDatosAtencionesPrisma {
         if (!motivoSalidaHospitalizacion)
           throw new BadRequestException("attentions.invalidDischargeReason");
       }
+    }
+    if (tipo.codigo === "guarderia") {
+      const tipoEstanciaId =
+        validado.detalle.fid_parametros_tipo_estancia_guarderia;
+      if (typeof tipoEstanciaId !== "string")
+        throw new BadRequestException("attentions.invalidDaycareType");
+      tipoEstanciaGuarderia = await tx.parametros.findFirst({
+        where: {
+          id_parametros: tipoEstanciaId,
+          codigo_grupo: "tipos_estancia_guarderia",
+          estado: 1,
+        },
+        select: { id_parametros: true, etiqueta: true },
+      });
+      if (!tipoEstanciaGuarderia)
+        throw new BadRequestException("attentions.invalidDaycareType");
+      const ingreso = validado.detalle.fecha_ingreso;
+      const salida = validado.detalle.fecha_salida;
+      if (
+        typeof ingreso !== "string" ||
+        (salida !== undefined &&
+          (typeof salida !== "string" || salida < ingreso))
+      )
+        throw new BadRequestException("attentions.invalidDaycareDates");
+    }
+    if (tipo.codigo === "remision") {
+      const remitenteId = validado.detalle.fid_usuarios_remitente;
+      if (remitenteId !== undefined) {
+        if (typeof remitenteId !== "string")
+          throw new BadRequestException("attentions.invalidReferringUser");
+        usuarioRemitente = await tx.usuarios.findFirst({
+          where: {
+            id_usuarios: remitenteId,
+            fid_organizaciones: organizacion,
+            estado: 1,
+            estado_cuenta: "activo",
+            eliminado_en: null,
+          },
+          select: { id_usuarios: true },
+        });
+        if (!usuarioRemitente)
+          throw new BadRequestException("attentions.invalidReferringUser");
+      }
+    }
+    if (tipo.codigo === "seguimiento") {
+      const tipoSeguimientoId =
+        validado.detalle.fid_parametros_tipo_seguimiento;
+      if (typeof tipoSeguimientoId !== "string")
+        throw new BadRequestException("attentions.invalidFollowUpType");
+      tipoSeguimiento = await tx.parametros.findFirst({
+        where: {
+          id_parametros: tipoSeguimientoId,
+          codigo_grupo: "tipos_seguimiento_atencion",
+          estado: 1,
+        },
+        select: { id_parametros: true, etiqueta: true },
+      });
+      if (!tipoSeguimiento)
+        throw new BadRequestException("attentions.invalidFollowUpType");
     }
     if (tipo.codigo === "cirugia_procedimiento") {
       const procedimientoId = validado.detalle.fid_procedimientos_veterinarios;
@@ -372,6 +484,141 @@ export class FuenteDatosAtencionesPrisma {
         nombre: nombres.get(item.fid_pruebas_laboratorio)!,
       }));
     }
+    if (tipo.codigo === "imagen_diagnostica") {
+      const estudioId = validado.detalle.fid_estudios_diagnosticos;
+      const sedacionId = validado.detalle.fid_parametros_sedacion_imagen;
+      if (typeof estudioId !== "string" || typeof sedacionId !== "string")
+        throw new BadRequestException("attentions.invalidDiagnosticImaging");
+      [estudioDiagnostico, sedacionImagen] = await Promise.all([
+        tx.estudios_diagnosticos.findFirst({
+          where: {
+            id_estudios_diagnosticos: estudioId,
+            fid_organizaciones: organizacion,
+            estado: 1,
+            eliminado_en: null,
+          },
+          select: { id_estudios_diagnosticos: true, nombre: true },
+        }),
+        tx.parametros.findFirst({
+          where: {
+            id_parametros: sedacionId,
+            codigo_grupo: "sedacion_imagen_diagnostica",
+            estado: 1,
+          },
+          select: { id_parametros: true, etiqueta: true },
+        }),
+      ]);
+      if (!estudioDiagnostico || !sedacionImagen)
+        throw new BadRequestException("attentions.invalidDiagnosticImaging");
+    }
+    if (tipo.codigo === "peluqueria_spa") {
+      const items = validado.detalle.servicios;
+      const fotosAntes = validado.detalle.cantidad_fotos_antes;
+      const fotosDespues = validado.detalle.cantidad_fotos_despues;
+      if (
+        !Array.isArray(items) ||
+        !items.length ||
+        typeof fotosAntes !== "number" ||
+        typeof fotosDespues !== "number" ||
+        fotosAntes + fotosDespues !== archivos.length ||
+        archivos.some((archivo) => !archivo.tipo_mime.startsWith("image/"))
+      )
+        throw new BadRequestException("attentions.invalidGroomingRecord");
+      const recibidos = items.map((item) => ({
+        fid_servicios_peluqueria_spa: item.fid_servicios_peluqueria_spa,
+        fid_usuarios_encargado: item.fid_usuarios_encargado,
+        motivo: item.motivo,
+        detalle_observaciones: item.detalle_observaciones,
+      }));
+      if (
+        recibidos.some(
+          (item) =>
+            typeof item.fid_servicios_peluqueria_spa !== "string" ||
+            (item.fid_usuarios_encargado !== undefined &&
+              typeof item.fid_usuarios_encargado !== "string") ||
+            (item.motivo !== undefined && typeof item.motivo !== "string") ||
+            (item.detalle_observaciones !== undefined &&
+              typeof item.detalle_observaciones !== "string"),
+        )
+      )
+        throw new BadRequestException("attentions.invalidGroomingRecord");
+      const [servicios, encargados, etapas] = await Promise.all([
+        tx.servicios_peluqueria_spa.findMany({
+          where: {
+            id_servicios_peluqueria_spa: {
+              in: recibidos.map(
+                (item) => item.fid_servicios_peluqueria_spa as string,
+              ),
+            },
+            fid_organizaciones: organizacion,
+            estado: 1,
+            eliminado_en: null,
+          },
+          select: { id_servicios_peluqueria_spa: true, nombre: true },
+        }),
+        tx.usuarios.findMany({
+          where: {
+            id_usuarios: {
+              in: recibidos.flatMap((item) =>
+                typeof item.fid_usuarios_encargado === "string"
+                  ? [item.fid_usuarios_encargado]
+                  : [],
+              ),
+            },
+            fid_organizaciones: organizacion,
+            estado: 1,
+            estado_cuenta: "activo",
+            eliminado_en: null,
+          },
+          select: { id_usuarios: true },
+        }),
+        tx.parametros.findMany({
+          where: {
+            codigo_grupo: "etapas_foto_peluqueria_spa",
+            codigo: { in: ["antes", "despues"] },
+            estado: 1,
+          },
+          select: { id_parametros: true, codigo: true },
+        }),
+      ]);
+      const nombres = new Map(
+        servicios.map((servicio) => [
+          servicio.id_servicios_peluqueria_spa,
+          servicio.nombre,
+        ]),
+      );
+      const usuarios = new Set(
+        encargados.map((encargado) => encargado.id_usuarios),
+      );
+      if (
+        recibidos.some(
+          (item) =>
+            !nombres.has(item.fid_servicios_peluqueria_spa as string) ||
+            (typeof item.fid_usuarios_encargado === "string" &&
+              !usuarios.has(item.fid_usuarios_encargado)),
+        )
+      )
+        throw new BadRequestException("attentions.invalidGroomingRecord");
+      const antes = etapas.find(
+        (etapa) => etapa.codigo === "antes",
+      )?.id_parametros;
+      const despues = etapas.find(
+        (etapa) => etapa.codigo === "despues",
+      )?.id_parametros;
+      if (!antes || !despues)
+        throw new BadRequestException("attentions.invalidGroomingRecord");
+      etapasFotosPeluqueria = { antes, despues };
+      serviciosPeluqueria = recibidos.map((item) => ({
+        ...item,
+        fid_servicios_peluqueria_spa:
+          item.fid_servicios_peluqueria_spa as string,
+        fid_usuarios_encargado: item.fid_usuarios_encargado as
+          string | undefined,
+        motivo: item.motivo as string | undefined,
+        detalle_observaciones: item.detalle_observaciones as string | undefined,
+        nombre: nombres.get(item.fid_servicios_peluqueria_spa as string)!,
+      }));
+    }
     const [fechaProgramada, programadoPara] = await Promise.all([
       this.fechaCivil(tx, validado.fecha_programada),
       this.instanteTenant(tx, validado.programado_local, zona),
@@ -390,13 +637,38 @@ export class FuenteDatosAtencionesPrisma {
           tipoHospitalizacion?.id_tipos_hospitalizacion ?? null,
         fid_parametros_motivo_salida_hospitalizacion:
           motivoSalidaHospitalizacion?.id_parametros ?? null,
+        fid_parametros_tipo_estancia_guarderia:
+          tipoEstanciaGuarderia?.id_parametros ?? null,
+        fid_usuarios_remitente: usuarioRemitente?.id_usuarios ?? null,
+        fid_registros_atencion_origen:
+          registroOrigen?.id_registros_atencion ?? null,
+        fid_parametros_tipo_seguimiento: tipoSeguimiento?.id_parametros ?? null,
         fid_procedimientos_veterinarios:
           procedimiento?.id_procedimientos_veterinarios ?? null,
+        fid_estudios_diagnosticos:
+          estudioDiagnostico?.id_estudios_diagnosticos ?? null,
+        fid_parametros_sedacion_imagen: sedacionImagen?.id_parametros ?? null,
         resumen:
           motivo?.nombre.slice(0, 160) ??
           vacuna?.nombre.slice(0, 160) ??
           tipoHospitalizacion?.nombre.slice(0, 160) ??
+          tipoEstanciaGuarderia?.etiqueta.slice(0, 160) ??
+          (tipo.codigo === "remision" &&
+          typeof validado.detalle.clinica_veterinaria_destino === "string"
+            ? validado.detalle.clinica_veterinaria_destino.slice(0, 160)
+            : null) ??
+          (tipo.codigo === "seguimiento" &&
+          typeof validado.detalle.detalle_seguimiento === "string"
+            ? validado.detalle.detalle_seguimiento.slice(0, 160)
+            : null) ??
           procedimiento?.nombre.slice(0, 160) ??
+          estudioDiagnostico?.nombre.slice(0, 160) ??
+          (serviciosPeluqueria.length
+            ? `${serviciosPeluqueria[0].nombre}${serviciosPeluqueria.length > 1 ? ` +${serviciosPeluqueria.length - 1}` : ""}`.slice(
+                0,
+                160,
+              )
+            : null) ??
           (pruebasLaboratorio.length
             ? `${pruebasLaboratorio[0].nombre}${pruebasLaboratorio.length > 1 ? ` +${pruebasLaboratorio.length - 1}` : ""}`.slice(
                 0,
@@ -416,7 +688,37 @@ export class FuenteDatosAtencionesPrisma {
       },
       select: { id_registros_atencion: true },
     });
-    if (tipo.codigo === "laboratorio") {
+    if (tipo.codigo === "peluqueria_spa") {
+      await tx.servicios_registro_peluqueria_spa.createMany({
+        data: serviciosPeluqueria.map((item, orden) => ({
+          fid_organizaciones: organizacion,
+          fid_registros_atencion: registroId,
+          fid_servicios_peluqueria_spa: item.fid_servicios_peluqueria_spa,
+          fid_usuarios_encargado: item.fid_usuarios_encargado ?? null,
+          motivo: item.motivo ?? null,
+          detalle_observaciones: item.detalle_observaciones ?? null,
+          orden,
+          created_by: usuario,
+          updated_by: usuario,
+        })),
+      });
+      if (archivos.length && etapasFotosPeluqueria) {
+        const cantidadAntes = validado.detalle.cantidad_fotos_antes as number;
+        await tx.adjuntos_registro_atencion.createMany({
+          data: archivos.map((archivo, indice) => ({
+            ...archivo,
+            fid_organizaciones: organizacion,
+            fid_registros_atencion: registroId,
+            fid_parametros_etapa_foto_peluqueria:
+              indice < cantidadAntes
+                ? etapasFotosPeluqueria!.antes
+                : etapasFotosPeluqueria!.despues,
+            created_by: usuario,
+            updated_by: usuario,
+          })),
+        });
+      }
+    } else if (tipo.codigo === "laboratorio") {
       let offset = 0;
       for (const [orden, item] of pruebasLaboratorio.entries()) {
         const pruebaRegistro = await tx.pruebas_registro_laboratorio.create({
@@ -534,15 +836,17 @@ export class FuenteDatosAtencionesPrisma {
       registros: {
         where: { estado: 1, eliminado_en: null },
         orderBy: [
-          { created_at: "desc" as const },
+          { realizado_en: "desc" as const },
           { id_registros_atencion: "desc" as const },
         ],
         select: {
           id_registros_atencion: true,
+          fid_registros_atencion_origen: true,
           resumen: true,
           detalle: true,
           fecha_programada: true,
           programado_para: true,
+          realizado_en: true,
           created_at: true,
           motivo_consulta: { select: { nombre: true } },
           vacuna: { select: { nombre: true } },
@@ -563,7 +867,64 @@ export class FuenteDatosAtencionesPrisma {
               },
             },
           },
+          tipo_estancia_guarderia: {
+            select: {
+              etiqueta: true,
+              traducciones: {
+                select: { codigo_idioma: true, etiqueta: true },
+              },
+            },
+          },
+          usuario_remitente: {
+            select: {
+              usuario: true,
+              persona: {
+                select: {
+                  nombres: true,
+                  apellido_paterno: true,
+                  apellido_materno: true,
+                },
+              },
+            },
+          },
           procedimiento_veterinario: { select: { nombre: true } },
+          estudio_diagnostico: { select: { nombre: true } },
+          sedacion_imagen: {
+            select: {
+              etiqueta: true,
+              traducciones: { select: { codigo_idioma: true, etiqueta: true } },
+            },
+          },
+          tipo_seguimiento: {
+            select: {
+              etiqueta: true,
+              traducciones: { select: { codigo_idioma: true, etiqueta: true } },
+            },
+          },
+          servicios_peluqueria_spa: {
+            where: { estado: 1 },
+            orderBy: [
+              { orden: "asc" },
+              { id_servicios_registro_peluqueria_spa: "asc" },
+            ],
+            select: {
+              motivo: true,
+              detalle_observaciones: true,
+              servicio: { select: { nombre: true } },
+              encargado: {
+                select: {
+                  usuario: true,
+                  persona: {
+                    select: {
+                      nombres: true,
+                      apellido_paterno: true,
+                      apellido_materno: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           pruebas_laboratorio: {
             where: { estado: 1 },
             orderBy: [
@@ -571,6 +932,7 @@ export class FuenteDatosAtencionesPrisma {
               { id_pruebas_registro_laboratorio: "asc" },
             ],
             select: {
+              id_pruebas_registro_laboratorio: true,
               cantidad: true,
               prueba: {
                 select: {
@@ -616,6 +978,15 @@ export class FuenteDatosAtencionesPrisma {
               nombre_original: true,
               tipo_mime: true,
               bytes: true,
+              etapa_foto_peluqueria: {
+                select: {
+                  codigo: true,
+                  etiqueta: true,
+                  traducciones: {
+                    select: { codigo_idioma: true, etiqueta: true },
+                  },
+                },
+              },
             },
           },
           tipo: {
@@ -628,6 +999,7 @@ export class FuenteDatosAtencionesPrisma {
               descripcion_en: true,
               icono: true,
               color_hex: true,
+              campos: true,
             },
           },
         },
@@ -649,6 +1021,8 @@ export class FuenteDatosAtencionesPrisma {
         subespecie: { nombre_es: string; nombre_en: string } | null;
       };
       registros: Array<{
+        id_registros_atencion: string;
+        fid_registros_atencion_origen: string | null;
         detalle: Prisma.JsonValue;
         motivo_consulta: { nombre: string } | null;
         vacuna: { nombre: string } | null;
@@ -661,8 +1035,30 @@ export class FuenteDatosAtencionesPrisma {
           etiqueta: string;
           traducciones: Array<{ codigo_idioma: string; etiqueta: string }>;
         } | null;
+        tipo_estancia_guarderia: {
+          etiqueta: string;
+          traducciones: Array<{ codigo_idioma: string; etiqueta: string }>;
+        } | null;
+        usuario_remitente: {
+          usuario: string;
+          persona: {
+            nombres: string;
+            apellido_paterno: string;
+            apellido_materno: string | null;
+          };
+        } | null;
         procedimiento_veterinario: { nombre: string } | null;
+        estudio_diagnostico: { nombre: string } | null;
+        sedacion_imagen: {
+          etiqueta: string;
+          traducciones: Array<{ codigo_idioma: string; etiqueta: string }>;
+        } | null;
+        tipo_seguimiento: {
+          etiqueta: string;
+          traducciones: Array<{ codigo_idioma: string; etiqueta: string }>;
+        } | null;
         pruebas_laboratorio: Array<{
+          id_pruebas_registro_laboratorio: string;
           cantidad: number;
           prueba: { nombre: string; categoria: { nombre: string } };
           profesional: {
@@ -680,7 +1076,32 @@ export class FuenteDatosAtencionesPrisma {
             bytes: number;
           }>;
         }>;
+        servicios_peluqueria_spa: Array<{
+          motivo: string | null;
+          detalle_observaciones: string | null;
+          servicio: { nombre: string };
+          encargado: {
+            usuario: string;
+            persona: {
+              nombres: string;
+              apellido_paterno: string;
+              apellido_materno: string | null;
+            };
+          } | null;
+        }>;
+        adjuntos: Array<{
+          id_adjuntos_registro_atencion: string;
+          nombre_original: string;
+          tipo_mime: string;
+          bytes: number;
+          etapa_foto_peluqueria: {
+            codigo: string;
+            etiqueta: string;
+            traducciones: Array<{ codigo_idioma: string; etiqueta: string }>;
+          } | null;
+        }>;
         tipo: {
+          codigo: string;
           nombre_es: string;
           nombre_en: string;
           descripcion_es: string;
@@ -690,6 +1111,149 @@ export class FuenteDatosAtencionesPrisma {
     },
   >(item: T, idioma: string) {
     const clasificacion = item.mascota.raza ?? item.mascota.subespecie;
+    const registros = item.registros.map((registro) => {
+      const detalleEdicion = {
+        ...(registro.detalle as Record<string, unknown>),
+      };
+      const detalle = { ...detalleEdicion };
+      if (registro.tipo.codigo === "laboratorio") delete detalle.fecha;
+      if (registro.motivo_consulta)
+        detalle.fid_motivos_consulta = registro.motivo_consulta.nombre;
+      if (registro.vacuna) detalle.fid_vacunas = registro.vacuna.nombre;
+      if (registro.tipo_desparasitacion)
+        detalle.fid_parametros_tipo_desparasitacion =
+          registro.tipo_desparasitacion.traducciones.find(
+            (traduccion) => traduccion.codigo_idioma === idioma,
+          )?.etiqueta ?? registro.tipo_desparasitacion.etiqueta;
+      if (registro.tipo_hospitalizacion)
+        detalle.fid_tipos_hospitalizacion =
+          registro.tipo_hospitalizacion.nombre;
+      if (registro.motivo_salida_hospitalizacion)
+        detalle.fid_parametros_motivo_salida_hospitalizacion =
+          registro.motivo_salida_hospitalizacion.traducciones.find(
+            (traduccion) => traduccion.codigo_idioma === idioma,
+          )?.etiqueta ?? registro.motivo_salida_hospitalizacion.etiqueta;
+      if (registro.tipo_estancia_guarderia)
+        detalle.fid_parametros_tipo_estancia_guarderia =
+          registro.tipo_estancia_guarderia.traducciones.find(
+            (traduccion) => traduccion.codigo_idioma === idioma,
+          )?.etiqueta ?? registro.tipo_estancia_guarderia.etiqueta;
+      if (registro.tipo_seguimiento)
+        detalle.fid_parametros_tipo_seguimiento =
+          registro.tipo_seguimiento.traducciones.find(
+            (traduccion) => traduccion.codigo_idioma === idioma,
+          )?.etiqueta ?? registro.tipo_seguimiento.etiqueta;
+      if (registro.usuario_remitente)
+        detalle.fid_usuarios_remitente =
+          [
+            registro.usuario_remitente.persona.nombres,
+            registro.usuario_remitente.persona.apellido_paterno,
+            registro.usuario_remitente.persona.apellido_materno,
+          ]
+            .filter(Boolean)
+            .join(" ") || registro.usuario_remitente.usuario;
+      if (registro.procedimiento_veterinario)
+        detalle.fid_procedimientos_veterinarios =
+          registro.procedimiento_veterinario.nombre;
+      if (registro.estudio_diagnostico)
+        detalle.fid_estudios_diagnosticos = registro.estudio_diagnostico.nombre;
+      if (registro.sedacion_imagen)
+        detalle.fid_parametros_sedacion_imagen =
+          registro.sedacion_imagen.traducciones.find(
+            (traduccion) => traduccion.codigo_idioma === idioma,
+          )?.etiqueta ?? registro.sedacion_imagen.etiqueta;
+      if (registro.pruebas_laboratorio.length)
+        detalle.pruebas = registro.pruebas_laboratorio.map((prueba) => ({
+          prueba: prueba.prueba.nombre,
+          categoria: prueba.prueba.categoria.nombre,
+          profesional:
+            [
+              prueba.profesional.persona.nombres,
+              prueba.profesional.persona.apellido_paterno,
+              prueba.profesional.persona.apellido_materno,
+            ]
+              .filter(Boolean)
+              .join(" ") || prueba.profesional.usuario,
+          cantidad: prueba.cantidad,
+          resultados: prueba.adjuntos.map((adjunto) => adjunto.nombre_original),
+        }));
+      if (registro.servicios_peluqueria_spa.length)
+        detalle.servicios = registro.servicios_peluqueria_spa.map(
+          (servicio) => ({
+            servicio: servicio.servicio.nombre,
+            motivo: servicio.motivo,
+            encargado: servicio.encargado
+              ? [
+                  servicio.encargado.persona.nombres,
+                  servicio.encargado.persona.apellido_paterno,
+                  servicio.encargado.persona.apellido_materno,
+                ]
+                  .filter(Boolean)
+                  .join(" ") || servicio.encargado.usuario
+              : null,
+            detalle_observaciones: servicio.detalle_observaciones,
+          }),
+        );
+      if (registro.tipo.codigo === "peluqueria_spa") {
+        delete detalle.cantidad_fotos_antes;
+        delete detalle.cantidad_fotos_despues;
+      }
+      const grupoLaboratorio = new Map(
+        registro.pruebas_laboratorio.flatMap((prueba, indice) =>
+          prueba.adjuntos.map(
+            (adjunto) =>
+              [adjunto.id_adjuntos_registro_atencion, indice] as const,
+          ),
+        ),
+      );
+      return {
+        ...registro,
+        detalle,
+        detalle_edicion: detalleEdicion,
+        adjuntos: registro.adjuntos.map(
+          ({ etapa_foto_peluqueria, ...adjunto }) => ({
+            ...adjunto,
+            etapa_foto: etapa_foto_peluqueria
+              ? (etapa_foto_peluqueria.traducciones.find(
+                  (traduccion) => traduccion.codigo_idioma === idioma,
+                )?.etiqueta ?? etapa_foto_peluqueria.etiqueta)
+              : null,
+            grupo_adjunto:
+              registro.tipo.codigo === "laboratorio"
+                ? (grupoLaboratorio.get(
+                    adjunto.id_adjuntos_registro_atencion,
+                  ) ?? 0)
+                : registro.tipo.codigo === "peluqueria_spa"
+                  ? etapa_foto_peluqueria?.codigo === "despues"
+                    ? 1
+                    : 0
+                  : 0,
+          }),
+        ),
+        motivo_consulta: undefined,
+        vacuna: undefined,
+        tipo_desparasitacion: undefined,
+        tipo_hospitalizacion: undefined,
+        motivo_salida_hospitalizacion: undefined,
+        tipo_estancia_guarderia: undefined,
+        usuario_remitente: undefined,
+        procedimiento_veterinario: undefined,
+        estudio_diagnostico: undefined,
+        sedacion_imagen: undefined,
+        tipo_seguimiento: undefined,
+        pruebas_laboratorio: undefined,
+        servicios_peluqueria_spa: undefined,
+        tipo: {
+          ...registro.tipo,
+          nombre:
+            idioma === "en" ? registro.tipo.nombre_en : registro.tipo.nombre_es,
+          descripcion:
+            idioma === "en"
+              ? registro.tipo.descripcion_en
+              : registro.tipo.descripcion_es,
+        },
+      };
+    });
     return {
       ...item,
       estado_atencion: {
@@ -718,65 +1282,16 @@ export class FuenteDatosAtencionesPrisma {
             : clasificacion.nombre_es
           : null,
       },
-      registros: item.registros.map((registro) => {
-        const detalle = { ...(registro.detalle as Record<string, unknown>) };
-        if (registro.motivo_consulta)
-          detalle.fid_motivos_consulta = registro.motivo_consulta.nombre;
-        if (registro.vacuna) detalle.fid_vacunas = registro.vacuna.nombre;
-        if (registro.tipo_desparasitacion)
-          detalle.fid_parametros_tipo_desparasitacion =
-            registro.tipo_desparasitacion.traducciones.find(
-              (traduccion) => traduccion.codigo_idioma === idioma,
-            )?.etiqueta ?? registro.tipo_desparasitacion.etiqueta;
-        if (registro.tipo_hospitalizacion)
-          detalle.fid_tipos_hospitalizacion =
-            registro.tipo_hospitalizacion.nombre;
-        if (registro.motivo_salida_hospitalizacion)
-          detalle.fid_parametros_motivo_salida_hospitalizacion =
-            registro.motivo_salida_hospitalizacion.traducciones.find(
-              (traduccion) => traduccion.codigo_idioma === idioma,
-            )?.etiqueta ?? registro.motivo_salida_hospitalizacion.etiqueta;
-        if (registro.procedimiento_veterinario)
-          detalle.fid_procedimientos_veterinarios =
-            registro.procedimiento_veterinario.nombre;
-        if (registro.pruebas_laboratorio.length)
-          detalle.pruebas = registro.pruebas_laboratorio.map((item) => ({
-            prueba: item.prueba.nombre,
-            categoria: item.prueba.categoria.nombre,
-            profesional:
-              [
-                item.profesional.persona.nombres,
-                item.profesional.persona.apellido_paterno,
-                item.profesional.persona.apellido_materno,
-              ]
-                .filter(Boolean)
-                .join(" ") || item.profesional.usuario,
-            cantidad: item.cantidad,
-            resultados: item.adjuntos.map((adjunto) => adjunto.nombre_original),
-          }));
-        return {
+      registros: registros
+        .filter((registro) => !registro.fid_registros_atencion_origen)
+        .map((registro) => ({
           ...registro,
-          detalle,
-          motivo_consulta: undefined,
-          vacuna: undefined,
-          tipo_desparasitacion: undefined,
-          tipo_hospitalizacion: undefined,
-          motivo_salida_hospitalizacion: undefined,
-          procedimiento_veterinario: undefined,
-          pruebas_laboratorio: undefined,
-          tipo: {
-            ...registro.tipo,
-            nombre:
-              idioma === "en"
-                ? registro.tipo.nombre_en
-                : registro.tipo.nombre_es,
-            descripcion:
-              idioma === "en"
-                ? registro.tipo.descripcion_en
-                : registro.tipo.descripcion_es,
-          },
-        };
-      }),
+          seguimientos: registros.filter(
+            (seguimiento) =>
+              seguimiento.fid_registros_atencion_origen ===
+              registro.id_registros_atencion,
+          ),
+        })),
     };
   }
 
@@ -790,8 +1305,7 @@ export class FuenteDatosAtencionesPrisma {
       organizacion,
     );
     const q = filtros.q?.trim();
-    const items = await this.prisma.atenciones.findMany({
-      where: {
+    const base: Prisma.atencionesWhereInput = {
         fid_organizaciones: organizacion,
         fecha_atencion: filtros.incluir_ayer
           ? { gte: fecha_anterior, lte: fecha }
@@ -815,19 +1329,49 @@ export class FuenteDatosAtencionesPrisma {
               ],
             }
           : {}),
-      },
-      orderBy: [
-        { fecha_atencion: "desc" },
-        { llegada_en: "desc" },
-        { id_atenciones: "desc" },
-      ],
-      select: this.seleccionAtencion(),
-    });
+    };
+    const atras = Boolean(filtros.antes_de);
+    const cursorId = filtros.antes_de ?? filtros.despues_de;
+    const cursor = cursorId
+      ? await this.prisma.atenciones.findFirst({ where: { AND: [base, { id_atenciones: cursorId }] }, select: { fecha_atencion: true, llegada_en: true, id_atenciones: true } })
+      : null;
+    if (cursorId && !cursor) throw new BadRequestException("attentions.invalidCursor");
+    const condicion: Prisma.atencionesWhereInput = cursor ? { OR: atras
+      ? [
+          { fecha_atencion: { gt: cursor.fecha_atencion } },
+          { fecha_atencion: cursor.fecha_atencion, llegada_en: { gt: cursor.llegada_en } },
+          { fecha_atencion: cursor.fecha_atencion, llegada_en: cursor.llegada_en, id_atenciones: { gt: cursor.id_atenciones } },
+        ]
+      : [
+          { fecha_atencion: { lt: cursor.fecha_atencion } },
+          { fecha_atencion: cursor.fecha_atencion, llegada_en: { lt: cursor.llegada_en } },
+          { fecha_atencion: cursor.fecha_atencion, llegada_en: cursor.llegada_en, id_atenciones: { lt: cursor.id_atenciones } },
+        ]
+    } : {};
+    const [filas, total] = await Promise.all([
+      this.prisma.atenciones.findMany({
+        where: { AND: [base, condicion] },
+        orderBy: atras
+          ? [{ fecha_atencion: "asc" }, { llegada_en: "asc" }, { id_atenciones: "asc" }]
+          : [{ fecha_atencion: "desc" }, { llegada_en: "desc" }, { id_atenciones: "desc" }],
+        take: 11,
+        select: this.seleccionAtencion(),
+      }),
+      this.prisma.atenciones.count({ where: base }),
+    ]);
+    const hayMas = filas.length > 10;
+    if (hayMas) filas.pop();
+    if (atras) filas.reverse();
+    const items = filas;
     return {
       fecha,
       fecha_desde: filtros.incluir_ayer ? fecha_anterior : fecha,
       atenciones: items.map((item) => this.presentar(item, idioma)),
-      total: items.length,
+      total,
+      paginacion: {
+        anterior: items.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? items[0]!.id_atenciones : null,
+        siguiente: items.length && (atras || hayMas) ? items.at(-1)!.id_atenciones : null,
+      },
     };
   }
 
@@ -840,10 +1384,15 @@ export class FuenteDatosAtencionesPrisma {
       profesionales,
       tiposHospitalizacion,
       procedimientos,
+      estudiosDiagnosticos,
+      serviciosPeluqueriaSpa,
+      opcionesSedacionImagen,
       motivosSalidaHospitalizacion,
+      tiposEstanciaGuarderia,
       motivos,
       vacunas,
       tiposDesparasitacion,
+      tiposSeguimiento,
     ] = await Promise.all([
       this.prisma.tipos_registro_atencion.findMany({
         where: { estado: 1 },
@@ -920,11 +1469,55 @@ export class FuenteDatosAtencionesPrisma {
           descripcion_guia: true,
         },
       }),
+      this.prisma.estudios_diagnosticos.findMany({
+        where: {
+          fid_organizaciones: organizacion,
+          estado: 1,
+          eliminado_en: null,
+        },
+        orderBy: [{ nombre: "asc" }, { id_estudios_diagnosticos: "asc" }],
+        select: { id_estudios_diagnosticos: true, nombre: true },
+      }),
+      this.prisma.servicios_peluqueria_spa.findMany({
+        where: {
+          fid_organizaciones: organizacion,
+          estado: 1,
+          eliminado_en: null,
+        },
+        orderBy: [{ nombre: "asc" }, { id_servicios_peluqueria_spa: "asc" }],
+        select: { id_servicios_peluqueria_spa: true, nombre: true },
+      }),
+      this.prisma.parametros.findMany({
+        where: { codigo_grupo: "sedacion_imagen_diagnostica", estado: 1 },
+        orderBy: [{ orden: "asc" }, { codigo: "asc" }],
+        select: {
+          id_parametros: true,
+          etiqueta: true,
+          traducciones: {
+            where: { codigo_idioma: idioma },
+            select: { etiqueta: true },
+            take: 1,
+          },
+        },
+      }),
       this.prisma.parametros.findMany({
         where: {
           codigo_grupo: "motivos_salida_hospitalizacion",
           estado: 1,
         },
+        orderBy: [{ orden: "asc" }, { codigo: "asc" }],
+        select: {
+          id_parametros: true,
+          etiqueta: true,
+          traducciones: {
+            where: { codigo_idioma: idioma },
+            select: { etiqueta: true },
+            take: 1,
+          },
+        },
+      }),
+      this.prisma.parametros.findMany({
+        where: { codigo_grupo: "tipos_estancia_guarderia", estado: 1 },
         orderBy: [{ orden: "asc" }, { codigo: "asc" }],
         select: {
           id_parametros: true,
@@ -967,6 +1560,19 @@ export class FuenteDatosAtencionesPrisma {
           },
         },
       }),
+      this.prisma.parametros.findMany({
+        where: { codigo_grupo: "tipos_seguimiento_atencion", estado: 1 },
+        orderBy: [{ orden: "asc" }, { codigo: "asc" }],
+        select: {
+          id_parametros: true,
+          etiqueta: true,
+          traducciones: {
+            where: { codigo_idioma: idioma },
+            select: { etiqueta: true },
+            take: 1,
+          },
+        },
+      }),
     ]);
     const maximoGlobalAdjuntos = this.config.getOrThrow<number>(
       "ATTENTION_ATTACHMENT_MAX_FILES",
@@ -985,6 +1591,8 @@ export class FuenteDatosAtencionesPrisma {
         icono: tipo.icono,
         color_hex: tipo.color_hex,
         acepta_adjuntos: tipo.acepta_adjuntos,
+        permite_registro_raiz: tipo.permite_registro_raiz,
+        requiere_registro_origen: tipo.requiere_registro_origen,
         max_adjuntos: tipo.acepta_adjuntos
           ? Math.min(
               tipo.max_adjuntos ?? maximoGlobalAdjuntos,
@@ -1026,19 +1634,24 @@ export class FuenteDatosAtencionesPrisma {
                     grupo: prueba.categoria.nombre,
                     grupo_id: prueba.fid_categorias_pruebas_laboratorio,
                   }))
-                : subcampo.fuente === "usuarios_organizacion"
-                  ? profesionales.map((profesional) => ({
-                      id: profesional.id_usuarios,
-                      etiqueta:
-                        [
-                          profesional.persona.nombres,
-                          profesional.persona.apellido_paterno,
-                          profesional.persona.apellido_materno,
-                        ]
-                          .filter(Boolean)
-                          .join(" ") || profesional.usuario,
+                : subcampo.fuente === "servicios_peluqueria_spa"
+                  ? serviciosPeluqueriaSpa.map((servicio) => ({
+                      id: servicio.id_servicios_peluqueria_spa,
+                      etiqueta: servicio.nombre,
                     }))
-                  : undefined,
+                  : subcampo.fuente === "usuarios_organizacion"
+                    ? profesionales.map((profesional) => ({
+                        id: profesional.id_usuarios,
+                        etiqueta:
+                          [
+                            profesional.persona.nombres,
+                            profesional.persona.apellido_paterno,
+                            profesional.persona.apellido_materno,
+                          ]
+                            .filter(Boolean)
+                            .join(" ") || profesional.usuario,
+                      }))
+                    : undefined,
           })),
           opciones:
             campo.fuente === "motivos_consulta"
@@ -1046,37 +1659,80 @@ export class FuenteDatosAtencionesPrisma {
                   id: motivo.id_motivos_consulta,
                   etiqueta: motivo.nombre,
                 }))
-              : campo.fuente === "vacunas"
-                ? vacunas.map((vacuna) => ({
-                    id: vacuna.id_vacunas,
-                    etiqueta: vacuna.nombre,
+              : campo.fuente === "usuarios_organizacion"
+                ? profesionales.map((profesional) => ({
+                    id: profesional.id_usuarios,
+                    etiqueta:
+                      [
+                        profesional.persona.nombres,
+                        profesional.persona.apellido_paterno,
+                        profesional.persona.apellido_materno,
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || profesional.usuario,
                   }))
-                : campo.fuente === "tipos_desparasitacion"
-                  ? tiposDesparasitacion.map((tipoDesparasitacion) => ({
-                      id: tipoDesparasitacion.id_parametros,
-                      etiqueta:
-                        tipoDesparasitacion.traducciones[0]?.etiqueta ??
-                        tipoDesparasitacion.etiqueta,
+                : campo.fuente === "vacunas"
+                  ? vacunas.map((vacuna) => ({
+                      id: vacuna.id_vacunas,
+                      etiqueta: vacuna.nombre,
                     }))
-                  : campo.fuente === "tipos_hospitalizacion"
-                    ? tiposHospitalizacion.map((tipoHospitalizacion) => ({
-                        id: tipoHospitalizacion.id_tipos_hospitalizacion,
-                        etiqueta: tipoHospitalizacion.nombre,
+                  : campo.fuente === "tipos_desparasitacion"
+                    ? tiposDesparasitacion.map((tipoDesparasitacion) => ({
+                        id: tipoDesparasitacion.id_parametros,
+                        etiqueta:
+                          tipoDesparasitacion.traducciones[0]?.etiqueta ??
+                          tipoDesparasitacion.etiqueta,
                       }))
-                    : campo.fuente === "procedimientos_veterinarios"
-                      ? procedimientos.map((procedimiento) => ({
-                          id: procedimiento.id_procedimientos_veterinarios,
-                          etiqueta: procedimiento.nombre,
-                          descripcion: procedimiento.descripcion_guia,
+                    : campo.fuente === "tipos_hospitalizacion"
+                      ? tiposHospitalizacion.map((tipoHospitalizacion) => ({
+                          id: tipoHospitalizacion.id_tipos_hospitalizacion,
+                          etiqueta: tipoHospitalizacion.nombre,
                         }))
-                      : campo.fuente === "motivos_salida_hospitalizacion"
-                        ? motivosSalidaHospitalizacion.map((motivoSalida) => ({
-                            id: motivoSalida.id_parametros,
-                            etiqueta:
-                              motivoSalida.traducciones[0]?.etiqueta ??
-                              motivoSalida.etiqueta,
+                      : campo.fuente === "procedimientos_veterinarios"
+                        ? procedimientos.map((procedimiento) => ({
+                            id: procedimiento.id_procedimientos_veterinarios,
+                            etiqueta: procedimiento.nombre,
+                            descripcion: procedimiento.descripcion_guia,
                           }))
-                        : undefined,
+                        : campo.fuente === "estudios_diagnosticos"
+                          ? estudiosDiagnosticos.map((estudio) => ({
+                              id: estudio.id_estudios_diagnosticos,
+                              etiqueta: estudio.nombre,
+                            }))
+                          : campo.fuente === "sedacion_imagen_diagnostica"
+                            ? opcionesSedacionImagen.map((opcion) => ({
+                                id: opcion.id_parametros,
+                                etiqueta:
+                                  opcion.traducciones[0]?.etiqueta ??
+                                  opcion.etiqueta,
+                              }))
+                            : campo.fuente === "motivos_salida_hospitalizacion"
+                              ? motivosSalidaHospitalizacion.map(
+                                  (motivoSalida) => ({
+                                    id: motivoSalida.id_parametros,
+                                    etiqueta:
+                                      motivoSalida.traducciones[0]?.etiqueta ??
+                                      motivoSalida.etiqueta,
+                                  }),
+                                )
+                              : campo.fuente === "tipos_estancia_guarderia"
+                                ? tiposEstanciaGuarderia.map(
+                                    (tipoEstancia) => ({
+                                      id: tipoEstancia.id_parametros,
+                                      etiqueta:
+                                        tipoEstancia.traducciones[0]
+                                          ?.etiqueta ?? tipoEstancia.etiqueta,
+                                    }),
+                                  )
+                                : campo.fuente === "tipos_seguimiento_atencion"
+                                  ? tiposSeguimiento.map((tipoSeguimiento) => ({
+                                      id: tipoSeguimiento.id_parametros,
+                                      etiqueta:
+                                        tipoSeguimiento.traducciones[0]
+                                          ?.etiqueta ??
+                                        tipoSeguimiento.etiqueta,
+                                    }))
+                                  : undefined,
         })),
       })),
       estados: estados.map(({ traducciones, ...estado }) => ({
@@ -1244,6 +1900,97 @@ export class FuenteDatosAtencionesPrisma {
     return {
       campo: campo.clave,
       valor: ultimo?.fecha.toISOString().slice(0, 10) ?? null,
+    };
+  }
+
+  async historialMascota(
+    organizacion: string,
+    mascotaId: string,
+    idioma: string,
+  ) {
+    const mascota = await this.prisma.mascotas.findFirst({
+      where: {
+        id_mascotas: mascotaId,
+        fid_organizaciones: organizacion,
+        estado: 1,
+        eliminado_en: null,
+      },
+      select: {
+        id_mascotas: true,
+        nombre: true,
+        foto_url: true,
+        animal_servicio: true,
+        apoyo_emocional: true,
+        codigo_chip: true,
+        fecha_nacimiento: true,
+        peso: true,
+        alimento: true,
+        especie: { select: { nombre_es: true, nombre_en: true } },
+        raza: { select: { nombre_es: true, nombre_en: true } },
+        subespecie: { select: { nombre_es: true, nombre_en: true } },
+        genero: { select: { etiqueta: true } },
+        color: { select: { etiqueta: true, color_hex: true } },
+        unidad_peso: { select: { etiqueta: true } },
+        talla: { select: { etiqueta: true } },
+        estado_reproductivo: { select: { etiqueta: true } },
+        temperamento: { select: { etiqueta: true, color_hex: true } },
+        propietario: {
+          select: {
+            id_propietarios: true,
+            nombre_completo: true,
+            celular: true,
+          },
+        },
+      },
+    });
+    if (!mascota) throw new NotFoundException("pets.notFound");
+    const atenciones = await this.prisma.atenciones.findMany({
+      where: {
+        fid_organizaciones: organizacion,
+        fid_mascotas: mascotaId,
+        estado: 1,
+        eliminado_en: null,
+      },
+      orderBy: [
+        { fecha_atencion: "desc" },
+        { llegada_en: "desc" },
+        { id_atenciones: "desc" },
+      ],
+      select: this.seleccionAtencion(),
+    });
+    const clasificacion = mascota.raza ?? mascota.subespecie;
+    return {
+      mascota: {
+        id_mascotas: mascota.id_mascotas,
+        nombre: mascota.nombre,
+        animal_servicio: mascota.animal_servicio,
+        apoyo_emocional: mascota.apoyo_emocional,
+        codigo_chip: mascota.codigo_chip,
+        fecha_nacimiento: mascota.fecha_nacimiento,
+        peso: mascota.peso?.toString() ?? null,
+        alimento: mascota.alimento,
+        foto_version: mascota.foto_url?.split("/").at(-1) ?? null,
+        especie:
+          idioma === "en"
+            ? mascota.especie.nombre_en
+            : mascota.especie.nombre_es,
+        clasificacion: clasificacion
+          ? idioma === "en"
+            ? clasificacion.nombre_en
+            : clasificacion.nombre_es
+          : null,
+        genero: mascota.genero,
+        color: mascota.color,
+        unidad_peso: mascota.unidad_peso,
+        talla: mascota.talla,
+        estado_reproductivo: mascota.estado_reproductivo,
+        temperamento: mascota.temperamento,
+        propietario: mascota.propietario,
+      },
+      atenciones: atenciones.map((atencion) =>
+        this.presentar(atencion, idioma),
+      ),
+      total: atenciones.length,
     };
   }
 
@@ -1419,6 +2166,341 @@ export class FuenteDatosAtencionesPrisma {
     }
   }
 
+  async editarRegistro(
+    id: string,
+    registroId: string,
+    organizacion: string,
+    datos: DatosEditarRegistroAtencion,
+    adjuntos: ArchivoAdjuntoAtencion[],
+    usuario: string,
+    contexto: ContextoSolicitud,
+  ) {
+    const guardadosNuevos = await this.guardarAdjuntos(
+      organizacion,
+      id,
+      registroId,
+      datos.fid_tipos_registro_atencion,
+      adjuntos,
+    );
+    try {
+      const clavesRetiradas = await this.prisma.$transaction(async (tx) => {
+        await this.validarContexto(tx, organizacion, usuario);
+        const atencion = await this.atencionExistente(tx, id, organizacion);
+        if (
+          ["finalizada", "cancelada"].includes(atencion.estado_atencion.codigo)
+        )
+          throw new BadRequestException("attentions.closed");
+        await tx.$queryRaw`SELECT id_registros_atencion FROM personas.registros_atencion WHERE id_registros_atencion = ${registroId}::uuid AND fid_atenciones = ${id}::uuid AND fid_organizaciones = ${organizacion}::uuid AND eliminado_en IS NULL FOR UPDATE`;
+        const original = await tx.registros_atencion.findFirst({
+          where: {
+            id_registros_atencion: registroId,
+            fid_atenciones: id,
+            fid_organizaciones: organizacion,
+            estado: 1,
+            eliminado_en: null,
+          },
+          select: {
+            fid_tipos_registro_atencion: true,
+            fid_registros_atencion_origen: true,
+            tipo: { select: { codigo: true } },
+            pruebas_laboratorio: {
+              where: { estado: 1 },
+              orderBy: [
+                { orden: "asc" },
+                { id_pruebas_registro_laboratorio: "asc" },
+              ],
+              select: { id_pruebas_registro_laboratorio: true },
+            },
+            adjuntos: {
+              where: { estado: 1, eliminado_en: null },
+              orderBy: [
+                { created_at: "asc" },
+                { id_adjuntos_registro_atencion: "asc" },
+              ],
+              select: {
+                id_adjuntos_registro_atencion: true,
+                fid_pruebas_registro_laboratorio: true,
+                clave_objeto: true,
+                nombre_original: true,
+                tipo_mime: true,
+                bytes: true,
+                checksum_sha256: true,
+                etapa_foto_peluqueria: { select: { codigo: true } },
+              },
+            },
+          },
+        });
+        if (!original) throw new NotFoundException("attentions.recordNotFound");
+        if (
+          datos.fid_tipos_registro_atencion !==
+          original.fid_tipos_registro_atencion
+        )
+          throw new BadRequestException("attentions.recordTypeImmutable");
+
+        const porId = new Map(
+          original.adjuntos.map((adjunto) => [
+            adjunto.id_adjuntos_registro_atencion,
+            adjunto,
+          ]),
+        );
+        const gruposPredeterminados = (() => {
+          if (original.tipo.codigo === "laboratorio")
+            return original.pruebas_laboratorio.map((prueba) =>
+              original.adjuntos
+                .filter(
+                  (adjunto) =>
+                    adjunto.fid_pruebas_registro_laboratorio ===
+                    prueba.id_pruebas_registro_laboratorio,
+                )
+                .map((adjunto) => adjunto.id_adjuntos_registro_atencion),
+            );
+          if (original.tipo.codigo === "peluqueria_spa")
+            return ["antes", "despues"].map((etapa) =>
+              original.adjuntos
+                .filter(
+                  (adjunto) => adjunto.etapa_foto_peluqueria?.codigo === etapa,
+                )
+                .map((adjunto) => adjunto.id_adjuntos_registro_atencion),
+            );
+          return [
+            original.adjuntos.map(
+              (adjunto) => adjunto.id_adjuntos_registro_atencion,
+            ),
+          ];
+        })();
+        const grupos = datos.adjuntos_conservados ?? gruposPredeterminados;
+        if (
+          !Array.isArray(grupos) ||
+          grupos.length > 20 ||
+          grupos.some(
+            (grupo) =>
+              !Array.isArray(grupo) ||
+              grupo.length > 10 ||
+              grupo.some(
+                (item) => typeof item !== "string" || !porId.has(item),
+              ),
+          )
+        )
+          throw new BadRequestException("attentions.invalidAttachments");
+        const idsConservados = grupos.flat();
+        if (new Set(idsConservados).size !== idsConservados.length)
+          throw new BadRequestException("attentions.invalidAttachments");
+
+        const conservar = (grupo: string[]) =>
+          grupo.map((idAdjunto) => {
+            const adjunto = porId.get(idAdjunto)!;
+            return {
+              clave_objeto: adjunto.clave_objeto,
+              nombre_original: adjunto.nombre_original,
+              tipo_mime: adjunto.tipo_mime,
+              bytes: adjunto.bytes,
+              checksum_sha256: adjunto.checksum_sha256,
+            };
+          });
+        let guardadosOrdenados: AdjuntoAtencionGuardado[];
+        if (original.tipo.codigo === "laboratorio") {
+          const pruebas = Array.isArray(datos.detalle.pruebas)
+            ? (datos.detalle.pruebas as Array<Record<string, unknown>>)
+            : [];
+          if (grupos.length !== pruebas.length)
+            throw new BadRequestException("attentions.invalidAttachments");
+          let offset = 0;
+          guardadosOrdenados = grupos.flatMap((grupo, indice) => {
+            const cantidad = pruebas[indice]?.cantidad_adjuntos;
+            if (
+              !Number.isInteger(cantidad) ||
+              (cantidad as number) < grupo.length
+            )
+              throw new BadRequestException("attentions.invalidAttachments");
+            const nuevos = guardadosNuevos.slice(
+              offset,
+              offset + (cantidad as number) - grupo.length,
+            );
+            offset += nuevos.length;
+            return [...conservar(grupo), ...nuevos];
+          });
+          if (offset !== guardadosNuevos.length)
+            throw new BadRequestException("attentions.invalidAttachments");
+        } else if (original.tipo.codigo === "peluqueria_spa") {
+          if (grupos.length !== 2)
+            throw new BadRequestException("attentions.invalidAttachments");
+          const cantidades = [
+            datos.detalle.cantidad_fotos_antes,
+            datos.detalle.cantidad_fotos_despues,
+          ];
+          let offset = 0;
+          guardadosOrdenados = grupos.flatMap((grupo, indice) => {
+            const cantidad = cantidades[indice];
+            if (
+              !Number.isInteger(cantidad) ||
+              (cantidad as number) < grupo.length
+            )
+              throw new BadRequestException("attentions.invalidAttachments");
+            const nuevos = guardadosNuevos.slice(
+              offset,
+              offset + (cantidad as number) - grupo.length,
+            );
+            offset += nuevos.length;
+            return [...conservar(grupo), ...nuevos];
+          });
+          if (offset !== guardadosNuevos.length)
+            throw new BadRequestException("attentions.invalidAttachments");
+        } else {
+          if (grupos.length !== 1)
+            throw new BadRequestException("attentions.invalidAttachments");
+          guardadosOrdenados = [...conservar(grupos[0]), ...guardadosNuevos];
+        }
+
+        const temporalId = randomUUID();
+        const clavesOriginales = new Map<string, string>();
+        const adjuntosTemporales = guardadosOrdenados.map((adjunto) => {
+          const claveTemporal = `edicion-temporal/${randomUUID()}`;
+          clavesOriginales.set(claveTemporal, adjunto.clave_objeto);
+          return { ...adjunto, clave_objeto: claveTemporal };
+        });
+        const { tipo } = await this.crearRegistro(
+          tx,
+          id,
+          organizacion,
+          {
+            ...datos,
+            fid_registros_atencion_origen:
+              original.fid_registros_atencion_origen ?? undefined,
+          },
+          usuario,
+          (await this.tiempoTenant(tx, organizacion)).zona,
+          temporalId,
+          adjuntosTemporales,
+        );
+        const temporal = await tx.registros_atencion.findUniqueOrThrow({
+          where: { id_registros_atencion: temporalId },
+        });
+        const adjuntosCreados = await tx.adjuntos_registro_atencion.findMany({
+          where: {
+            fid_registros_atencion: temporalId,
+            fid_organizaciones: organizacion,
+          },
+          select: {
+            id_adjuntos_registro_atencion: true,
+            clave_objeto: true,
+          },
+        });
+
+        await tx.adjuntos_registro_atencion.deleteMany({
+          where: {
+            fid_registros_atencion: registroId,
+            fid_organizaciones: organizacion,
+          },
+        });
+        await tx.pruebas_registro_laboratorio.deleteMany({
+          where: {
+            fid_registros_atencion: registroId,
+            fid_organizaciones: organizacion,
+          },
+        });
+        await tx.servicios_registro_peluqueria_spa.deleteMany({
+          where: {
+            fid_registros_atencion: registroId,
+            fid_organizaciones: organizacion,
+          },
+        });
+        await tx.pruebas_registro_laboratorio.updateMany({
+          where: {
+            fid_registros_atencion: temporalId,
+            fid_organizaciones: organizacion,
+          },
+          data: { fid_registros_atencion: registroId, updated_by: usuario },
+        });
+        await tx.servicios_registro_peluqueria_spa.updateMany({
+          where: {
+            fid_registros_atencion: temporalId,
+            fid_organizaciones: organizacion,
+          },
+          data: { fid_registros_atencion: registroId, updated_by: usuario },
+        });
+        for (const adjunto of adjuntosCreados) {
+          const claveOriginal = clavesOriginales.get(adjunto.clave_objeto);
+          if (!claveOriginal)
+            throw new BadRequestException("attentions.invalidRecord");
+          await tx.adjuntos_registro_atencion.update({
+            where: {
+              id_adjuntos_registro_atencion:
+                adjunto.id_adjuntos_registro_atencion,
+            },
+            data: { clave_objeto: claveOriginal },
+          });
+        }
+        await tx.adjuntos_registro_atencion.updateMany({
+          where: {
+            fid_registros_atencion: temporalId,
+            fid_organizaciones: organizacion,
+          },
+          data: { fid_registros_atencion: registroId, updated_by: usuario },
+        });
+        await tx.registros_atencion.update({
+          where: { id_registros_atencion: registroId },
+          data: {
+            fid_motivos_consulta: temporal.fid_motivos_consulta,
+            fid_vacunas: temporal.fid_vacunas,
+            fid_parametros_tipo_desparasitacion:
+              temporal.fid_parametros_tipo_desparasitacion,
+            fid_tipos_hospitalizacion: temporal.fid_tipos_hospitalizacion,
+            fid_parametros_motivo_salida_hospitalizacion:
+              temporal.fid_parametros_motivo_salida_hospitalizacion,
+            fid_parametros_tipo_estancia_guarderia:
+              temporal.fid_parametros_tipo_estancia_guarderia,
+            fid_usuarios_remitente: temporal.fid_usuarios_remitente,
+            fid_parametros_tipo_seguimiento:
+              temporal.fid_parametros_tipo_seguimiento,
+            fid_procedimientos_veterinarios:
+              temporal.fid_procedimientos_veterinarios,
+            fid_estudios_diagnosticos: temporal.fid_estudios_diagnosticos,
+            fid_parametros_sedacion_imagen:
+              temporal.fid_parametros_sedacion_imagen,
+            resumen: temporal.resumen,
+            detalle: temporal.detalle as Prisma.InputJsonValue,
+            fecha_programada: temporal.fecha_programada,
+            programado_para: temporal.programado_para,
+            updated_by: usuario,
+          },
+        });
+        await tx.registros_atencion.delete({
+          where: { id_registros_atencion: temporalId },
+        });
+        await this.auditoria.registrar(
+          {
+            accion: "atenciones.registro_actualizado",
+            entidad: "registros_atencion",
+            id_entidad: registroId,
+            fid_organizaciones: organizacion,
+            fid_usuarios: usuario,
+            peticion: contexto,
+            metadatos: {
+              atencion: id,
+              tipo: tipo.id_tipos_registro_atencion,
+              adjuntos_agregados: guardadosNuevos.length,
+              adjuntos_retirados:
+                original.adjuntos.length - idsConservados.length,
+            },
+          },
+          tx,
+        );
+        return original.adjuntos
+          .filter(
+            (adjunto) =>
+              !idsConservados.includes(adjunto.id_adjuntos_registro_atencion),
+          )
+          .map((adjunto) => adjunto.clave_objeto);
+      });
+      await this.adjuntos.eliminarTodos(clavesRetiradas);
+    } catch (error) {
+      await this.adjuntos.eliminarTodos(
+        guardadosNuevos.map((item) => item.clave_objeto),
+      );
+      throw error;
+    }
+  }
+
   async cambiarEstado(
     id: string,
     organizacion: string,
@@ -1494,11 +2576,50 @@ export class FuenteDatosAtencionesPrisma {
             where: { eliminado_en: null },
             select: { clave_objeto: true },
           },
+          seguimientos: {
+            where: { estado: 1, eliminado_en: null },
+            select: {
+              id_registros_atencion: true,
+              adjuntos: {
+                where: { eliminado_en: null },
+                select: { clave_objeto: true },
+              },
+            },
+          },
         },
       });
       if (!registro) throw new NotFoundException("attentions.recordNotFound");
-      await tx.$executeRaw`UPDATE personas.adjuntos_registro_atencion SET estado = 0, eliminado_en = CURRENT_TIMESTAMP, eliminado_por = ${usuario}::uuid, updated_by = ${usuario} WHERE fid_registros_atencion = ${registroId}::uuid AND fid_organizaciones = ${organizacion}::uuid AND eliminado_en IS NULL`;
-      await tx.$executeRaw`UPDATE personas.registros_atencion SET estado = 0, eliminado_en = CURRENT_TIMESTAMP, eliminado_por = ${usuario}::uuid, updated_by = ${usuario} WHERE id_registros_atencion = ${registroId}::uuid AND fid_atenciones = ${id}::uuid AND fid_organizaciones = ${organizacion}::uuid`;
+      const ids = [
+        registro.id_registros_atencion,
+        ...registro.seguimientos.map((item) => item.id_registros_atencion),
+      ];
+      await tx.adjuntos_registro_atencion.updateMany({
+        where: {
+          fid_registros_atencion: { in: ids },
+          fid_organizaciones: organizacion,
+          eliminado_en: null,
+        },
+        data: {
+          estado: 0,
+          eliminado_en: new Date(),
+          eliminado_por: usuario,
+          updated_by: usuario,
+        },
+      });
+      await tx.registros_atencion.updateMany({
+        where: {
+          id_registros_atencion: { in: ids },
+          fid_atenciones: id,
+          fid_organizaciones: organizacion,
+          eliminado_en: null,
+        },
+        data: {
+          estado: 0,
+          eliminado_en: new Date(),
+          eliminado_por: usuario,
+          updated_by: usuario,
+        },
+      });
       await this.auditoria.registrar(
         {
           accion: "atenciones.registro_eliminado",
@@ -1511,7 +2632,12 @@ export class FuenteDatosAtencionesPrisma {
         },
         tx,
       );
-      return registro.adjuntos.map((adjunto) => adjunto.clave_objeto);
+      return [
+        ...registro.adjuntos.map((adjunto) => adjunto.clave_objeto),
+        ...registro.seguimientos.flatMap((seguimiento) =>
+          seguimiento.adjuntos.map((adjunto) => adjunto.clave_objeto),
+        ),
+      ];
     });
     await this.adjuntos.eliminarTodos(claves);
   }
@@ -1559,14 +2685,35 @@ export class FuenteDatosAtencionesPrisma {
   async eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionAtencion,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     const claves = await this.prisma.$transaction(async (tx) => {
       await this.validarContexto(tx, organizacion, usuario);
       const atencion = await this.atencionExistente(tx, id, organizacion);
-      if (["finalizada", "cancelada"].includes(atencion.estado_atencion.codigo))
-        throw new BadRequestException("attentions.closed");
+      const eliminacionProtegida = [
+        "en_atencion",
+        "finalizada",
+        "cancelada",
+      ].includes(atencion.estado_atencion.codigo);
+      if (eliminacionProtegida && !datos.confirmar_eliminacion_protegida) {
+        const cantidadRegistros = await tx.registros_atencion.count({
+          where: {
+            fid_atenciones: id,
+            fid_organizaciones: organizacion,
+            estado: 1,
+            eliminado_en: null,
+          },
+        });
+        throw new ConflictException({
+          message: "attentions.protectedDeletionConfirmationRequired",
+          publicData: {
+            estado_codigo: atencion.estado_atencion.codigo,
+            cantidad_registros: cantidadRegistros,
+          },
+        });
+      }
       const adjuntos = await tx.adjuntos_registro_atencion.findMany({
         where: {
           fid_organizaciones: organizacion,
@@ -1586,6 +2733,10 @@ export class FuenteDatosAtencionesPrisma {
           fid_organizaciones: organizacion,
           fid_usuarios: usuario,
           peticion: contexto,
+          metadatos: {
+            estado_anterior: atencion.fid_parametros_estado,
+            eliminacion_protegida: eliminacionProtegida,
+          },
         },
         tx,
       );

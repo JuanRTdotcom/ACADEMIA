@@ -10,6 +10,7 @@ export class RepositorioTiposHospitalizacionDatos extends RepositorioTiposHospit
   listar(...args: Parameters<RepositorioTiposHospitalizacion["listar"]>) {
     return this.fuente.listar(...args);
   }
+  buscar(...args: Parameters<RepositorioTiposHospitalizacion["buscar"]>) { return this.fuente.buscar(...args); }
   crear(...args: Parameters<RepositorioTiposHospitalizacion["crear"]>) {
     return this.fuente.crear(...args);
   }

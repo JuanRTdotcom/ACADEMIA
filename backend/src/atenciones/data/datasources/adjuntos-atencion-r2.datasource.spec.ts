@@ -1,4 +1,5 @@
 import { BadRequestException, PayloadTooLargeException } from "@nestjs/common";
+import { randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { AlmacenAdjuntosAtencionR2 } from "./adjuntos-atencion-r2.datasource";
 
@@ -75,6 +76,25 @@ describe("AlmacenAdjuntosAtencionR2", () => {
       height: 120,
       format: "jpeg",
     });
+  });
+
+  it("acepta y procesa una fotografía válida de aproximadamente 4 MB", async () => {
+    const contenido = await sharp(randomBytes(1200 * 1200 * 3), {
+      raw: { width: 1200, height: 1200, channels: 3 },
+    })
+      .png({ compressionLevel: 0 })
+      .toBuffer();
+    expect(contenido.length).toBeGreaterThan(4 * 1024 * 1024);
+    expect(contenido.length).toBeLessThan(10 * 1024 * 1024);
+
+    const resultado = await almacen.guardar("org", "atencion", "registro", {
+      contenido,
+      tipo_mime: "image/png",
+      nombre_original: "consulta-general.png",
+    });
+
+    expect(resultado.tipo_mime).toBe("image/jpeg");
+    expect(guardar.ejecutar).toHaveBeenCalledTimes(1);
   });
 
   it("rechaza archivos cuyo contenido no coincide con el tipo declarado", async () => {

@@ -20,19 +20,31 @@ import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-c
 import { CasoUsoGestionarPropietarios } from "../../domain/usecases/gestionar-propietarios";
 import { DtoGuardarPropietario } from "../dto/guardar-propietario.dto";
 import { DtoListarPropietarios } from "../dto/listar-propietarios.dto";
+import { DtoEliminarPropietario } from "../dto/eliminar-propietario.dto";
+import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
+import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
 
 @Controller("clinic/owners")
 export class ControladorPropietarios {
-  constructor(private propietarios: CasoUsoGestionarPropietarios) {}
+  constructor(
+    private propietarios: CasoUsoGestionarPropietarios,
+    private tokens: ServicioTokenOpaco,
+  ) {}
 
   @Get()
   @Permisos("clinic.owners.read")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  listar(
+  async listar(
     @Query() filtros: DtoListarPropietarios,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
-    return this.propietarios.listar(usuario.fid_organizaciones, filtros);
+    const posicion = leerPosicionCatalogo(this.tokens, "clinic-owners", filtros.p, usuario.fid_organizaciones, filtros.q, "owners.invalidCursor");
+    const listado = await this.propietarios.listar(usuario.fid_organizaciones, {
+      q: filtros.q,
+      despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined,
+      antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+    });
+    return protegerPaginacionCatalogo(this.tokens, "clinic-owners", listado, usuario.fid_organizaciones, filtros.q);
   }
 
   @Get("options")
@@ -99,12 +111,14 @@ export class ControladorPropietarios {
   @HttpCode(200)
   async eliminar(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Body() dto: DtoEliminarPropietario,
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
     await this.propietarios.eliminar(
       id,
       usuario.fid_organizaciones,
+      dto,
       usuario.sub,
       crearContextoSolicitud(req),
     );

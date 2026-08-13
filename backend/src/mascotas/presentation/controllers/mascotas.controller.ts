@@ -26,31 +26,41 @@ import { UsuarioActual } from "../../../autenticacion/presentation/decorators/us
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
 import { CasoUsoGestionarMascotas } from "../../domain/usecases/gestionar-mascotas";
 import { DtoGuardarMascota } from "../dto/guardar-mascota.dto";
+import { DtoEliminarMascota } from "../dto/eliminar-mascota.dto";
 import {
   DtoBuscarPropietariosMascota,
   DtoListarMascotas,
 } from "../dto/listar-mascotas.dto";
 import { InterceptorErroresFotoMascota } from "../interceptors/interceptor-errores-foto-mascota";
+import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
+import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
 
 @Controller("clinic/pets")
 export class ControladorMascotas {
   constructor(
     private mascotas: CasoUsoGestionarMascotas,
     private config: ConfigService,
+    private tokens: ServicioTokenOpaco,
   ) {}
 
   @Get()
   @Permisos("clinic.pets.read")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  listar(
+  async listar(
     @Query() filtros: DtoListarMascotas,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
-    return this.mascotas.listar(
+    const posicion = leerPosicionCatalogo(this.tokens, "clinic-pets", filtros.p, usuario.fid_organizaciones, filtros.q, "pets.invalidCursor");
+    const listado = await this.mascotas.listar(
       usuario.fid_organizaciones,
-      filtros,
+      {
+        q: filtros.q,
+        despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+      },
       usuario.idioma,
     );
+    return protegerPaginacionCatalogo(this.tokens, "clinic-pets", listado, usuario.fid_organizaciones, filtros.q);
   }
 
   @Get("options")
@@ -174,12 +184,14 @@ export class ControladorMascotas {
   @Throttle({ default: { limit: 15, ttl: 60_000 } })
   async eliminar(
     @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() dto: DtoEliminarMascota,
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
     await this.mascotas.eliminar(
       id,
       usuario.fid_organizaciones,
+      dto,
       usuario.sub,
       crearContextoSolicitud(req),
     );

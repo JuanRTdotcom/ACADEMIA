@@ -6,9 +6,14 @@ import { parseUserContext } from "$lib/server/user-context";
 
 export const load: PageServerLoad = async (event) => {
   const { usuario } = await event.parent();
-  const response = await companyRequest(event, "/company/vaccines");
+  const query = new URLSearchParams();
+  const position = event.url.searchParams.get("p");
+  const search = event.url.searchParams.get("q")?.trim() ?? "";
+  if (position) query.set("p", position);
+  if (search) query.set("q", search);
+  const response = await companyRequest(event, `/company/vaccines${query.size ? `?${query}` : ""}`);
   if (!response.ok) error(response.status, await companyMessage(response, "vaccines.loadError"));
-  return { ...(await response.json()), usuario };
+  return { ...(await response.json()), usuario, busqueda: search };
 };
 
 async function mutate(event: RequestEvent, permission: string, path: string, method: string, body?: object) {

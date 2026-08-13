@@ -1,8 +1,10 @@
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { DatosPruebaLaboratorio } from "../entities/prueba-laboratorio";
+import type { ResultadoCatalogoPaginado } from "../../../comun/domain/entities/catalogo-paginado";
+import type { DatosPruebaLaboratorio, FiltrosPruebasLaboratorio } from "../entities/prueba-laboratorio";
 
 export abstract class RepositorioPruebasLaboratorio {
-  abstract listar(organizacion: string): Promise<unknown>;
+  abstract listar(organizacion: string, filtros: FiltrosPruebasLaboratorio): Promise<ResultadoCatalogoPaginado>;
+  abstract buscar(organizacion: string, consulta: string): Promise<unknown>;
   abstract crear(
     organizacion: string,
     datos: DatosPruebaLaboratorio,

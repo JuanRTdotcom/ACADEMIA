@@ -12,7 +12,7 @@
 	type Species = { id_especies_animales: string; codigo: string; nombre: string; nombre_cientifico?: string | null };
 	type Subspecies = { id_subespecies_animales: string; fid_especies_animales: string; codigo: string; nombre: string; nombre_cientifico?: string | null };
 	type Breed = { id_razas_animales: string; fid_especies_animales: string; codigo: string; nombre: string };
-	type Owner = { id_propietarios: string; nombre_completo: string; numero_documento: string; celular: string | null; tipo_documento: { etiqueta: string } };
+	type Owner = { id_propietarios: string; nombre_completo: string; numero_documento: string; celular: string | null; foto_version?: string | null; tipo_documento: { etiqueta: string } };
 	type Options = { especies: Species[]; subespecies: Subspecies[]; razas: Breed[]; generos: Parameter[]; colores: Parameter[]; unidades_peso: Parameter[]; tallas: Parameter[]; estados_reproductivos: Parameter[]; temperamentos: Parameter[]; unidad_peso_predeterminada: string | null };
 	type Pet = Partial<Record<'id_mascotas' | 'nombre' | 'codigo_chip' | 'fid_especies_animales' | 'fid_subespecies_animales' | 'fid_razas_animales' | 'fid_parametros_genero' | 'fid_parametros_color' | 'fecha_nacimiento' | 'peso' | 'fid_parametros_unidad_peso' | 'fid_parametros_talla' | 'fid_parametros_estado_reproductivo' | 'fid_parametros_temperamento' | 'alimento' | 'foto_version', string | null>> & { animal_servicio?: boolean; apoyo_emocional?: boolean; propietario?: Owner | null };
 	type FormState = { petMessage?: string } | null;

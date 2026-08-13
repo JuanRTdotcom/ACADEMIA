@@ -10,22 +10,23 @@ import {
 
 const texto = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim().replace(/\s+/g, " ") : value;
+const INVALIDO = { message: "laboratoryTests.invalidData" };
 
 export class DtoGuardarPruebaLaboratorio {
-  @IsDefined()
-  @IsUUID("4")
+  @IsDefined(INVALIDO)
+  @IsUUID("4", INVALIDO)
   fid_categorias_pruebas_laboratorio!: string;
 
-  @IsDefined()
+  @IsDefined(INVALIDO)
   @Transform(texto)
-  @IsString()
-  @MinLength(2)
-  @MaxLength(220)
+  @IsString(INVALIDO)
+  @MinLength(2, INVALIDO)
+  @MaxLength(220, INVALIDO)
   nombre!: string;
 }
 
 export class DtoCambiarEstadoPruebaLaboratorio {
-  @IsDefined()
-  @IsBoolean()
+  @IsDefined(INVALIDO)
+  @IsBoolean(INVALIDO)
   activo!: boolean;
 }

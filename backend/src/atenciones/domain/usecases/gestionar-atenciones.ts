@@ -2,8 +2,10 @@ import { Injectable } from "@nestjs/common";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
 import type {
   DatosCrearAtencion,
+  DatosEditarRegistroAtencion,
   DatosRegistroAtencion,
   ArchivoAdjuntoAtencion,
+  EliminacionAtencion,
   FiltrosAtenciones,
 } from "../entities/atencion";
 import { RepositorioAtenciones } from "../repositories/repositorio-atenciones";
@@ -34,6 +36,9 @@ export class CasoUsoGestionarAtenciones {
   ultimoRegistroMascota(organizacion: string, mascota: string, tipo: string) {
     return this.atenciones.ultimoRegistroMascota(organizacion, mascota, tipo);
   }
+  historialMascota(organizacion: string, mascota: string, idioma: string) {
+    return this.atenciones.historialMascota(organizacion, mascota, idioma);
+  }
   obtener(id: string, organizacion: string, idioma: string) {
     return this.atenciones.obtener(id, organizacion, idioma);
   }
@@ -62,6 +67,25 @@ export class CasoUsoGestionarAtenciones {
   ) {
     return this.atenciones.agregarRegistro(
       id,
+      organizacion,
+      datos,
+      adjuntos,
+      usuario,
+      contexto,
+    );
+  }
+  editarRegistro(
+    id: string,
+    registro: string,
+    organizacion: string,
+    datos: DatosEditarRegistroAtencion,
+    adjuntos: ArchivoAdjuntoAtencion[],
+    usuario: string,
+    contexto: ContextoSolicitud,
+  ) {
+    return this.atenciones.editarRegistro(
+      id,
+      registro,
       organizacion,
       datos,
       adjuntos,
@@ -110,9 +134,10 @@ export class CasoUsoGestionarAtenciones {
   eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionAtencion,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.atenciones.eliminar(id, organizacion, usuario, contexto);
+    return this.atenciones.eliminar(id, organizacion, datos, usuario, contexto);
   }
 }

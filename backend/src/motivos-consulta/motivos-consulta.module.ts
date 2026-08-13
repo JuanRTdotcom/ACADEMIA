@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ModuloTokenOpaco } from "../comun/seguridad/token-opaco.module";
 import { FuenteDatosMotivosConsultaPrisma } from "./data/datasources/motivos-consulta-prisma.datasource";
 import { RepositorioMotivosConsultaDatos } from "./data/repositories/repositorio-motivos-consulta.impl";
 import { RepositorioMotivosConsulta } from "./domain/repositories/repositorio-motivos-consulta";
@@ -6,6 +7,7 @@ import { CasoUsoGestionarMotivosConsulta } from "./domain/usecases/gestionar-mot
 import { ControladorMotivosConsulta } from "./presentation/controllers/motivos-consulta.controller";
 
 @Module({
+  imports: [ModuloTokenOpaco],
   controllers: [ControladorMotivosConsulta],
   providers: [
     FuenteDatosMotivosConsultaPrisma,

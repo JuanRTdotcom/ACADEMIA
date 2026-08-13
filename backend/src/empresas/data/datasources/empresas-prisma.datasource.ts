@@ -10,6 +10,7 @@ import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-
 import { ServicioAuditoria } from "../../../comun/auditoria/servicio-auditoria";
 import { PrismaService } from "../../../comun/prisma.service";
 import { parseDateInTimezone } from "../../../comun/fechas";
+import { SERVICIOS_PELUQUERIA_SPA_INICIALES } from "../../../comun/catalogos/servicios-peluqueria-spa-iniciales";
 import type {
   DatosCrearEmpresa,
   ListadoEmpresas,
@@ -30,6 +31,7 @@ import type {
 import { versionMedioEmpresa } from "../../domain/entities/medio-empresa";
 import { AlmacenMediosEmpresaR2 } from "./company-media-r2.datasource";
 import { PROCEDIMIENTOS_VETERINARIOS_INICIALES } from "../../../comun/catalogos/procedimientos-veterinarios-iniciales";
+import { ESTUDIOS_DIAGNOSTICOS_INICIALES } from "../../../comun/catalogos/estudios-diagnosticos-iniciales";
 
 type ClientePrisma = Prisma.TransactionClient;
 
@@ -1326,6 +1328,24 @@ export class FuenteDatosEmpresasPrisma {
           FROM configuracion.catalogo_pruebas_laboratorio_base base
           WHERE base.estado = 1
         `;
+
+        await tx.estudios_diagnosticos.createMany({
+          data: ESTUDIOS_DIAGNOSTICOS_INICIALES.map((nombre) => ({
+            fid_organizaciones: organizacion.id_organizaciones,
+            nombre,
+            created_by: idUsuarioActual,
+            updated_by: idUsuarioActual,
+          })),
+        });
+
+        await tx.servicios_peluqueria_spa.createMany({
+          data: SERVICIOS_PELUQUERIA_SPA_INICIALES.map((nombre) => ({
+            fid_organizaciones: organizacion.id_organizaciones,
+            nombre,
+            created_by: idUsuarioActual,
+            updated_by: idUsuarioActual,
+          })),
+        });
 
         await this.auditoria.registrar(
           {

@@ -43,10 +43,12 @@ export const load: PageServerLoad = async (event) => {
     redirect(303, '/dashboard');
   }
   const q = event.url.searchParams.get('q')?.trim() ?? '';
+  const p = event.url.searchParams.get('p')?.trim() ?? '';
   try {
+    const query = new URLSearchParams(); if (q) query.set('q', q); if (p) query.set('p', p);
     const response = await companyRequest(
       event,
-      `/company/current/users${q ? `?q=${encodeURIComponent(q)}` : ''}`
+      `/company/current/users${query.size ? `?${query}` : ''}`
     );
     if (!response.ok) {
       error(response.status, await companyMessage(response, 'users.loadError'));

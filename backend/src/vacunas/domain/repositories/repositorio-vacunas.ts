@@ -1,8 +1,16 @@
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { DatosVacuna } from "../entities/vacuna";
+import type {
+  CatalogoVacunas,
+  DatosVacuna,
+  FiltrosVacunas,
+} from "../entities/vacuna";
 
 export abstract class RepositorioVacunas {
-  abstract listar(organizacion: string): Promise<unknown>;
+  abstract listar(
+    organizacion: string,
+    filtros: FiltrosVacunas,
+  ): Promise<CatalogoVacunas>;
+  abstract buscar(organizacion: string, consulta: string): Promise<unknown[]>;
   abstract crear(
     organizacion: string,
     datos: DatosVacuna,

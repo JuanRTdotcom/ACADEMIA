@@ -28,30 +28,43 @@ import {
   DtoBuscarPropietariosAtencion,
   DtoCambiarEstadoAtencion,
   DtoCrearAtencion,
+  DtoEditarRegistroAtencion,
+  DtoEliminarAtencion,
   DtoListarAtenciones,
   DtoRegistroAtencion,
 } from "../dto/atenciones.dto";
 import { InterceptorErroresAdjuntosAtencion } from "../interceptors/interceptor-errores-adjuntos-atencion";
+import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
+import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
 
 @Controller("clinic/attentions")
 export class ControladorAtenciones {
   constructor(
     private atenciones: CasoUsoGestionarAtenciones,
     private config: ConfigService,
+    private tokens: ServicioTokenOpaco,
   ) {}
 
   @Get()
   @Permisos("clinic.attentions.read")
   @Throttle({ default: { limit: 40, ttl: 60_000 } })
-  listar(
+  async listar(
     @Query() filtros: DtoListarAtenciones,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
-    return this.atenciones.listarHoy(
+    const contexto = filtros.incluir_ayer ? "ayer" : "hoy";
+    const posicion = leerPosicionCatalogo(this.tokens, "clinic-attentions", filtros.p, usuario.fid_organizaciones, filtros.q, "attentions.invalidCursor", contexto);
+    const listado = await this.atenciones.listarHoy(
       usuario.fid_organizaciones,
-      filtros,
+      {
+        q: filtros.q,
+        incluir_ayer: filtros.incluir_ayer,
+        despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+      },
       usuario.idioma,
     );
+    return protegerPaginacionCatalogo(this.tokens, "clinic-attentions", listado, usuario.fid_organizaciones, filtros.q, contexto);
   }
 
   @Get("options")
@@ -100,6 +113,20 @@ export class ControladorAtenciones {
       usuario.fid_organizaciones,
       mascota,
       tipo,
+    );
+  }
+
+  @Get("pets/:pet/history")
+  @Permisos("clinic.attentions.read")
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  historialMascota(
+    @Param("pet", new ParseUUIDPipe({ version: "4" })) mascota: string,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    return this.atenciones.historialMascota(
+      usuario.fid_organizaciones,
+      mascota,
+      usuario.idioma,
     );
   }
 
@@ -162,6 +189,34 @@ export class ControladorAtenciones {
       usuario.sub,
       crearContextoSolicitud(req),
     );
+  }
+
+  @Patch(":id/records/:record")
+  @Permisos("clinic.attentions.update")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @UseInterceptors(
+    InterceptorErroresAdjuntosAtencion,
+    FilesInterceptor("adjuntos"),
+  )
+  async editarRegistro(
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("record", new ParseUUIDPipe({ version: "4" })) registro: string,
+    @Body() dto: DtoEditarRegistroAtencion,
+    @UploadedFiles() archivos: Express.Multer.File[] | undefined,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    await this.atenciones.editarRegistro(
+      id,
+      registro,
+      usuario.fid_organizaciones,
+      dto,
+      this.archivos(archivos),
+      usuario.sub,
+      crearContextoSolicitud(req),
+    );
+    return { ok: true };
   }
 
   @Get(":id/records/:record/attachments/:attachment")
@@ -242,12 +297,14 @@ export class ControladorAtenciones {
   @HttpCode(200)
   async eliminar(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Body() dto: DtoEliminarAtencion,
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
     await this.atenciones.eliminar(
       id,
       usuario.fid_organizaciones,
+      dto,
       usuario.sub,
       crearContextoSolicitud(req),
     );

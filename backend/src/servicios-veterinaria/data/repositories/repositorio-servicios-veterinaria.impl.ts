@@ -11,6 +11,9 @@ export class RepositorioServiciosVeterinariaDatos extends RepositorioServiciosVe
   listar(...args: Parameters<RepositorioServiciosVeterinaria["listar"]>) {
     return this.fuente.listar(...args);
   }
+  buscar(...args: Parameters<RepositorioServiciosVeterinaria["buscar"]>) {
+    return this.fuente.buscar(...args);
+  }
   obtener(...args: Parameters<RepositorioServiciosVeterinaria["obtener"]>) {
     return this.fuente.obtener(...args);
   }

@@ -10,6 +10,7 @@ export class RepositorioProcedimientosVeterinariosDatos extends RepositorioProce
   listar(...args: Parameters<RepositorioProcedimientosVeterinarios["listar"]>) {
     return this.fuente.listar(...args);
   }
+  buscar(...args: Parameters<RepositorioProcedimientosVeterinarios["buscar"]>) { return this.fuente.buscar(...args); }
   crear(...args: Parameters<RepositorioProcedimientosVeterinarios["crear"]>) {
     return this.fuente.crear(...args);
   }

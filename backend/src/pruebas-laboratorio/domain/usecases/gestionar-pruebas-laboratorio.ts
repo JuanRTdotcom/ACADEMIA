@@ -1,14 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
-import type { DatosPruebaLaboratorio } from "../entities/prueba-laboratorio";
+import type { DatosPruebaLaboratorio, FiltrosPruebasLaboratorio } from "../entities/prueba-laboratorio";
 import { RepositorioPruebasLaboratorio } from "../repositories/repositorio-pruebas-laboratorio";
 
 @Injectable()
 export class CasoUsoGestionarPruebasLaboratorio {
   constructor(private pruebas: RepositorioPruebasLaboratorio) {}
-  listar(organizacion: string) {
-    return this.pruebas.listar(organizacion);
+  listar(organizacion: string, filtros: FiltrosPruebasLaboratorio) {
+    return this.pruebas.listar(organizacion, filtros);
   }
+  buscar(organizacion: string, consulta: string) { return this.pruebas.buscar(organizacion, consulta); }
   crear(
     organizacion: string,
     datos: DatosPruebaLaboratorio,

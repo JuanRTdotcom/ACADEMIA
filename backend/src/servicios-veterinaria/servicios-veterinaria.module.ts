@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ModuloTokenOpaco } from "../comun/seguridad/token-opaco.module";
 import { FuenteDatosServiciosVeterinariaPrisma } from "./data/datasources/servicios-veterinaria-prisma.datasource";
 import { RepositorioServiciosVeterinariaDatos } from "./data/repositories/repositorio-servicios-veterinaria.impl";
 import { RepositorioServiciosVeterinaria } from "./domain/repositories/repositorio-servicios-veterinaria";
@@ -6,6 +7,7 @@ import { CasoUsoGestionarServiciosVeterinaria } from "./domain/usecases/gestiona
 import { ControladorServiciosVeterinaria } from "./presentation/controllers/servicios-veterinaria.controller";
 
 @Module({
+  imports: [ModuloTokenOpaco],
   controllers: [ControladorServiciosVeterinaria],
   providers: [
     FuenteDatosServiciosVeterinariaPrisma,

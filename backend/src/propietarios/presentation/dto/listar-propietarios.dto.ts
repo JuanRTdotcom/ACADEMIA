@@ -1,12 +1,3 @@
-import { Transform } from "class-transformer";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { DtoListarCatalogoPaginado } from "../../../comun/presentation/dto/catalogo-paginado.dto";
 
-export class DtoListarPropietarios {
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === "string" ? value.trim() : value,
-  )
-  q?: string;
-}
+export class DtoListarPropietarios extends DtoListarCatalogoPaginado {}

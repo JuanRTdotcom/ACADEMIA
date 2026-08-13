@@ -11,9 +11,11 @@ import { RepositorioMascotas } from "./domain/repositories/repositorio-mascotas"
 import { CasoUsoGestionarMascotas } from "./domain/usecases/gestionar-mascotas";
 import { ControladorMascotas } from "./presentation/controllers/mascotas.controller";
 import { InterceptorErroresFotoMascota } from "./presentation/interceptors/interceptor-errores-foto-mascota";
+import { ModuloTokenOpaco } from "../comun/seguridad/token-opaco.module";
 
 @Module({
   imports: [
+    ModuloTokenOpaco,
     ModuloAlmacenamiento,
     MulterModule.registerAsync({
       inject: [ConfigService],

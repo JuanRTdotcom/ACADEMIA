@@ -7,9 +7,10 @@ import { ControladorUsuarios } from "./presentation/controllers/usuarios.control
 import { ControladorEmpresaUsuarios } from "./presentation/controllers/empresa-usuarios.controller";
 import { ModuloAlmacenamiento } from "../storage/storage.module";
 import { AlmacenAvatarR2 } from "../perfil/data/datasources/avatar/avatar-r2.datasource";
+import { ModuloTokenOpaco } from "../comun/seguridad/token-opaco.module";
 
 @Module({
-  imports: [ModuloAlmacenamiento],
+  imports: [ModuloAlmacenamiento, ModuloTokenOpaco],
   controllers: [ControladorUsuarios, ControladorEmpresaUsuarios],
   providers: [
     AlmacenAvatarR2,

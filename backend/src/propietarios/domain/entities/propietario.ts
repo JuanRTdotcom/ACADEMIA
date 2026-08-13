@@ -19,4 +19,10 @@ export interface DatosPropietario {
 
 export interface FiltrosPropietarios {
   q?: string;
+  despues_de?: string;
+  antes_de?: string;
+}
+
+export interface EliminacionPropietario {
+  confirmar_desvinculacion?: boolean;
 }

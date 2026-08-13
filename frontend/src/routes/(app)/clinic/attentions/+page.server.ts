@@ -5,12 +5,14 @@ import { attentionRequest, changeAttentionStatus, removeAttention } from "$lib/s
 
 export const load: PageServerLoad = async (event) => {
   const { usuario } = await event.parent();
-  const q = event.url.searchParams.get("q")?.trim().slice(0, 120) ?? "";
+  const q = event.url.searchParams.get("q")?.trim().slice(0, 220) ?? "";
+  const p = event.url.searchParams.get("p")?.slice(0, 1000) ?? "";
   const incluirAyer = event.url.searchParams.get("incluir_ayer") === "1";
   try {
     const canUpdate = tienePermiso(usuario.permisos, "clinic.attentions.update");
     const filtros = new URLSearchParams();
     if (q) filtros.set("q", q);
+    if (p) filtros.set("p", p);
     if (incluirAyer) filtros.set("incluir_ayer", "1");
     const [listado, opciones] = await Promise.all([
       attentionRequest(event, `/clinic/attentions${filtros.size ? `?${filtros}` : ""}`),

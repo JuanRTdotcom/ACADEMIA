@@ -168,6 +168,15 @@ describe("validación de registros de atención", () => {
             min: 1,
             max: 999,
           },
+          {
+            clave: "cantidad_adjuntos",
+            etiqueta_es: "Archivo de resultado",
+            etiqueta_en: "Result file",
+            tipo: "number",
+            requerido: true,
+            min: 0,
+            max: 1,
+          },
         ],
       },
     ] as const;
@@ -177,6 +186,7 @@ describe("validación de registros de atención", () => {
           {
             fid_pruebas_laboratorio: "11111111-1111-4111-8111-111111111111",
             cantidad: "2",
+            cantidad_adjuntos: "1",
           },
         ],
       })?.detalle,
@@ -185,12 +195,24 @@ describe("validación de registros de atención", () => {
         {
           fid_pruebas_laboratorio: "11111111-1111-4111-8111-111111111111",
           cantidad: 2,
+          cantidad_adjuntos: 1,
         },
       ],
     });
     expect(
       validarRegistroAtencion(laboratorio, {
         pruebas: [{ fid_pruebas_laboratorio: "no-uuid", cantidad: 0 }],
+      }),
+    ).toBeNull();
+    expect(
+      validarRegistroAtencion(laboratorio, {
+        pruebas: [
+          {
+            fid_pruebas_laboratorio: "11111111-1111-4111-8111-111111111111",
+            cantidad: 1,
+            cantidad_adjuntos: 2,
+          },
+        ],
       }),
     ).toBeNull();
   });

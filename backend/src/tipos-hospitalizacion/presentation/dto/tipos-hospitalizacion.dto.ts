@@ -9,18 +9,19 @@ import {
 
 const texto = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim().replace(/\s+/g, " ") : value;
+const INVALIDO = { message: "hospitalizationTypes.invalidData" };
 
 export class DtoGuardarTipoHospitalizacion {
-  @IsDefined()
+  @IsDefined(INVALIDO)
   @Transform(texto)
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
+  @IsString(INVALIDO)
+  @MinLength(2, INVALIDO)
+  @MaxLength(120, INVALIDO)
   nombre!: string;
 }
 
 export class DtoCambiarEstadoTipoHospitalizacion {
-  @IsDefined()
-  @IsBoolean()
+  @IsDefined(INVALIDO)
+  @IsBoolean(INVALIDO)
   activo!: boolean;
 }

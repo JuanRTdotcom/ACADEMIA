@@ -1,8 +1,11 @@
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
+import type { ResultadoCatalogoPaginado } from "../../../comun/domain/entities/catalogo-paginado";
 import type {
   DatosCrearAtencion,
+  DatosEditarRegistroAtencion,
   DatosRegistroAtencion,
   ArchivoAdjuntoAtencion,
+  EliminacionAtencion,
   FiltrosAtenciones,
 } from "../entities/atencion";
 
@@ -11,7 +14,7 @@ export abstract class RepositorioAtenciones {
     organizacion: string,
     filtros: FiltrosAtenciones,
     idioma: string,
-  ): Promise<unknown>;
+  ): Promise<ResultadoCatalogoPaginado>;
   abstract opciones(organizacion: string, idioma: string): Promise<unknown>;
   abstract buscarPropietarios(
     organizacion: string,
@@ -26,6 +29,11 @@ export abstract class RepositorioAtenciones {
     organizacion: string,
     mascota: string,
     tipo: string,
+  ): Promise<unknown>;
+  abstract historialMascota(
+    organizacion: string,
+    mascota: string,
+    idioma: string,
   ): Promise<unknown>;
   abstract obtener(
     id: string,
@@ -47,6 +55,15 @@ export abstract class RepositorioAtenciones {
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<{ id_registros_atencion: string }>;
+  abstract editarRegistro(
+    id: string,
+    registro: string,
+    organizacion: string,
+    datos: DatosEditarRegistroAtencion,
+    adjuntos: ArchivoAdjuntoAtencion[],
+    usuario: string,
+    contexto: ContextoSolicitud,
+  ): Promise<void>;
   abstract cambiarEstado(
     id: string,
     organizacion: string,
@@ -75,6 +92,7 @@ export abstract class RepositorioAtenciones {
   abstract eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionAtencion,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void>;

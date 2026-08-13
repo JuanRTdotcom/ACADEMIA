@@ -37,6 +37,9 @@ import { ModuloVacunas } from "./vacunas/vacunas.module";
 import { ModuloTiposHospitalizacion } from "./tipos-hospitalizacion/tipos-hospitalizacion.module";
 import { ModuloProcedimientosVeterinarios } from "./procedimientos-veterinarios/procedimientos-veterinarios.module";
 import { ModuloPruebasLaboratorio } from "./pruebas-laboratorio/pruebas-laboratorio.module";
+import { ModuloEstudiosDiagnosticos } from "./estudios-diagnosticos/estudios-diagnosticos.module";
+import { ModuloServiciosPeluqueriaSpa } from "./servicios-peluqueria-spa/servicios-peluqueria-spa.module";
+import { ModuloOperaciones } from "./operaciones/operaciones.module";
 
 @Module({
   imports: [
@@ -78,6 +81,9 @@ import { ModuloPruebasLaboratorio } from "./pruebas-laboratorio/pruebas-laborato
     ModuloTiposHospitalizacion,
     ModuloProcedimientosVeterinarios,
     ModuloPruebasLaboratorio,
+    ModuloEstudiosDiagnosticos,
+    ModuloServiciosPeluqueriaSpa,
+    ModuloOperaciones,
   ],
   providers: [
     // Filtro global: traduce el mensaje de toda excepción al idioma de la petición.

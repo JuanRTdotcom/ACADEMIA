@@ -116,6 +116,18 @@ export const navGroups: NavGroup[] = [
         permissions: ["administrator.laboratory_tests.read"],
       },
       {
+        label: "nav.diagnosticStudies",
+        icon: "image",
+        href: "/administrator/diagnostic-studies",
+        permissions: ["administrator.diagnostic_studies.read"],
+      },
+      {
+        label: "nav.groomingServices",
+        icon: "sparkles",
+        href: "/administrator/grooming-services",
+        permissions: ["administrator.grooming_services.read"],
+      },
+      {
         label: "nav.companyUsers",
         icon: "users",
         href: "/administrator/users",
@@ -144,6 +156,27 @@ export const navGroups: NavGroup[] = [
         href: "/clinic/pets",
         permissions: ["clinic.pets.read"],
       },
+    ],
+  },
+  {
+    title: "nav.group.commercial",
+    items: [
+      { label: "nav.sales", icon: "shopping-cart", href: "/operations/sales", permissions: ["operations.sales.read"] },
+      { label: "nav.inventory", icon: "package-search", href: "/operations/inventory", permissions: ["operations.inventory.read"] },
+      { label: "nav.electronicBilling", icon: "receipt-text", href: "/operations/billing", permissions: ["operations.billing.read"] },
+    ],
+  },
+  {
+    title: "nav.group.scheduling",
+    items: [
+      { label: "nav.appointments", icon: "calendar-days", href: "/operations/appointments", permissions: ["operations.appointments.read"] },
+      { label: "nav.reminders", icon: "bell-ring", href: "/operations/reminders", permissions: ["operations.reminders.read"] },
+    ],
+  },
+  {
+    title: "nav.group.reports",
+    items: [
+      { label: "nav.reports", icon: "chart-no-axes-combined", href: "/operations/reports", permissions: ["operations.reports.read"] },
     ],
   },
 ];

@@ -25,6 +25,8 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
   let tipoHospitalizacionCreado = "";
   let procedimientoCreado = "";
   let pruebaLaboratorioCreada = "";
+  let estudioDiagnosticoCreado = "";
+  let servicioPeluqueriaCreado = "";
   let cookies: string[] = [];
   const suffix = randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase();
   const username = `A${suffix}`;
@@ -171,7 +173,13 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
             ],
           },
         });
+        await prisma.adjuntos_registro_atencion.deleteMany({
+          where: { registro: { fid_atenciones: atencion } },
+        });
         await prisma.pruebas_registro_laboratorio.deleteMany({
+          where: { registro: { fid_atenciones: atencion } },
+        });
+        await prisma.servicios_registro_peluqueria_spa.deleteMany({
           where: { registro: { fid_atenciones: atencion } },
         });
         await prisma.registros_atencion.deleteMany({
@@ -213,6 +221,22 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
           where: { id_pruebas_laboratorio: pruebaLaboratorioCreada },
         });
       }
+      if (estudioDiagnosticoCreado) {
+        await prisma.auditoria.deleteMany({
+          where: { id_entidad: estudioDiagnosticoCreado },
+        });
+        await prisma.estudios_diagnosticos.deleteMany({
+          where: { id_estudios_diagnosticos: estudioDiagnosticoCreado },
+        });
+      }
+      if (servicioPeluqueriaCreado) {
+        await prisma.auditoria.deleteMany({
+          where: { id_entidad: servicioPeluqueriaCreado },
+        });
+        await prisma.servicios_peluqueria_spa.deleteMany({
+          where: { id_servicios_peluqueria_spa: servicioPeluqueriaCreado },
+        });
+      }
       if (mascota)
         await prisma.mascotas.deleteMany({ where: { id_mascotas: mascota } });
       if (propietario)
@@ -230,13 +254,24 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
     await app?.close();
   });
 
-  it("protege las rutas sin sesión", () =>
-    request(app.getHttpServer()).get("/clinic/attentions").expect(401));
+  it("protege las rutas sin sesión", async () => {
+    await request(app.getHttpServer()).get("/clinic/attentions").expect(401);
+    await request(app.getHttpServer())
+      .get(`/clinic/attentions/pets/${randomUUID()}/history`)
+      .expect(401);
+  });
 
   it("administra motivos de consulta por veterinaria y audita los cambios", async () => {
     await request(app.getHttpServer())
       .get("/company/consultation-reasons")
       .expect(401);
+    const invalido = await request(app.getHttpServer())
+      .post("/company/consultation-reasons")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: "", descripcion: "" })
+      .expect(400);
+    expect(invalido.body.codigo).toBe("consultationReasons.invalidData");
     await request(app.getHttpServer())
       .post("/company/consultation-reasons")
       .set("Cookie", cookies)
@@ -280,6 +315,13 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
 
   it("administra vacunas por veterinaria y audita los cambios", async () => {
     await request(app.getHttpServer()).get("/company/vaccines").expect(401);
+    const invalida = await request(app.getHttpServer())
+      .post("/company/vaccines")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: "x" })
+      .expect(400);
+    expect(invalida.body.codigo).toBe("vaccines.invalidData");
     const creada = await request(app.getHttpServer())
       .post("/company/vaccines")
       .set("Cookie", cookies)
@@ -326,6 +368,13 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
       .set("Cookie", cookies)
       .send({ nombre: `Sin CSRF ${suffix}` })
       .expect(403);
+    const invalido = await request(app.getHttpServer())
+      .post("/company/hospitalization-types")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: "x" })
+      .expect(400);
+    expect(invalido.body.codigo).toBe("hospitalizationTypes.invalidData");
     const creado = await request(app.getHttpServer())
       .post("/company/hospitalization-types")
       .set("Cookie", cookies)
@@ -382,6 +431,13 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
         descripcion_guia: "Guía inicial segura.",
       })
       .expect(403);
+    const invalido = await request(app.getHttpServer())
+      .post("/company/procedures")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: "x", descripcion_guia: "no" })
+      .expect(400);
+    expect(invalido.body.codigo).toBe("procedures.invalidData");
     const creado = await request(app.getHttpServer())
       .post("/company/procedures")
       .set("Cookie", cookies)
@@ -447,6 +503,13 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
     expect(lista.body.categorias).toHaveLength(15);
     const categoria =
       lista.body.categorias[0].id_categorias_pruebas_laboratorio;
+    const invalida = await request(app.getHttpServer())
+      .post("/company/laboratory-tests")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ fid_categorias_pruebas_laboratorio: "incorrecta", nombre: "x" })
+      .expect(400);
+    expect(invalida.body.codigo).toBe("laboratoryTests.invalidData");
     await request(app.getHttpServer())
       .post("/company/laboratory-tests")
       .set("Cookie", cookies)
@@ -478,6 +541,94 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
       await prisma.auditoria.count({
         where: {
           id_entidad: pruebaLaboratorioCreada,
+          fid_organizaciones: organizacion,
+        },
+      }),
+    ).toBe(2);
+  });
+
+  it("administra estudios diagnósticos por veterinaria, seguridad y auditoría", async () => {
+    await request(app.getHttpServer())
+      .get("/company/diagnostic-studies")
+      .expect(401);
+    const lista = await request(app.getHttpServer())
+      .get("/company/diagnostic-studies")
+      .set("Cookie", cookies)
+      .expect(200);
+    expect(lista.body.estudios.length).toBeGreaterThanOrEqual(10);
+    const invalido = await request(app.getHttpServer())
+      .post("/company/diagnostic-studies")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: "x" })
+      .expect(400);
+    expect(invalido.body.codigo).toBe("diagnosticStudies.invalidData");
+    await request(app.getHttpServer())
+      .post("/company/diagnostic-studies")
+      .set("Cookie", cookies)
+      .send({ nombre: `Estudio ${suffix}` })
+      .expect(403);
+    const creado = await request(app.getHttpServer())
+      .post("/company/diagnostic-studies")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: `Estudio ${suffix}` })
+      .expect(201);
+    estudioDiagnosticoCreado = creado.body.id_estudios_diagnosticos;
+    await request(app.getHttpServer())
+      .patch(`/company/diagnostic-studies/${estudioDiagnosticoCreado}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: `Estudio clínico ${suffix}` })
+      .expect(200);
+    expect(
+      await prisma.auditoria.count({
+        where: {
+          id_entidad: estudioDiagnosticoCreado,
+          fid_organizaciones: organizacion,
+        },
+      }),
+    ).toBe(2);
+  });
+
+  it("administra servicios de peluquería y spa por veterinaria, seguridad y auditoría", async () => {
+    await request(app.getHttpServer())
+      .get("/company/grooming-services")
+      .expect(401);
+    const lista = await request(app.getHttpServer())
+      .get("/company/grooming-services")
+      .set("Cookie", cookies)
+      .expect(200);
+    expect(lista.body.servicios.length).toBeGreaterThanOrEqual(10);
+    const invalido = await request(app.getHttpServer())
+      .post("/company/grooming-services")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: "x" })
+      .expect(400);
+    expect(invalido.body.codigo).toBe("groomingServices.invalidData");
+    await request(app.getHttpServer())
+      .post("/company/grooming-services")
+      .set("Cookie", cookies)
+      .send({ nombre: `Spa ${suffix}` })
+      .expect(403);
+    const creado = await request(app.getHttpServer())
+      .post("/company/grooming-services")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: `Spa ${suffix}` })
+      .expect(201);
+    servicioPeluqueriaCreado = creado.body.id_servicios_peluqueria_spa;
+    await request(app.getHttpServer())
+      .patch(`/company/grooming-services/${servicioPeluqueriaCreado}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ nombre: `Spa clínico ${suffix}` })
+      .expect(200);
+    expect(
+      await prisma.auditoria.count({
+        where: {
+          id_entidad: servicioPeluqueriaCreado,
           fid_organizaciones: organizacion,
         },
       }),
@@ -519,14 +670,111 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
     const laboratorio = opciones.body.tipos.find(
       (item: { codigo: string }) => item.codigo === "laboratorio",
     );
+    const imagenDiagnostica = opciones.body.tipos.find(
+      (item: { codigo: string }) => item.codigo === "imagen_diagnostica",
+    );
+    const peluqueriaSpa = opciones.body.tipos.find(
+      (item: { codigo: string }) => item.codigo === "peluqueria_spa",
+    );
+    const guarderia = opciones.body.tipos.find(
+      (item: { codigo: string }) => item.codigo === "guarderia",
+    );
+    const remision = opciones.body.tipos.find(
+      (item: { codigo: string }) => item.codigo === "remision",
+    );
+    const seguimiento = opciones.body.tipos.find(
+      (item: { codigo: string }) => item.codigo === "seguimiento",
+    );
+    const documento = opciones.body.tipos.find(
+      (item: { codigo: string }) => item.codigo === "documento",
+    );
+    const cita = opciones.body.tipos.find(
+      (item: { codigo: string }) => item.codigo === "cita",
+    );
+    expect(documento).toMatchObject({
+      permite_registro_raiz: false,
+      requiere_registro_origen: false,
+    });
+    expect(cita).toMatchObject({
+      permite_registro_raiz: false,
+      requiere_registro_origen: false,
+    });
+    expect(seguimiento).toMatchObject({
+      permite_registro_raiz: false,
+      requiere_registro_origen: true,
+      acepta_adjuntos: true,
+      max_adjuntos: 10,
+    });
+    const tiposSeguimiento = seguimiento.campos.find(
+      (item: { clave: string }) =>
+        item.clave === "fid_parametros_tipo_seguimiento",
+    ).opciones;
+    expect(tiposSeguimiento).toHaveLength(12);
+    const campoUsuarioRemitente = remision.campos.find(
+      (item: { clave: string }) => item.clave === "fid_usuarios_remitente",
+    );
+    expect(remision).toMatchObject({
+      icono: "truck",
+      acepta_adjuntos: false,
+      max_adjuntos: 0,
+    });
+    expect(campoUsuarioRemitente.opciones).toContainEqual(
+      expect.objectContaining({ id: usuario }),
+    );
+    const campoTipoEstancia = guarderia.campos.find(
+      (item: { clave: string }) =>
+        item.clave === "fid_parametros_tipo_estancia_guarderia",
+    );
+    expect(guarderia).toMatchObject({
+      nombre: "Guardería / hotel",
+      acepta_adjuntos: false,
+      max_adjuntos: 0,
+    });
+    expect(
+      campoTipoEstancia.opciones.map(
+        (item: { etiqueta: string }) => item.etiqueta,
+      ),
+    ).toEqual(["Guardería", "Hotel"]);
+    const campoServiciosPeluqueria = peluqueriaSpa.campos.find(
+      (item: { clave: string }) => item.clave === "servicios",
+    );
+    expect(peluqueriaSpa).toMatchObject({
+      icono: "sparkles",
+      acepta_adjuntos: true,
+      max_adjuntos: 10,
+    });
+    expect(
+      campoServiciosPeluqueria.campos.find(
+        (item: { clave: string }) =>
+          item.clave === "fid_servicios_peluqueria_spa",
+      ).opciones,
+    ).toContainEqual(
+      expect.objectContaining({
+        id: servicioPeluqueriaCreado,
+        etiqueta: `Spa clínico ${suffix}`,
+      }),
+    );
+    expect(
+      campoServiciosPeluqueria.campos.find(
+        (item: { clave: string }) => item.clave === "fid_usuarios_encargado",
+      ).opciones,
+    ).toContainEqual(expect.objectContaining({ id: usuario }));
     const campoPruebasLaboratorio = laboratorio.campos.find(
       (item: { clave: string }) => item.clave === "pruebas",
     );
+    expect(
+      laboratorio.campos.some(
+        (item: { clave: string }) => item.clave === "fecha",
+      ),
+    ).toBe(false);
     const subcampoPruebaLaboratorio = campoPruebasLaboratorio.campos.find(
       (item: { clave: string }) => item.clave === "fid_pruebas_laboratorio",
     );
     const subcampoProfesional = campoPruebasLaboratorio.campos.find(
       (item: { clave: string }) => item.clave === "fid_usuarios_profesional",
+    );
+    const subcampoArchivoResultado = campoPruebasLaboratorio.campos.find(
+      (item: { clave: string }) => item.clave === "cantidad_adjuntos",
     );
     expect(
       subcampoPruebaLaboratorio.opciones.find(
@@ -538,6 +786,26 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
         (item: { id: string }) => item.id === usuario,
       ),
     ).toBe(true);
+    expect(subcampoArchivoResultado).toMatchObject({ min: 0, max: 1 });
+    expect(imagenDiagnostica).toMatchObject({
+      icono: "image",
+      acepta_adjuntos: true,
+      max_adjuntos: 10,
+    });
+    const campoEstudioDiagnostico = imagenDiagnostica.campos.find(
+      (item: { clave: string }) => item.clave === "fid_estudios_diagnosticos",
+    );
+    const campoSedacionImagen = imagenDiagnostica.campos.find(
+      (item: { clave: string }) =>
+        item.clave === "fid_parametros_sedacion_imagen",
+    );
+    expect(campoEstudioDiagnostico.opciones).toContainEqual(
+      expect.objectContaining({
+        id: estudioDiagnosticoCreado,
+        etiqueta: `Estudio clínico ${suffix}`,
+      }),
+    );
+    expect(campoSedacionImagen.opciones).toHaveLength(3);
     expect(vacuna).toMatchObject({
       nombre_es: "Vacunación",
       nombre_en: "Vaccination",
@@ -639,19 +907,52 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
         },
       })
       .expect(400);
+    const mascotaInvalida = await request(app.getHttpServer())
+      .post("/clinic/attentions")
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field("fid_mascotas", "mascota-invalida")
+      .field(
+        "registro",
+        JSON.stringify({
+          fid_tipos_registro_atencion: consulta.id_tipos_registro_atencion,
+          detalle: detalleConsulta,
+        }),
+      )
+      .expect(400);
+    expect(mascotaInvalida.body.codigo).toBe("attentions.invalidPet");
     const creada = await request(app.getHttpServer())
       .post("/clinic/attentions")
       .set("Cookie", cookies)
       .set("x-sumaq-csrf", csrf)
-      .send({
-        fid_mascotas: mascota,
-        registro: {
+      .field("fid_mascotas", mascota)
+      .field(
+        "registro",
+        JSON.stringify({
           fid_tipos_registro_atencion: consulta.id_tipos_registro_atencion,
           detalle: detalleConsulta,
-        },
-      })
+        }),
+      )
       .expect(201);
     atencion = creada.body.id_atenciones;
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: documento.id_tipos_registro_atencion,
+        detalle: { documento: "No disponible desde Atenciones" },
+      })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: cita.id_tipos_registro_atencion,
+        detalle: { fecha: "2026-08-20T10:00", motivo: "No disponible" },
+      })
+      .expect(400);
     await prisma.$executeRaw`UPDATE personas.atenciones SET fecha_atencion = fecha_atencion - 1 WHERE id_atenciones = ${atencion}::uuid`;
     const soloHoy = await request(app.getHttpServer())
       .get("/clinic/attentions")
@@ -753,6 +1054,194 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
       nombre_es: "Vacunación",
       nombre_en: "Vaccination",
     });
+    await request(app.getHttpServer())
+      .patch(`/clinic/attentions/${atencion}/records/${registro}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: vacuna.id_tipos_registro_atencion,
+        detalle: {
+          fid_vacunas: opcionVacuna.id,
+          laboratorio: "Laboratorio actualizado",
+          lote: "L-123",
+          observaciones: "Registro clínico editado",
+        },
+      })
+      .expect(200);
+    expect(
+      await prisma.auditoria.count({
+        where: {
+          id_entidad: registro,
+          accion: "atenciones.registro_actualizado",
+          fid_organizaciones: organizacion,
+        },
+      }),
+    ).toBe(1);
+    const registroConsulta = detalle.body.atencion.registros.find(
+      (item: { tipo: { codigo: string } }) => item.tipo.codigo === "consulta",
+    ).id_registros_atencion;
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: seguimiento.id_tipos_registro_atencion,
+        detalle: {
+          fid_parametros_tipo_seguimiento: tiposSeguimiento[0].id,
+          detalle_seguimiento: "Evolución favorable",
+        },
+      })
+      .expect(400);
+    const seguimientoCreado = await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        seguimiento.id_tipos_registro_atencion,
+      )
+      .field("fid_registros_atencion_origen", registroConsulta)
+      .field(
+        "detalle",
+        JSON.stringify({
+          fid_parametros_tipo_seguimiento: tiposSeguimiento[0].id,
+          motivo: "Revisión posterior",
+          detalle_seguimiento: "Evolución favorable",
+          fecha_programada: "2026-08-20",
+        }),
+      )
+      .attach("adjuntos", Buffer.from("%PDF-1.4\n%%EOF"), "control.pdf")
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch(
+        `/clinic/attentions/${atencion}/records/${seguimientoCreado.body.id_registros_atencion}`,
+      )
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: seguimiento.id_tipos_registro_atencion,
+        detalle: {
+          fid_parametros_tipo_seguimiento: tiposSeguimiento[1].id,
+          motivo: "Revisión editada",
+          detalle_seguimiento: "Evolución favorable confirmada",
+          fecha_programada: "2026-08-21",
+        },
+      })
+      .expect(200);
+    expect(
+      await prisma.adjuntos_registro_atencion.count({
+        where: {
+          fid_registros_atencion: seguimientoCreado.body.id_registros_atencion,
+          estado: 1,
+          eliminado_en: null,
+        },
+      }),
+    ).toBe(1);
+    const adjuntoAnterior =
+      await prisma.adjuntos_registro_atencion.findFirstOrThrow({
+        where: {
+          fid_registros_atencion: seguimientoCreado.body.id_registros_atencion,
+          estado: 1,
+          eliminado_en: null,
+        },
+        select: { id_adjuntos_registro_atencion: true, clave_objeto: true },
+      });
+    await request(app.getHttpServer())
+      .patch(
+        `/clinic/attentions/${atencion}/records/${seguimientoCreado.body.id_registros_atencion}`,
+      )
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        seguimiento.id_tipos_registro_atencion,
+      )
+      .field(
+        "detalle",
+        JSON.stringify({
+          fid_parametros_tipo_seguimiento: tiposSeguimiento[1].id,
+          motivo: "Revisión con adjunto reemplazado",
+          detalle_seguimiento: "Evolución favorable confirmada",
+          fecha_programada: "2026-08-21",
+        }),
+      )
+      .field("adjuntos_conservados", JSON.stringify([[]]))
+      .attach("adjuntos", Buffer.from("%PDF-1.4\n%%EOF"), "nuevo-control.pdf")
+      .expect(200);
+    const adjuntosEditados = await prisma.adjuntos_registro_atencion.findMany({
+      where: {
+        fid_registros_atencion: seguimientoCreado.body.id_registros_atencion,
+        estado: 1,
+        eliminado_en: null,
+      },
+      select: { nombre_original: true, clave_objeto: true },
+    });
+    expect(adjuntosEditados).toHaveLength(1);
+    expect(adjuntosEditados[0].nombre_original).toBe("nuevo-control.pdf");
+    expect(adjuntosEditados[0].clave_objeto).not.toBe(
+      adjuntoAnterior.clave_objeto,
+    );
+    await request(app.getHttpServer())
+      .patch(
+        `/clinic/attentions/${atencion}/records/${seguimientoCreado.body.id_registros_atencion}`,
+      )
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        seguimiento.id_tipos_registro_atencion,
+      )
+      .field(
+        "detalle",
+        JSON.stringify({
+          fid_parametros_tipo_seguimiento: tiposSeguimiento[1].id,
+          detalle_seguimiento: "Intento con un adjunto ajeno",
+        }),
+      )
+      .field("adjuntos_conservados", JSON.stringify([[randomUUID()]]))
+      .expect(400);
+    const detalleConSeguimiento = await request(app.getHttpServer())
+      .get(`/clinic/attentions/${atencion}`)
+      .set("Cookie", cookies)
+      .expect(200);
+    const consultaConSeguimiento =
+      detalleConSeguimiento.body.atencion.registros.find(
+        (item: { id_registros_atencion: string }) =>
+          item.id_registros_atencion === registroConsulta,
+      );
+    expect(consultaConSeguimiento.seguimientos).toHaveLength(1);
+    expect(consultaConSeguimiento.seguimientos[0].id_registros_atencion).toBe(
+      seguimientoCreado.body.id_registros_atencion,
+    );
+    expect(
+      detalleConSeguimiento.body.atencion.registros.some(
+        (item: { id_registros_atencion: string }) =>
+          item.id_registros_atencion ===
+          seguimientoCreado.body.id_registros_atencion,
+      ),
+    ).toBe(false);
+    const historial = await request(app.getHttpServer())
+      .get(`/clinic/attentions/pets/${mascota}/history`)
+      .set("Cookie", cookies)
+      .expect(200);
+    expect(historial.body.mascota).toMatchObject({
+      id_mascotas: mascota,
+      nombre: "Paciente Atención",
+    });
+    expect(historial.body.atenciones[0].id_atenciones).toBe(atencion);
+    expect(
+      historial.body.atenciones[0].registros.find(
+        (item: { id_registros_atencion: string }) =>
+          item.id_registros_atencion === registroConsulta,
+      ).seguimientos,
+    ).toHaveLength(1);
+    expect(
+      historial.body.atenciones[0].registros[0].tipo.campos,
+    ).toBeInstanceOf(Array);
+    await request(app.getHttpServer())
+      .get(`/clinic/attentions/pets/${randomUUID()}/history`)
+      .set("Cookie", cookies)
+      .expect(404);
     await request(app.getHttpServer())
       .post(`/clinic/attentions/${atencion}/records`)
       .set("Cookie", cookies)
@@ -875,7 +1364,6 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
       .send({
         fid_tipos_registro_atencion: laboratorio.id_tipos_registro_atencion,
         detalle: {
-          fecha: "2026-08-11",
           pruebas: [
             {
               fid_usuarios_profesional: randomUUID(),
@@ -887,25 +1375,47 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
         },
       })
       .expect(400);
-    const laboratorioRegistrado = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post(`/clinic/attentions/${atencion}/records`)
       .set("Cookie", cookies)
       .set("x-sumaq-csrf", csrf)
       .send({
         fid_tipos_registro_atencion: laboratorio.id_tipos_registro_atencion,
         detalle: {
-          fecha: "2026-08-11",
+          pruebas: [
+            {
+              fid_usuarios_profesional: usuario,
+              fid_pruebas_laboratorio: pruebaLaboratorioCreada,
+              cantidad: 1,
+              cantidad_adjuntos: 2,
+            },
+          ],
+        },
+      })
+      .expect(400);
+    const laboratorioRegistrado = await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        laboratorio.id_tipos_registro_atencion,
+      )
+      .field(
+        "detalle",
+        JSON.stringify({
           pruebas: [
             {
               fid_usuarios_profesional: usuario,
               fid_pruebas_laboratorio: pruebaLaboratorioCreada,
               cantidad: 2,
-              cantidad_adjuntos: 0,
+              cantidad_adjuntos: 1,
             },
           ],
           diagnostico_presuntivo: "Control preventivo",
-        },
-      })
+        }),
+      )
+      .attach("adjuntos", Buffer.from("%PDF-1.4\n%%EOF"), "resultado.pdf")
       .expect(201);
     expect(
       await prisma.pruebas_registro_laboratorio.findFirst({
@@ -923,6 +1433,276 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
       fid_pruebas_laboratorio: pruebaLaboratorioCreada,
       fid_usuarios_profesional: usuario,
       cantidad: 2,
+    });
+    const resultadoLaboratorio =
+      await prisma.adjuntos_registro_atencion.findFirstOrThrow({
+        where: {
+          fid_registros_atencion:
+            laboratorioRegistrado.body.id_registros_atencion,
+        },
+        select: { id_adjuntos_registro_atencion: true },
+      });
+    await request(app.getHttpServer())
+      .patch(
+        `/clinic/attentions/${atencion}/records/${laboratorioRegistrado.body.id_registros_atencion}`,
+      )
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        laboratorio.id_tipos_registro_atencion,
+      )
+      .field(
+        "detalle",
+        JSON.stringify({
+          pruebas: [
+            {
+              fid_usuarios_profesional: usuario,
+              fid_pruebas_laboratorio: pruebaLaboratorioCreada,
+              cantidad: 2,
+              cantidad_adjuntos: 1,
+            },
+          ],
+          diagnostico_presuntivo: "Control preventivo editado",
+        }),
+      )
+      .field(
+        "adjuntos_conservados",
+        JSON.stringify([[resultadoLaboratorio.id_adjuntos_registro_atencion]]),
+      )
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion:
+          imagenDiagnostica.id_tipos_registro_atencion,
+        detalle: {
+          fid_estudios_diagnosticos: estudioDiagnosticoCreado,
+          fid_parametros_sedacion_imagen:
+            opciones.body.estados[0].id_parametros,
+          tipo_estudio: "Simple",
+        },
+      })
+      .expect(400);
+    const imagenRegistrada = await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion:
+          imagenDiagnostica.id_tipos_registro_atencion,
+        detalle: {
+          fid_estudios_diagnosticos: estudioDiagnosticoCreado,
+          fid_parametros_sedacion_imagen: campoSedacionImagen.opciones[0].id,
+          signos_clinicos: "Tos, disnea",
+          diagnosticos_presuntivos: "Bronquitis, neumonía",
+          tipo_estudio: "Tórax, dos proyecciones",
+          observaciones: "Paciente estable",
+        },
+      })
+      .expect(201);
+    expect(
+      await prisma.registros_atencion.findUniqueOrThrow({
+        where: {
+          id_registros_atencion: imagenRegistrada.body.id_registros_atencion,
+        },
+        select: {
+          fid_estudios_diagnosticos: true,
+          fid_parametros_sedacion_imagen: true,
+        },
+      }),
+    ).toEqual({
+      fid_estudios_diagnosticos: estudioDiagnosticoCreado,
+      fid_parametros_sedacion_imagen: campoSedacionImagen.opciones[0].id,
+    });
+    const detallePeluqueria = {
+      servicios: [{ fid_servicios_peluqueria_spa: servicioPeluqueriaCreado }],
+      observaciones_generales: "Sin incidentes",
+      cantidad_fotos_antes: 0,
+      cantidad_fotos_despues: 0,
+      fecha_programada: "2027-01-20",
+    };
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        peluqueriaSpa.id_tipos_registro_atencion,
+      )
+      .field(
+        "detalle",
+        JSON.stringify({ ...detallePeluqueria, cantidad_fotos_antes: 1 }),
+      )
+      .attach("adjuntos", Buffer.from("%PDF-1.4\n%%EOF"), "antes.pdf")
+      .expect(400);
+    const fotoPeluqueria = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const peluqueriaRegistrada = await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        peluqueriaSpa.id_tipos_registro_atencion,
+      )
+      .field(
+        "detalle",
+        JSON.stringify({ ...detallePeluqueria, cantidad_fotos_antes: 1 }),
+      )
+      .attach("adjuntos", fotoPeluqueria, "antes.png")
+      .expect(201);
+    expect(
+      await prisma.servicios_registro_peluqueria_spa.findFirst({
+        where: {
+          fid_registros_atencion:
+            peluqueriaRegistrada.body.id_registros_atencion,
+        },
+        select: {
+          fid_servicios_peluqueria_spa: true,
+          fid_usuarios_encargado: true,
+          motivo: true,
+        },
+      }),
+    ).toEqual({
+      fid_servicios_peluqueria_spa: servicioPeluqueriaCreado,
+      fid_usuarios_encargado: null,
+      motivo: null,
+    });
+    const fotoAntes = await prisma.adjuntos_registro_atencion.findFirstOrThrow({
+      where: {
+        fid_registros_atencion: peluqueriaRegistrada.body.id_registros_atencion,
+      },
+      select: { id_adjuntos_registro_atencion: true },
+    });
+    await request(app.getHttpServer())
+      .patch(
+        `/clinic/attentions/${atencion}/records/${peluqueriaRegistrada.body.id_registros_atencion}`,
+      )
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .field(
+        "fid_tipos_registro_atencion",
+        peluqueriaSpa.id_tipos_registro_atencion,
+      )
+      .field(
+        "detalle",
+        JSON.stringify({
+          ...detallePeluqueria,
+          cantidad_fotos_antes: 1,
+          cantidad_fotos_despues: 1,
+        }),
+      )
+      .field(
+        "adjuntos_conservados",
+        JSON.stringify([[fotoAntes.id_adjuntos_registro_atencion], []]),
+      )
+      .attach("adjuntos", fotoPeluqueria, "despues.png")
+      .expect(200);
+    const fotosEditadas = await prisma.adjuntos_registro_atencion.findMany({
+      where: {
+        fid_registros_atencion: peluqueriaRegistrada.body.id_registros_atencion,
+        estado: 1,
+        eliminado_en: null,
+      },
+      select: { etapa_foto_peluqueria: { select: { codigo: true } } },
+      orderBy: { created_at: "asc" },
+    });
+    expect(
+      fotosEditadas.map((foto) => foto.etapa_foto_peluqueria?.codigo),
+    ).toEqual(["antes", "despues"]);
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: guarderia.id_tipos_registro_atencion,
+        detalle: {
+          fecha_ingreso: "2027-02-02",
+          fecha_salida: "2027-02-01",
+          fid_parametros_tipo_estancia_guarderia:
+            campoTipoEstancia.opciones[0].id,
+        },
+      })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: guarderia.id_tipos_registro_atencion,
+        detalle: {
+          fecha_ingreso: "2027-02-02",
+          fid_parametros_tipo_estancia_guarderia:
+            opciones.body.estados[0].id_parametros,
+        },
+      })
+      .expect(400);
+    const guarderiaRegistrada = await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: guarderia.id_tipos_registro_atencion,
+        detalle: {
+          fecha_ingreso: "2027-02-02",
+          fecha_salida: "2027-02-03",
+          fid_parametros_tipo_estancia_guarderia:
+            campoTipoEstancia.opciones[1].id,
+          tipo_comida: "Alimento habitual",
+          cantidad_comida: "200 g por ración",
+          objetos_mascota: "Correa y manta",
+          observaciones_recomendaciones: "Dos paseos diarios",
+        },
+      })
+      .expect(201);
+    expect(
+      await prisma.registros_atencion.findUniqueOrThrow({
+        where: {
+          id_registros_atencion: guarderiaRegistrada.body.id_registros_atencion,
+        },
+        select: { fid_parametros_tipo_estancia_guarderia: true },
+      }),
+    ).toEqual({
+      fid_parametros_tipo_estancia_guarderia: campoTipoEstancia.opciones[1].id,
+    });
+    await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: remision.id_tipos_registro_atencion,
+        detalle: {
+          fid_usuarios_remitente: randomUUID(),
+          clinica_veterinaria_destino: "Clínica externa",
+        },
+      })
+      .expect(400);
+    const remisionRegistrada = await request(app.getHttpServer())
+      .post(`/clinic/attentions/${atencion}/records`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({
+        fid_tipos_registro_atencion: remision.id_tipos_registro_atencion,
+        detalle: {
+          clinica_veterinaria_destino: "Clínica veterinaria destino",
+        },
+      })
+      .expect(201);
+    expect(
+      await prisma.registros_atencion.findUniqueOrThrow({
+        where: {
+          id_registros_atencion: remisionRegistrada.body.id_registros_atencion,
+        },
+        select: { fid_usuarios_remitente: true, resumen: true },
+      }),
+    ).toEqual({
+      fid_usuarios_remitente: null,
+      resumen: "Clínica veterinaria destino",
     });
     await request(app.getHttpServer())
       .post(`/clinic/attentions/${atencion}/records`)
@@ -1032,6 +1812,51 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
         detalle: { fid_vacunas: vacunaCreada },
       })
       .expect(400);
+    const requiereReconfirmacion = await request(app.getHttpServer())
+      .delete(`/clinic/attentions/${atencion}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({})
+      .expect(409);
+    expect(requiereReconfirmacion.body).toEqual(
+      expect.objectContaining({
+        codigo: "attentions.protectedDeletionConfirmationRequired",
+        data: expect.objectContaining({
+          estado_codigo: "finalizada",
+          cantidad_registros: expect.any(Number),
+        }),
+      }),
+    );
+    expect(requiereReconfirmacion.body.data.cantidad_registros).toBeGreaterThan(
+      0,
+    );
+    await request(app.getHttpServer())
+      .delete(`/clinic/attentions/${atencion}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ confirmar_eliminacion_protegida: "true" })
+      .expect(400);
+    await request(app.getHttpServer())
+      .delete(`/clinic/attentions/${atencion}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ confirmar_eliminacion_protegida: true })
+      .expect(200);
+    expect(
+      await prisma.atenciones.findUniqueOrThrow({
+        where: { id_atenciones: atencion },
+        select: { estado: true, eliminado_en: true, eliminado_por: true },
+      }),
+    ).toEqual({
+      estado: 0,
+      eliminado_en: expect.any(Date),
+      eliminado_por: usuario,
+    });
+    expect(
+      await prisma.registros_atencion.count({
+        where: { fid_atenciones: atencion, eliminado_en: null },
+      }),
+    ).toBe(0);
     const acciones = await prisma.auditoria.findMany({
       where: {
         fid_organizaciones: organizacion,
@@ -1046,7 +1871,8 @@ describe("atenciones: tenant, permisos, validación y auditoría (e2e)", () => {
         "atenciones.registro_agregado",
         "atenciones.registro_eliminado",
         "atenciones.estado_cambiado",
+        "atenciones.eliminada",
       ]),
     );
-  });
+  }, 15_000);
 });

@@ -12,6 +12,7 @@ import { PrismaService } from "../../../comun/prisma.service";
 import type {
   ArchivoMascota,
   DatosMascota,
+  EliminacionMascota,
   FiltrosMascotas,
 } from "../../domain/entities/mascota";
 import { AlmacenFotoMascotaR2 } from "./foto-mascota-r2.datasource";
@@ -81,65 +82,61 @@ export class FuenteDatosMascotasPrisma {
     const parametrosSolicitados = Object.entries(GRUPOS).filter(([campo]) =>
       Boolean(datos[campo as keyof typeof GRUPOS]),
     );
-    const [especie, subespecie, raza, propietario, ...parametros] =
-      await Promise.all([
-        tx.especies_animales.findFirst({
+    const propietario = datos.fid_propietarios
+      ? await tx.$queryRaw<Array<{ id_propietarios: string }>>`
+          SELECT id_propietarios FROM personas.propietarios
+          WHERE id_propietarios = ${datos.fid_propietarios}::uuid
+            AND fid_organizaciones = ${organizacion}::uuid
+            AND estado = 1 AND eliminado_en IS NULL
+          FOR SHARE`
+      : [];
+    const [especie, subespecie, raza, ...parametros] = await Promise.all([
+      tx.especies_animales.findFirst({
+        where: {
+          id_especies_animales: datos.fid_especies_animales,
+          estado: 1,
+        },
+        select: { id_especies_animales: true },
+      }),
+      datos.fid_subespecies_animales
+        ? tx.subespecies_animales.findFirst({
+            where: {
+              id_subespecies_animales: datos.fid_subespecies_animales,
+              fid_especies_animales: datos.fid_especies_animales,
+              estado: 1,
+              especie: { estado: 1 },
+            },
+            select: { id_subespecies_animales: true },
+          })
+        : Promise.resolve(null),
+      datos.fid_razas_animales
+        ? tx.razas_animales.findFirst({
+            where: {
+              id_razas_animales: datos.fid_razas_animales,
+              fid_especies_animales: datos.fid_especies_animales,
+              estado: 1,
+              especie: { estado: 1 },
+            },
+            select: { id_razas_animales: true },
+          })
+        : Promise.resolve(null),
+      ...parametrosSolicitados.map(([campo, grupo]) =>
+        tx.parametros.findFirst({
           where: {
-            id_especies_animales: datos.fid_especies_animales,
+            id_parametros: datos[campo as keyof typeof GRUPOS]!,
+            codigo_grupo: grupo,
             estado: 1,
           },
-          select: { id_especies_animales: true },
+          select: { id_parametros: true },
         }),
-        datos.fid_subespecies_animales
-          ? tx.subespecies_animales.findFirst({
-              where: {
-                id_subespecies_animales: datos.fid_subespecies_animales,
-                fid_especies_animales: datos.fid_especies_animales,
-                estado: 1,
-                especie: { estado: 1 },
-              },
-              select: { id_subespecies_animales: true },
-            })
-          : Promise.resolve(null),
-        datos.fid_razas_animales
-          ? tx.razas_animales.findFirst({
-              where: {
-                id_razas_animales: datos.fid_razas_animales,
-                fid_especies_animales: datos.fid_especies_animales,
-                estado: 1,
-                especie: { estado: 1 },
-              },
-              select: { id_razas_animales: true },
-            })
-          : Promise.resolve(null),
-        datos.fid_propietarios
-          ? tx.propietarios.findFirst({
-              where: {
-                id_propietarios: datos.fid_propietarios,
-                fid_organizaciones: organizacion,
-                estado: 1,
-                eliminado_en: null,
-              },
-              select: { id_propietarios: true },
-            })
-          : Promise.resolve(null),
-        ...parametrosSolicitados.map(([campo, grupo]) =>
-          tx.parametros.findFirst({
-            where: {
-              id_parametros: datos[campo as keyof typeof GRUPOS]!,
-              codigo_grupo: grupo,
-              estado: 1,
-            },
-            select: { id_parametros: true },
-          }),
-        ),
-      ]);
+      ),
+    ]);
     if (!especie) throw new BadRequestException("pets.invalidSpecies");
     if (datos.fid_subespecies_animales && !subespecie)
       throw new BadRequestException("pets.invalidSpecies");
     if (datos.fid_razas_animales && !raza)
       throw new BadRequestException("pets.invalidSpecies");
-    if (datos.fid_propietarios && !propietario)
+    if (datos.fid_propietarios && !propietario.length)
       throw new BadRequestException("pets.invalidOwner");
     if (parametros.some((parametro) => !parametro))
       throw new BadRequestException("pets.invalidCatalog");
@@ -173,6 +170,7 @@ export class FuenteDatosMascotasPrisma {
           id_propietarios: true,
           nombre_completo: true,
           numero_documento: true,
+          foto_url: true,
           celular: true,
           tipo_documento: { select: { etiqueta: true } },
         },
@@ -190,6 +188,21 @@ export class FuenteDatosMascotasPrisma {
       temperamento: {
         select: { codigo: true, etiqueta: true, color_hex: true },
       },
+      _count: {
+        select: {
+          atenciones: { where: { estado: 1, eliminado_en: null } },
+        },
+      },
+      atenciones: {
+        where: { estado: 1, eliminado_en: null },
+        orderBy: [
+          { fecha_atencion: "desc" },
+          { llegada_en: "desc" },
+          { id_atenciones: "desc" },
+        ],
+        take: 1,
+        select: { llegada_en: true },
+      },
     } satisfies Prisma.mascotasSelect;
   }
 
@@ -200,14 +213,20 @@ export class FuenteDatosMascotasPrisma {
       especie: { nombre_es: string; nombre_en: string };
       subespecie: { nombre_es: string; nombre_en: string } | null;
       raza: { nombre_es: string; nombre_en: string } | null;
+      _count: { atenciones: number };
+      atenciones: Array<{ llegada_en: Date }>;
     },
   >(item: T, idioma = "es") {
-    const { foto_url, raza, subespecie, ...mascota } = item;
+    const { foto_url, raza, subespecie, _count, atenciones, ...mascota } = item;
     const clasificacion = raza ?? subespecie;
+    const propietario = "propietario" in mascota ? mascota.propietario as ({ foto_url: string | null } & Record<string, unknown>) | null : null;
     return {
       ...mascota,
+      propietario: propietario ? { ...propietario, foto_url: undefined, foto_version: propietario.foto_url?.split("/").at(-1) ?? null } : null,
       peso: item.peso?.toString() ?? null,
       foto_version: foto_url?.split("/").at(-1) ?? null,
+      cantidad_atenciones: _count.atenciones,
+      ultima_atencion_en: atenciones[0]?.llegada_en ?? null,
       especie: {
         ...item.especie,
         nombre:
@@ -227,8 +246,7 @@ export class FuenteDatosMascotasPrisma {
 
   async listar(organizacion: string, filtros: FiltrosMascotas, idioma: string) {
     const q = filtros.q?.trim();
-    const items = await this.prisma.mascotas.findMany({
-      where: {
+    const base: Prisma.mascotasWhereInput = {
         fid_organizaciones: organizacion,
         eliminado_en: null,
         organizacion: { estado: 1, eliminado_en: null },
@@ -245,13 +263,37 @@ export class FuenteDatosMascotasPrisma {
               ],
             }
           : {}),
-      },
-      orderBy: [{ created_at: "desc" }, { id_mascotas: "desc" }],
-      select: this.seleccion(),
-    });
+    };
+    const atras = Boolean(filtros.antes_de);
+    const cursorId = filtros.antes_de ?? filtros.despues_de;
+    const cursor = cursorId
+      ? await this.prisma.mascotas.findFirst({ where: { AND: [base, { id_mascotas: cursorId }] }, select: { created_at: true, id_mascotas: true } })
+      : null;
+    if (cursorId && !cursor) throw new BadRequestException("pets.invalidCursor");
+    const condicion: Prisma.mascotasWhereInput = cursor ? { OR: atras
+      ? [{ created_at: { gt: cursor.created_at } }, { created_at: cursor.created_at, id_mascotas: { gt: cursor.id_mascotas } }]
+      : [{ created_at: { lt: cursor.created_at } }, { created_at: cursor.created_at, id_mascotas: { lt: cursor.id_mascotas } }]
+    } : {};
+    const [filas, total] = await Promise.all([
+      this.prisma.mascotas.findMany({
+        where: { AND: [base, condicion] },
+        orderBy: atras ? [{ created_at: "asc" }, { id_mascotas: "asc" }] : [{ created_at: "desc" }, { id_mascotas: "desc" }],
+        take: 11,
+        select: this.seleccion(),
+      }),
+      this.prisma.mascotas.count({ where: base }),
+    ]);
+    const hayMas = filas.length > 10;
+    if (hayMas) filas.pop();
+    if (atras) filas.reverse();
+    const items = filas;
     return {
       mascotas: items.map((item) => this.presentar(item, idioma)),
-      total: items.length,
+      total,
+      paginacion: {
+        anterior: items.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? items[0]!.id_mascotas : null,
+        siguiente: items.length && (atras || hayMas) ? items.at(-1)!.id_mascotas : null,
+      },
     };
   }
 
@@ -358,11 +400,12 @@ export class FuenteDatosMascotasPrisma {
         id_propietarios: true,
         nombre_completo: true,
         numero_documento: true,
+        foto_url: true,
         celular: true,
         tipo_documento: { select: { etiqueta: true } },
       },
     });
-    return { propietarios };
+    return { propietarios: propietarios.map(({ foto_url, ...propietario }) => ({ ...propietario, foto_version: foto_url?.split("/").at(-1) ?? null })) };
   }
 
   async obtener(id: string, organizacion: string) {
@@ -532,13 +575,52 @@ export class FuenteDatosMascotasPrisma {
   async eliminar(
     id: string,
     organizacion: string,
+    datos: EliminacionMascota,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     const foto = await this.prisma.$transaction(async (tx) => {
       await this.validarContexto(tx, organizacion, usuario);
       const actual = await this.existente(tx, id, organizacion);
-      await tx.$executeRaw`UPDATE personas.mascotas SET estado = 0, eliminado_en = CURRENT_TIMESTAMP, eliminado_por = ${usuario}::uuid, updated_by = ${usuario} WHERE id_mascotas = ${id}::uuid AND fid_organizaciones = ${organizacion}::uuid`;
+      if (actual.fid_propietarios && !datos.confirmar_desvinculacion) {
+        const propietario = await tx.propietarios.findFirst({
+          where: {
+            id_propietarios: actual.fid_propietarios,
+            fid_organizaciones: organizacion,
+          },
+          select: {
+            id_propietarios: true,
+            nombre_completo: true,
+            numero_documento: true,
+            celular: true,
+            tipo_documento: { select: { etiqueta: true } },
+          },
+        });
+        if (!propietario) throw new NotFoundException("pets.notFound");
+        throw new ConflictException({
+          message: "pets.ownerUnlinkConfirmationRequired",
+          publicData: { propietario },
+        });
+      }
+      await tx.$executeRaw`UPDATE personas.mascotas SET fid_propietarios = NULL, estado = 0, eliminado_en = CURRENT_TIMESTAMP, eliminado_por = ${usuario}::uuid, updated_by = ${usuario} WHERE id_mascotas = ${id}::uuid AND fid_organizaciones = ${organizacion}::uuid`;
+      if (actual.fid_propietarios) {
+        await this.auditoria.registrar(
+          {
+            accion: "mascotas.propietario_retirado",
+            entidad: "mascotas",
+            id_entidad: id,
+            fid_organizaciones: organizacion,
+            fid_usuarios: usuario,
+            peticion: contexto,
+            metadatos: {
+              motivo: "eliminacion_mascota",
+              propietario_anterior: actual.fid_propietarios,
+              propietario_nuevo: null,
+            },
+          },
+          tx,
+        );
+      }
       await this.auditoria.registrar(
         {
           accion: "mascotas.eliminada",
@@ -547,6 +629,9 @@ export class FuenteDatosMascotasPrisma {
           fid_organizaciones: organizacion,
           fid_usuarios: usuario,
           peticion: contexto,
+          metadatos: {
+            propietario_anterior: actual.fid_propietarios,
+          },
         },
         tx,
       );

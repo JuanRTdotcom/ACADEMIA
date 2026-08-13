@@ -4,11 +4,14 @@ import {
   addAttentionRecord,
   attentionRequest,
   createAttentionConsultationReason,
+  createAttentionDiagnosticStudy,
+  createAttentionGroomingService,
   createAttentionHospitalizationType,
   createAttentionLaboratoryTest,
   createAttentionProcedure,
   createAttentionVaccine,
   removeAttentionRecord,
+  updateAttentionRecord,
 } from "$lib/server/attentions";
 
 export const load: PageServerLoad = async (event) => {
@@ -29,10 +32,13 @@ export const load: PageServerLoad = async (event) => {
 
 export const actions: Actions = {
   record: (event) => addAttentionRecord(event, event.params.id ?? ""),
+  editRecord: (event) => updateAttentionRecord(event, event.params.id ?? ""),
   deleteRecord: (event) => removeAttentionRecord(event, event.params.id ?? ""),
   vaccine: createAttentionVaccine,
   hospitalizationType: createAttentionHospitalizationType,
   procedure: createAttentionProcedure,
   consultationReason: createAttentionConsultationReason,
   laboratoryTest: createAttentionLaboratoryTest,
+  diagnosticStudy: createAttentionDiagnosticStudy,
+  groomingService: createAttentionGroomingService,
 };

@@ -10,6 +10,7 @@ export class RepositorioPruebasLaboratorioDatos extends RepositorioPruebasLabora
   listar(...args: Parameters<RepositorioPruebasLaboratorio["listar"]>) {
     return this.fuente.listar(...args);
   }
+  buscar(...args: Parameters<RepositorioPruebasLaboratorio["buscar"]>) { return this.fuente.buscar(...args); }
   crear(...args: Parameters<RepositorioPruebasLaboratorio["crear"]>) {
     return this.fuente.crear(...args);
   }

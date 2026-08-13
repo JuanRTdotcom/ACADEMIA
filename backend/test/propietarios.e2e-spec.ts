@@ -17,6 +17,8 @@ describe("propietarios: seguridad y ciclo tenant (e2e)", () => {
   let usuario = "";
   let propietario = "";
   let propietarioAjeno = "";
+  const propietariosMascotas: string[] = [];
+  const mascotas: string[] = [];
   let cookies: string[] = [];
   const suffix = randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase();
   const username = `PO${suffix}`;
@@ -97,6 +99,25 @@ describe("propietarios: seguridad y ciclo tenant (e2e)", () => {
 
   afterAll(async () => {
     if (prisma) {
+      if (mascotas.length) {
+        await prisma.auditoria.deleteMany({
+          where: { entidad: "mascotas", id_entidad: { in: mascotas } },
+        });
+        await prisma.mascotas.deleteMany({
+          where: { id_mascotas: { in: mascotas } },
+        });
+      }
+      if (propietariosMascotas.length) {
+        await prisma.auditoria.deleteMany({
+          where: {
+            entidad: "propietarios",
+            id_entidad: { in: propietariosMascotas },
+          },
+        });
+        await prisma.propietarios.deleteMany({
+          where: { id_propietarios: { in: propietariosMascotas } },
+        });
+      }
       if (propietario) {
         await prisma.auditoria.deleteMany({
           where: { entidad: "propietarios", id_entidad: propietario },
@@ -240,6 +261,111 @@ describe("propietarios: seguridad y ciclo tenant (e2e)", () => {
       "propietarios.creado",
       "propietarios.eliminado",
       "propietarios.modificado",
+    ]);
+  });
+
+  it("exige confirmar la desvinculación automática de las mascotas", async () => {
+    const [tipoDocumento, especie, genero] = await Promise.all([
+      prisma.parametros.findFirstOrThrow({
+        where: { codigo_grupo: "tipos_documento", estado: 1 },
+      }),
+      prisma.especies_animales.findFirstOrThrow({ where: { estado: 1 } }),
+      prisma.parametros.findFirstOrThrow({
+        where: { codigo_grupo: "generos_mascota", estado: 1 },
+      }),
+    ]);
+    const crearPropietario = async (indice: string) => {
+      const creado = await prisma.propietarios.create({
+        data: {
+          fid_organizaciones: organizacion,
+          fid_parametros_tipo_documento: tipoDocumento.id_parametros,
+          numero_documento: `REL${suffix}${indice}`,
+          nombre_completo: `Propietario relación ${indice}`,
+          sin_correo: true,
+          created_by: usuario,
+          updated_by: usuario,
+        },
+      });
+      propietariosMascotas.push(creado.id_propietarios);
+      return creado.id_propietarios;
+    };
+    const origenConMascota = await crearPropietario("A");
+    const origenSinPropietario = await crearPropietario("C");
+    const crearMascota = async (nombre: string, fid_propietarios: string) => {
+      const creada = await prisma.mascotas.create({
+        data: {
+          fid_organizaciones: organizacion,
+          fid_propietarios,
+          nombre,
+          fid_especies_animales: especie.id_especies_animales,
+          fid_parametros_genero: genero.id_parametros,
+          created_by: usuario,
+          updated_by: usuario,
+        },
+      });
+      mascotas.push(creada.id_mascotas);
+      return creada.id_mascotas;
+    };
+    const mascotaVinculada = await crearMascota(
+      "Mascota por resolver",
+      origenConMascota,
+    );
+    const mascotaSinPropietario = await crearMascota(
+      "Mascota independiente",
+      origenSinPropietario,
+    );
+
+    const impacto = await request(app.getHttpServer())
+      .delete(`/clinic/owners/${origenConMascota}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({})
+      .expect(409);
+    expect(impacto.body.codigo).toBe("owners.petsResolutionRequired");
+    expect(impacto.body.data.cantidad_mascotas).toBe(1);
+    expect(impacto.body.data.mascotas[0].id_mascotas).toBe(mascotaVinculada);
+    expect(impacto.body.data.destinos).toBeUndefined();
+    await request(app.getHttpServer())
+      .delete(`/clinic/owners/${origenConMascota}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ confirmar_desvinculacion: "true" })
+      .expect(400);
+    await request(app.getHttpServer())
+      .delete(`/clinic/owners/${origenConMascota}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ confirmar_desvinculacion: true })
+      .expect(200);
+    expect(
+      (
+        await prisma.mascotas.findUniqueOrThrow({
+          where: { id_mascotas: mascotaVinculada },
+        })
+      ).fid_propietarios,
+    ).toBeNull();
+
+    await request(app.getHttpServer())
+      .delete(`/clinic/owners/${origenSinPropietario}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ confirmar_desvinculacion: true })
+      .expect(200);
+    expect(
+      (
+        await prisma.mascotas.findUniqueOrThrow({
+          where: { id_mascotas: mascotaSinPropietario },
+        })
+      ).fid_propietarios,
+    ).toBeNull();
+
+    const auditorias = await prisma.auditoria.findMany({
+      where: { entidad: "mascotas", id_entidad: { in: mascotas } },
+      select: { accion: true },
+    });
+    expect(auditorias.map(({ accion }) => accion).sort()).toEqual([
+      "mascotas.propietario_retirado",
+      "mascotas.propietario_retirado",
     ]);
   });
 });

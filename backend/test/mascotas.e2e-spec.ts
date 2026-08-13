@@ -200,6 +200,7 @@ describe("mascotas: seguridad, fotos y ciclo tenant (e2e)", () => {
           fid_parametros_tipo_documento: tipoDocumento.id_parametros,
           numero_documento: `PD${suffix}`,
           nombre_completo: `Propietario Mascota ${suffix}`,
+          celular: "999888777",
           sin_correo: true,
           created_by: usuario,
           updated_by: usuario,
@@ -603,10 +604,41 @@ describe("mascotas: seguridad, fotos y ciclo tenant (e2e)", () => {
       .expect(200);
     expect(objetos.has(creada.foto_url!)).toBe(false);
 
+    await prisma.mascotas.update({
+      where: { id_mascotas: mascota },
+      data: { fid_propietarios: propietario },
+    });
+    const requiereConfirmacion = await request(app.getHttpServer())
+      .delete(`/clinic/pets/${mascota}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({})
+      .expect(409);
+    expect(requiereConfirmacion.body).toEqual(
+      expect.objectContaining({
+        codigo: "pets.ownerUnlinkConfirmationRequired",
+        data: {
+          propietario: expect.objectContaining({
+            id_propietarios: propietario,
+            nombre_completo: expect.any(String),
+            numero_documento: expect.any(String),
+            celular: expect.any(String),
+          }),
+        },
+      }),
+    );
     await request(app.getHttpServer())
       .delete(`/clinic/pets/${mascota}`)
       .set("Cookie", cookies)
       .set("x-sumaq-csrf", csrf)
+      .send({ confirmar_desvinculacion: "true" })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .delete(`/clinic/pets/${mascota}`)
+      .set("Cookie", cookies)
+      .set("x-sumaq-csrf", csrf)
+      .send({ confirmar_desvinculacion: true })
       .expect(200);
     const eliminada = await prisma.mascotas.findUniqueOrThrow({
       where: { id_mascotas: mascota },
@@ -614,6 +646,7 @@ describe("mascotas: seguridad, fotos y ciclo tenant (e2e)", () => {
     expect(eliminada.estado).toBe(0);
     expect(eliminada.eliminado_en).not.toBeNull();
     expect(eliminada.eliminado_por).toBe(usuario);
+    expect(eliminada.fid_propietarios).toBeNull();
     const acciones = await prisma.auditoria.findMany({
       where: { entidad: "mascotas", id_entidad: mascota },
       select: { accion: true, fid_organizaciones: true, fid_usuarios: true },
@@ -622,6 +655,7 @@ describe("mascotas: seguridad, fotos y ciclo tenant (e2e)", () => {
       "mascotas.creada",
       "mascotas.eliminada",
       "mascotas.modificada",
+      "mascotas.propietario_retirado",
     ]);
     expect(acciones).toEqual(
       expect.arrayContaining([

@@ -1,0 +1,2 @@
+import { error } from '@sveltejs/kit'; import type { PageServerLoad } from './$types'; import { companyMessage, companyRequest } from '$lib/server/companies';
+export const load: PageServerLoad = async (event) => { const { usuario } = await event.parent(); const response = await companyRequest(event,'/operations/reports/summary'); if(!response.ok) error(response.status,await companyMessage(response,'operations.loadError')); return { ...(await response.json()), usuario }; };

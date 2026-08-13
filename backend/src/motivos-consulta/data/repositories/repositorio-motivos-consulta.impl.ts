@@ -10,6 +10,9 @@ export class RepositorioMotivosConsultaDatos extends RepositorioMotivosConsulta 
   listar(...args: Parameters<RepositorioMotivosConsulta["listar"]>) {
     return this.fuente.listar(...args);
   }
+  buscar(...args: Parameters<RepositorioMotivosConsulta["buscar"]>) {
+    return this.fuente.buscar(...args);
+  }
   crear(...args: Parameters<RepositorioMotivosConsulta["crear"]>) {
     return this.fuente.crear(...args);
   }

@@ -5,6 +5,7 @@
   import { toast } from 'svelte-sonner';
   import type { PageProps } from "./$types";
   import { Breadcrumb, Button, Card, Icon, Switch, i18n } from "$lib";
+  import { MODULE_GROUP_ORDER, moduleGroupKey, type ModuleGroupKey } from '$lib/config/module-groups';
 
   type Module = { id_modulos: string; codigo: string; nombre: string; icono: string | null; description?: string };
   type Plan = { id_planes: string; codigo: string; nombre: string; descripcion: string | null; modulos: { id_modulos: string }[] };
@@ -21,27 +22,17 @@
   let saving = $state(false);
   let initializedPlan = $state(untrack(() => (data as PageData).plan.id_planes));
 
-  type GroupKey = 'superadmin' | 'administrator' | 'profile' | 'resources' | 'system';
-  
-  const groupKey = (code: string): GroupKey => {
-    if (code.startsWith('superadmin.')) return 'superadmin';
-    if (code.startsWith('administrator.')) return 'administrator';
-    if (code.startsWith('profile.')) return 'profile';
-    if (code === 'resources') return 'resources';
-    return 'system';
-  };
-
-  const groupName = (key: GroupKey) => i18n.t(`permissions.groups.${key}`);
+  const groupName = (key: ModuleGroupKey) => i18n.t(`permissions.groups.${key}`);
 
   const groups = $derived.by(() => {
-    const result = new Map<GroupKey, { key: GroupKey; modules: Module[] }>();
+    const result = new Map<ModuleGroupKey, { key: ModuleGroupKey; modules: Module[] }>();
     for (const module of pageData.modulosDisponibles) {
-      const key = groupKey(module.codigo);
+      const key = moduleGroupKey(module.codigo);
       const group = result.get(key) ?? { key, modules: [] };
       group.modules.push(module);
       result.set(key, group);
     }
-    return [...result.values()];
+    return [...result.values()].sort((a, b) => MODULE_GROUP_ORDER.indexOf(a.key) - MODULE_GROUP_ORDER.indexOf(b.key));
   });
 
   $effect(() => {

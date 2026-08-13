@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ModuloTokenOpaco } from "../comun/seguridad/token-opaco.module";
 import { FuenteDatosPruebasLaboratorioPrisma } from "./data/datasources/pruebas-laboratorio-prisma.datasource";
 import { RepositorioPruebasLaboratorioDatos } from "./data/repositories/repositorio-pruebas-laboratorio.impl";
 import { RepositorioPruebasLaboratorio } from "./domain/repositories/repositorio-pruebas-laboratorio";
@@ -6,6 +7,7 @@ import { CasoUsoGestionarPruebasLaboratorio } from "./domain/usecases/gestionar-
 import { ControladorPruebasLaboratorio } from "./presentation/controllers/pruebas-laboratorio.controller";
 
 @Module({
+  imports: [ModuloTokenOpaco],
   controllers: [ControladorPruebasLaboratorio],
   providers: [
     FuenteDatosPruebasLaboratorioPrisma,

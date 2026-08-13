@@ -12,9 +12,11 @@ import { CasoUsoGestionarAtenciones } from "./domain/usecases/gestionar-atencion
 import { ControladorAtenciones } from "./presentation/controllers/atenciones.controller";
 import { InterceptorErroresAdjuntosAtencion } from "./presentation/interceptors/interceptor-errores-adjuntos-atencion";
 import { formatoAdjuntoAtencion } from "./data/datasources/formatos-adjuntos-atencion";
+import { ModuloTokenOpaco } from "../comun/seguridad/token-opaco.module";
 
 @Module({
   imports: [
+    ModuloTokenOpaco,
     ModuloAlmacenamiento,
     MulterModule.registerAsync({
       inject: [ConfigService],
