@@ -12,13 +12,13 @@ describe("CasoUsoGestionarServiciosVeterinaria", () => {
     } as unknown as RepositorioServiciosVeterinaria;
     const casoUso = new CasoUsoGestionarServiciosVeterinaria(repositorio);
 
-    await casoUso.listar("veterinaria", { despues_de: "cursor" });
-    await casoUso.buscar("veterinaria", "consulta");
+    await casoUso.listar("veterinaria", "sede", { despues_de: "cursor" });
+    await casoUso.buscar("veterinaria", "sede", "consulta");
 
-    expect(listar).toHaveBeenCalledWith("veterinaria", {
+    expect(listar).toHaveBeenCalledWith("veterinaria", "sede", {
       despues_de: "cursor",
     });
-    expect(buscar).toHaveBeenCalledWith("veterinaria", "consulta");
+    expect(buscar).toHaveBeenCalledWith("veterinaria", "sede", "consulta");
   });
 
   it("delega la eliminación con el tenant y actor de la sesión", async () => {
@@ -34,11 +34,18 @@ describe("CasoUsoGestionarServiciosVeterinaria", () => {
       agente_usuario: "test",
     };
 
-    await casoUso.eliminar("servicio", "veterinaria", "usuario", contexto);
+    await casoUso.eliminar(
+      "servicio",
+      "veterinaria",
+      "sede",
+      "usuario",
+      contexto,
+    );
 
     expect(eliminar).toHaveBeenCalledWith(
       "servicio",
       "veterinaria",
+      "sede",
       "usuario",
       contexto,
     );

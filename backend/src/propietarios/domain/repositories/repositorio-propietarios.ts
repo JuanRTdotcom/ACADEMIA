@@ -9,12 +9,14 @@ import type {
 export abstract class RepositorioPropietarios {
   abstract listar(
     organizacion: string,
+    sede: string,
     filtros: FiltrosPropietarios,
   ): Promise<ResultadoCatalogoPaginado>;
-  abstract opciones(organizacion: string, idioma: string): Promise<unknown>;
+  abstract opciones(organizacion: string, sede: string, idioma: string): Promise<unknown>;
   abstract obtener(id: string, organizacion: string): Promise<unknown>;
   abstract crear(
     organizacion: string,
+    sede: string,
     datos: DatosPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -22,6 +24,7 @@ export abstract class RepositorioPropietarios {
   abstract actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -29,6 +32,7 @@ export abstract class RepositorioPropietarios {
   abstract eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: EliminacionPropietario,
     usuario: string,
     contexto: ContextoSolicitud,

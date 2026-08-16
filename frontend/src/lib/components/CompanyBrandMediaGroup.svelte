@@ -25,7 +25,7 @@
 	});
 
 	const mediaUrl = (type: string, version: string | null) =>
-		version ? `/media/tenant/${type}/${version}` : null;
+		version ? `/media/company/view/${type}/${version}` : null;
 
 	async function changeReuse(value: boolean) {
 		if (saving || value === same) return;

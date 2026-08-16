@@ -7,8 +7,12 @@ import { ControladorServiciosVeterinaria } from "./servicios-veterinaria.control
 
 describe("ControladorServiciosVeterinaria - paginación opaca", () => {
   const organizacion = "3bfab781-1a04-4675-a621-6cba0ee64a53";
+  const sede = "82e711b6-e155-4978-8502-58a2868349b1";
   const cursor = "e0cc20cf-3f2e-44ef-8c66-f538d53a0778";
-  const usuario = { fid_organizaciones: organizacion } as UsuarioAutenticado;
+  const usuario = {
+    fid_organizaciones: organizacion,
+    contexto: { sede_activa: { id_sedes: sede } },
+  } as UsuarioAutenticado;
   const tokens = new ServicioTokenOpaco(
     new ConfigService({ JWT_ACCESS_SECRET: "a".repeat(64) }),
   );
@@ -29,7 +33,7 @@ describe("ControladorServiciosVeterinaria - paginación opaca", () => {
     expect(primera.paginacion.siguiente).not.toContain(cursor);
 
     await controlador.listar({ p: primera.paginacion.siguiente! }, usuario);
-    expect(listar).toHaveBeenLastCalledWith(organizacion, {
+    expect(listar).toHaveBeenLastCalledWith(organizacion, sede, {
       despues_de: cursor,
       antes_de: undefined,
       consulta: undefined,
@@ -38,6 +42,16 @@ describe("ControladorServiciosVeterinaria - paginación opaca", () => {
     await expect(
       controlador.listar({ p: primera.paginacion.siguiente! }, {
         fid_organizaciones: "aa7e101d-d668-4e5c-bcf4-76a946e75f82",
+        contexto: { sede_activa: { id_sedes: sede } },
+      } as UsuarioAutenticado),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(
+      controlador.listar({ p: primera.paginacion.siguiente! }, {
+        fid_organizaciones: organizacion,
+        contexto: {
+          sede_activa: { id_sedes: "812793bb-43e0-49ae-a488-ad01585904f1" },
+        },
       } as UsuarioAutenticado),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

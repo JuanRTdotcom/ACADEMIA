@@ -10,28 +10,38 @@ import type {
 } from "../entities/atencion";
 
 export abstract class RepositorioAtenciones {
+  abstract validarAccesoSede(
+    id: string,
+    organizacion: string,
+    sede: string,
+  ): Promise<void>;
   abstract listarHoy(
     organizacion: string,
+    sede: string,
     filtros: FiltrosAtenciones,
     idioma: string,
   ): Promise<ResultadoCatalogoPaginado>;
   abstract opciones(organizacion: string, idioma: string): Promise<unknown>;
   abstract buscarPropietarios(
     organizacion: string,
+    sede: string,
     q: string,
   ): Promise<unknown>;
   abstract mascotasPropietario(
     organizacion: string,
+    sede: string,
     propietario: string,
     idioma: string,
   ): Promise<unknown>;
   abstract ultimoRegistroMascota(
     organizacion: string,
+    sede: string,
     mascota: string,
     tipo: string,
   ): Promise<unknown>;
   abstract historialMascota(
     organizacion: string,
+    sede: string,
     mascota: string,
     idioma: string,
   ): Promise<unknown>;
@@ -42,6 +52,7 @@ export abstract class RepositorioAtenciones {
   ): Promise<unknown>;
   abstract crear(
     organizacion: string,
+    sede: string,
     datos: DatosCrearAtencion,
     adjuntos: ArchivoAdjuntoAtencion[],
     usuario: string,

@@ -10,6 +10,9 @@ interface CompanySummary {
 	escudo_version: string | null;
 	escudo_oscuro_version: string | null;
 	url_publica: string;
+	sede_activa: {
+		nombre: string;
+	} | null;
 }
 
 export const load: LayoutServerLoad = async (event) => {

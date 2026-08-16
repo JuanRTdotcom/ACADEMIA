@@ -1,7 +1,6 @@
 import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
-  ArrayMinSize,
   ArrayUnique,
   IsArray,
   IsDefined,
@@ -323,14 +322,6 @@ export class DtoGuardarComunicacionesEmpresa {
   @Matches(/^$|^[+0-9()\-\s]+$/)
   @Transform(texto)
   soporte_whatsapp!: string;
-
-  @IsDefined()
-  @IsArray()
-  @ArrayMinSize(7)
-  @ArrayMaxSize(7)
-  @ValidateNested({ each: true })
-  @Type(() => DtoHorarioAtencionEmpresa)
-  horarios!: DtoHorarioAtencionEmpresa[];
 }
 
 export class DtoGuardarRegionEmpresa {

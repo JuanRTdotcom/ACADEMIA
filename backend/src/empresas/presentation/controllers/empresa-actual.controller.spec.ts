@@ -3,7 +3,11 @@ import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/
 import { ControladorEmpresaActual } from "./empresa-actual.controller";
 
 const usuario = (permisos: string[]) =>
-  ({ fid_organizaciones: "tenant-1", permisos }) as UsuarioAutenticado;
+  ({
+    fid_organizaciones: "tenant-1",
+    permisos,
+    contexto: { sede_activa: { id_sedes: "branch-1" } },
+  }) as UsuarioAutenticado;
 
 describe("ControladorEmpresaActual", () => {
   const empresa = { seccion: jest.fn() };
@@ -27,6 +31,10 @@ describe("ControladorEmpresaActual", () => {
         usuario(["administrator.company.agenda.read"]),
       ),
     ).toEqual({ agenda_activa: true });
-    expect(empresa.seccion).toHaveBeenCalledWith("tenant-1", "agenda");
+    expect(empresa.seccion).toHaveBeenCalledWith(
+      "tenant-1",
+      "agenda",
+      "branch-1",
+    );
   });
 });

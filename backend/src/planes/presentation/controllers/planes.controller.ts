@@ -16,6 +16,7 @@ import { UsuarioActual } from "../../../autenticacion/presentation/decorators/us
 import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/tipos";
 import { Permisos } from "../../../autenticacion/presentation/decorators/permisos.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
+import { resolverIdioma } from "../../../comun/i18n/resolver-idioma";
 import { FuenteDatosPlanesPrisma } from "../../data/datasources/planes-prisma.datasource";
 import {
   DtoGestionarPlan,
@@ -33,6 +34,13 @@ export class ControladorPlanes {
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   listar() {
     return this.planes.listar();
+  }
+
+  @Get("storage-units")
+  @Permisos("superadmin.plans.read")
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  unidadesAlmacenamiento(@Req() peticion: Request) {
+    return this.planes.unidadesAlmacenamiento(resolverIdioma(peticion));
   }
 
   @Get("creation-options")

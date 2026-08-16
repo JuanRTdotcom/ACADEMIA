@@ -29,6 +29,38 @@ export interface ContextoUsuario {
     nombre: string;
     plan: { codigo: string; nombre: string };
   };
+  sedes: {
+    id_sedes: string;
+    codigo: string;
+    nombre: string;
+    es_principal: boolean;
+  }[];
+  sede_activa: {
+    id_sedes: string;
+    codigo: string;
+    nombre: string;
+    es_principal: boolean;
+    apariencia: {
+      color_primario: string | null;
+      cabecera_claro: string | null;
+      cabecera_oscuro: string | null;
+      esquinero_claro: string | null;
+      esquinero_oscuro: string | null;
+      menu_claro: string | null;
+      menu_oscuro: string | null;
+      mostrar_escudo_menu: boolean;
+      mostrar_nombre_empresa_menu: boolean;
+      ocultar_esquinero_expandido: boolean;
+      esquinero_fondo_activo: boolean;
+      cabecera_ocultar_borde: boolean;
+      menu_ocultar_borde: boolean;
+      tamano_escudo_menu: number;
+      escudo_version: string | null;
+      escudo_oscuro_version: string | null;
+      imagotipo_version: string | null;
+      imagotipo_oscuro_version: string | null;
+    };
+  } | null;
   roles: { codigo: string; nombre: string }[];
   permisos: string[];
   modulos: {

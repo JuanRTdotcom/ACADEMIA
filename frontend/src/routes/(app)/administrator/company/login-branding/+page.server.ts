@@ -1,4 +1,4 @@
-import { fail } from "@sveltejs/kit";
+import { fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import {
   formText,
@@ -42,7 +42,9 @@ const BENEFIT_ICONS = new Set([
 ]);
 
 export const load: PageServerLoad = async (event) => {
-  await event.parent();
+  const parent = await event.parent();
+  if (!parent.usuario.sede_activa?.es_principal)
+    redirect(303, "/administrator/company/general");
   const [section, branding] = await Promise.all([
     loadCompanySection<LoginBranding>(event, "login-branding"),
     loadCompanyBranding(event),

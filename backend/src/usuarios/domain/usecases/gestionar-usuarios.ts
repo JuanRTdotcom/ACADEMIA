@@ -8,10 +8,10 @@ import { RepositorioUsuarios } from "../repositories/repositorio-usuarios";
 export class CasoUsoGestionarUsuarios {
   constructor(private readonly usuarios: RepositorioUsuarios) {}
   listar(busqueda: string) { return this.usuarios.listar(busqueda); }
-  listarDeEmpresa(empresaId: string, filtros: FiltrosUsuariosEmpresa) { return this.usuarios.listarDeEmpresa(empresaId, filtros); }
+  listarDeEmpresa(empresaId: string, sede: string, filtros: FiltrosUsuariosEmpresa) { return this.usuarios.listarDeEmpresa(empresaId, sede, filtros); }
   obtener(id: string, actor: string) { return this.usuarios.obtener(id, actor); }
   opciones() { return this.usuarios.opciones(); }
-  opcionesDeEmpresa(empresaId: string) { return this.usuarios.opcionesDeEmpresa(empresaId); }
+  opcionesDeEmpresa(empresaId: string, actor: string) { return this.usuarios.opcionesDeEmpresa(empresaId, actor); }
   obtenerAvatar(id: string, actor: string) { return this.usuarios.obtenerAvatar(id, actor); }
   crear(datos: DatosUsuario, actor: string, contexto: ContextoSolicitud) { return this.usuarios.crear(datos, actor, contexto); }
   actualizar(id: string, datos: Omit<DatosUsuario, "contrasenia_temporal">, actor: string, contexto: ContextoSolicitud) { return this.usuarios.actualizar(id, datos, actor, contexto); }

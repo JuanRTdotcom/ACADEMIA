@@ -39,14 +39,22 @@ const text = (form: FormData, field: string) =>
     .replace(/\s+/g, " ");
 
 function planBody(form: FormData) {
-  const almacenamiento = text(form, "almacenamiento_gb");
+  const almacenamiento = text(form, "almacenamiento_valor");
+  const unidad = text(form, "fid_parametros_unidad_almacenamiento");
+  const sedes = text(form, "maximo_sedes");
+  const usuarios = text(form, "maximo_usuarios");
+  const mensajes = text(form, "maximo_mensajes_mensuales");
+  const usoIa = text(form, "maximo_uso_ia_mensual");
   return {
     codigo: text(form, "codigo").toUpperCase(),
     nombre: text(form, "nombre"),
     descripcion: text(form, "descripcion"),
-    almacenamiento_max_bytes: almacenamiento
-      ? Number(almacenamiento) * 1024 ** 3
-      : null,
+    almacenamiento_valor: almacenamiento ? Number(almacenamiento) : null,
+    fid_parametros_unidad_almacenamiento: almacenamiento ? unidad : null,
+    maximo_sedes: sedes ? Number(sedes) : null,
+    maximo_usuarios: usuarios ? Number(usuarios) : null,
+    maximo_mensajes_mensuales: mensajes ? Number(mensajes) : null,
+    maximo_uso_ia_mensual: usoIa ? Number(usoIa) : null,
   };
 }
 
@@ -56,22 +64,36 @@ function validPlan(body: ReturnType<typeof planBody>) {
     body.nombre.length >= 2 &&
     body.nombre.length <= 100 &&
     body.descripcion.length <= 250 &&
-    (body.almacenamiento_max_bytes === null ||
-      (Number.isSafeInteger(body.almacenamiento_max_bytes) &&
-        body.almacenamiento_max_bytes >= 1024 ** 3 &&
-        body.almacenamiento_max_bytes % 1024 ** 3 === 0))
+    (body.almacenamiento_valor === null ||
+      (Number.isSafeInteger(body.almacenamiento_valor) &&
+        body.almacenamiento_valor >= 1 &&
+        UUID.test(body.fid_parametros_unidad_almacenamiento ?? ""))) &&
+    (body.maximo_sedes === null ||
+      (Number.isInteger(body.maximo_sedes) && body.maximo_sedes >= 1 && body.maximo_sedes <= 1_000_000)) &&
+    (body.maximo_usuarios === null ||
+      (Number.isInteger(body.maximo_usuarios) && body.maximo_usuarios >= 1 && body.maximo_usuarios <= 1_000_000)) &&
+    (body.maximo_mensajes_mensuales === null ||
+      (Number.isInteger(body.maximo_mensajes_mensuales) && body.maximo_mensajes_mensuales >= 1 && body.maximo_mensajes_mensuales <= 1_000_000_000)) &&
+    (body.maximo_uso_ia_mensual === null ||
+      (Number.isInteger(body.maximo_uso_ia_mensual) && body.maximo_uso_ia_mensual >= 1 && body.maximo_uso_ia_mensual <= 1_000_000_000))
   );
 }
 
 export const load: PageServerLoad = async (event) => {
   await event.parent();
   try {
-    const plansResponse = await request(event, "/plans");
+    const [plansResponse, unitsResponse] = await Promise.all([
+      request(event, "/plans"),
+      request(event, "/plans/storage-units"),
+    ]);
     if (!plansResponse.ok)
       error(plansResponse.status, await message(plansResponse, "plans.loadError"));
+    if (!unitsResponse.ok)
+      error(unitsResponse.status, await message(unitsResponse, "plans.loadError"));
 
     return {
       planes: await plansResponse.json(),
+      unidades_almacenamiento: await unitsResponse.json(),
     };
   } catch (cause) {
     if (cause && typeof cause === "object" && "status" in cause) throw cause;

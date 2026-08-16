@@ -3,6 +3,7 @@ import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-
 export interface ComandoActor {
   organizacion: string;
   usuario: string;
+  sede: string;
   contexto: ContextoSolicitud;
 }
 

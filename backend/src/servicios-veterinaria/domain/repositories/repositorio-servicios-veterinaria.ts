@@ -8,21 +8,25 @@ import type {
 export abstract class RepositorioServiciosVeterinaria {
   abstract listar(
     organizacion: string,
+    sede: string,
     filtros: FiltrosServiciosVeterinaria,
   ): Promise<CatalogoServiciosVeterinaria>;
   abstract buscar(
     organizacion: string,
+    sede: string,
     consulta: string,
   ): Promise<CatalogoServiciosVeterinaria["servicios"]>;
   abstract obtener(
     id: string,
     organizacion: string,
+    sede: string,
   ): Promise<{
     servicio: CatalogoServiciosVeterinaria["servicios"][number];
     moneda: CatalogoServiciosVeterinaria["moneda"];
   }>;
   abstract crear(
     organizacion: string,
+    sede: string,
     datos: DatosServicioVeterinaria,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -30,6 +34,7 @@ export abstract class RepositorioServiciosVeterinaria {
   abstract actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosServicioVeterinaria,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -37,6 +42,7 @@ export abstract class RepositorioServiciosVeterinaria {
   abstract cambiarEstado(
     id: string,
     organizacion: string,
+    sede: string,
     activo: boolean,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -44,6 +50,7 @@ export abstract class RepositorioServiciosVeterinaria {
   abstract eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void>;

@@ -8,6 +8,7 @@ export interface DatosUsuario {
   contrasenia_temporal: string;
   fid_roles: string[];
   fid_permisos: string[];
+  fid_sedes?: string[];
 }
 
 export interface UsuarioListado {
@@ -23,8 +24,19 @@ export interface UsuarioListado {
   estado_cuenta: string;
   created_at: Date;
   empresa: { nombre: string; slug: string };
-  roles: Array<{ id_roles: string; nombre: string; codigo: string; icono: string }>;
+  roles: Array<{
+    id_roles: string;
+    nombre: string;
+    codigo: string;
+    icono: string;
+  }>;
   permisos: string[];
+  sedes?: Array<{
+    id_sedes: string;
+    codigo: string;
+    nombre: string;
+    es_principal: boolean;
+  }>;
 }
 
 export interface ModuloPermisosUsuario {
@@ -47,9 +59,21 @@ export interface ModuloPermisosUsuario {
 
 export interface OpcionesUsuario {
   empresas: Array<{ id_organizaciones: string; nombre: string; slug: string }>;
-  roles: Array<{ id_roles: string; nombre: string; codigo: string; icono: string; permisos: string[] }>;
+  roles: Array<{
+    id_roles: string;
+    nombre: string;
+    codigo: string;
+    icono: string;
+    permisos: string[];
+  }>;
   modulos: ModuloPermisosUsuario[];
   modulos_por_empresa: Record<string, ModuloPermisosUsuario[]>;
+  sedes?: Array<{
+    id_sedes: string;
+    codigo: string;
+    nombre: string;
+    es_principal: boolean;
+  }>;
 }
 export interface FiltrosUsuariosEmpresa {
   despues_de?: string;

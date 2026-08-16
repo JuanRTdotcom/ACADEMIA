@@ -23,7 +23,12 @@ export class FuenteDatosPropietariosPrisma {
     private auditoria: ServicioAuditoria,
   ) {}
 
-  private async validarContexto(tx: Tx, organizacion: string, usuario: string) {
+  private async validarContexto(
+    tx: Tx,
+    organizacion: string,
+    usuario: string,
+    sede: string,
+  ) {
     await tx.$queryRaw`SELECT id_organizaciones FROM nucleo.organizaciones WHERE id_organizaciones = ${organizacion}::uuid AND estado = 1 AND eliminado_en IS NULL FOR UPDATE`;
     const actor = await tx.usuarios.findFirst({
       where: {
@@ -34,9 +39,21 @@ export class FuenteDatosPropietariosPrisma {
         eliminado_en: null,
         organizacion: { estado: 1, eliminado_en: null },
       },
-      select: { id_usuarios: true },
+      select: {
+        id_usuarios: true,
+        usuarios_sedes: {
+          where: {
+            fid_sedes: sede,
+            estado: 1,
+            sede: { estado: 1, eliminado_en: null },
+          },
+          select: { id_usuarios_sedes: true },
+          take: 1,
+        },
+      },
     });
-    if (!actor) throw new NotFoundException("owners.unavailable");
+    if (!actor || actor.usuarios_sedes.length !== 1)
+      throw new NotFoundException("owners.unavailable");
   }
 
   private async existente(tx: Tx, id: string, organizacion: string) {
@@ -129,6 +146,7 @@ export class FuenteDatosPropietariosPrisma {
   private seleccion() {
     return {
       id_propietarios: true,
+      fid_sedes_registro: true,
       fid_parametros_tipo_documento: true,
       numero_documento: true,
       nombre_completo: true,
@@ -150,6 +168,7 @@ export class FuenteDatosPropietariosPrisma {
       updated_at: true,
       tipo_documento: { select: { codigo: true, etiqueta: true } },
       como_conocio: { select: { codigo: true, etiqueta: true } },
+      sede_registro: { select: { id_sedes: true, codigo: true, nombre: true } },
       pais: { select: { nombre_es: true, nombre_en: true } },
       admin_level_3: {
         select: {
@@ -176,10 +195,15 @@ export class FuenteDatosPropietariosPrisma {
     } satisfies Prisma.propietariosSelect;
   }
 
-  async listar(organizacion: string, filtros: FiltrosPropietarios) {
+  async listar(
+    organizacion: string,
+    sede: string,
+    filtros: FiltrosPropietarios,
+  ) {
     const q = filtros.q?.trim();
     const base: Prisma.propietariosWhereInput = {
         fid_organizaciones: organizacion,
+        fid_sedes_registro: sede,
         eliminado_en: null,
         organizacion: { estado: 1, eliminado_en: null },
         ...(q
@@ -236,7 +260,7 @@ export class FuenteDatosPropietariosPrisma {
     };
   }
 
-  async opciones(organizacion: string, idioma: string) {
+  async opciones(organizacion: string, sede: string, idioma: string) {
     const [parametros, perfil, paises, nivel1, nivel2, nivel3] =
       await Promise.all([
         this.prisma.parametros.findMany({
@@ -263,11 +287,12 @@ export class FuenteDatosPropietariosPrisma {
             },
           },
         }),
-        this.prisma.perfil_organizacion.findFirst({
+        this.prisma.sedes.findFirst({
           where: {
             fid_organizaciones: organizacion,
+            id_sedes: sede,
             estado: 1,
-            organizacion: { estado: 1, eliminado_en: null },
+            eliminado_en: null,
           },
           select: { fid_admin_level_0: true, fid_admin_level_3: true },
         }),
@@ -401,13 +426,14 @@ export class FuenteDatosPropietariosPrisma {
 
   async crear(
     organizacion: string,
+    sede: string,
     datos: DatosPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     try {
       return await this.prisma.$transaction(async (tx) => {
-        await this.validarContexto(tx, organizacion, usuario);
+        await this.validarContexto(tx, organizacion, usuario, sede);
         await this.validarReferencias(tx, datos);
         const [{ ahora }] = await tx.$queryRaw<
           Array<{ ahora: Date }>
@@ -415,6 +441,7 @@ export class FuenteDatosPropietariosPrisma {
         const propietario = await tx.propietarios.create({
           data: {
             fid_organizaciones: organizacion,
+            fid_sedes_registro: sede,
             ...this.datosPersistencia(datos, usuario, ahora),
             created_by: usuario,
           },
@@ -428,7 +455,7 @@ export class FuenteDatosPropietariosPrisma {
             fid_organizaciones: organizacion,
             fid_usuarios: usuario,
             peticion: contexto,
-            metadatos: { nombre: datos.nombre_completo },
+            metadatos: { nombre: datos.nombre_completo, fid_sedes: sede },
           },
           tx,
         );
@@ -442,13 +469,14 @@ export class FuenteDatosPropietariosPrisma {
   async actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.validarContexto(tx, organizacion, usuario);
+        await this.validarContexto(tx, organizacion, usuario, sede);
         const actual = await this.existente(tx, id, organizacion);
         await this.validarReferencias(tx, datos);
         const campos: string[] = [];
@@ -537,12 +565,13 @@ export class FuenteDatosPropietariosPrisma {
   async eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: EliminacionPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     await this.prisma.$transaction(async (tx) => {
-      await this.validarContexto(tx, organizacion, usuario);
+      await this.validarContexto(tx, organizacion, usuario, sede);
       await this.existente(tx, id, organizacion);
       const mascotas = await tx.$queryRaw<
         Array<{ id_mascotas: string; nombre: string; foto_url: string | null }>

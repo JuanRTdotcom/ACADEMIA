@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -35,7 +36,10 @@ import {
 } from "../dto/atenciones.dto";
 import { InterceptorErroresAdjuntosAtencion } from "../interceptors/interceptor-errores-adjuntos-atencion";
 import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
-import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
+import {
+  leerPosicionCatalogo,
+  protegerPaginacionCatalogo,
+} from "../../../comun/seguridad/paginacion-catalogo";
 
 @Controller("clinic/attentions")
 export class ControladorAtenciones {
@@ -45,6 +49,12 @@ export class ControladorAtenciones {
     private tokens: ServicioTokenOpaco,
   ) {}
 
+  private sede(usuario: UsuarioAutenticado) {
+    const sede = usuario.contexto.sede_activa?.id_sedes;
+    if (!sede) throw new BadRequestException("attentions.branchRequired");
+    return sede;
+  }
+
   @Get()
   @Permisos("clinic.attentions.read")
   @Throttle({ default: { limit: 40, ttl: 60_000 } })
@@ -53,18 +63,36 @@ export class ControladorAtenciones {
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     const contexto = filtros.incluir_ayer ? "ayer" : "hoy";
-    const posicion = leerPosicionCatalogo(this.tokens, "clinic-attentions", filtros.p, usuario.fid_organizaciones, filtros.q, "attentions.invalidCursor", contexto);
+    const alcance = `${contexto}:${this.sede(usuario)}`;
+    const posicion = leerPosicionCatalogo(
+      this.tokens,
+      "clinic-attentions",
+      filtros.p,
+      usuario.fid_organizaciones,
+      filtros.q,
+      "attentions.invalidCursor",
+      alcance,
+    );
     const listado = await this.atenciones.listarHoy(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       {
         q: filtros.q,
         incluir_ayer: filtros.incluir_ayer,
-        despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        despues_de:
+          posicion?.direccion === "siguiente" ? posicion.id : undefined,
         antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
       },
       usuario.idioma,
     );
-    return protegerPaginacionCatalogo(this.tokens, "clinic-attentions", listado, usuario.fid_organizaciones, filtros.q, contexto);
+    return protegerPaginacionCatalogo(
+      this.tokens,
+      "clinic-attentions",
+      listado,
+      usuario.fid_organizaciones,
+      filtros.q,
+      alcance,
+    );
   }
 
   @Get("options")
@@ -83,6 +111,7 @@ export class ControladorAtenciones {
   ) {
     return this.atenciones.buscarPropietarios(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       filtros.q,
     );
   }
@@ -96,6 +125,7 @@ export class ControladorAtenciones {
   ) {
     return this.atenciones.mascotasPropietario(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       propietario,
       usuario.idioma,
     );
@@ -111,6 +141,7 @@ export class ControladorAtenciones {
   ) {
     return this.atenciones.ultimoRegistroMascota(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       mascota,
       tipo,
     );
@@ -125,6 +156,7 @@ export class ControladorAtenciones {
   ) {
     return this.atenciones.historialMascota(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       mascota,
       usuario.idioma,
     );
@@ -132,10 +164,15 @@ export class ControladorAtenciones {
 
   @Get(":id")
   @Permisos("clinic.attentions.read")
-  obtener(
+  async obtener(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
+    await this.atenciones.validarAccesoSede(
+      id,
+      usuario.fid_organizaciones,
+      this.sede(usuario),
+    );
     return this.atenciones.obtener(
       id,
       usuario.fid_organizaciones,
@@ -159,6 +196,7 @@ export class ControladorAtenciones {
   ) {
     return this.atenciones.crear(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       { fid_mascotas: dto.fid_mascotas, registro: dto.registro },
       this.archivos(archivos),
       usuario.sub,
@@ -174,13 +212,18 @@ export class ControladorAtenciones {
     InterceptorErroresAdjuntosAtencion,
     FilesInterceptor("adjuntos"),
   )
-  agregar(
+  async agregar(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @Body() dto: DtoRegistroAtencion,
     @UploadedFiles() archivos: Express.Multer.File[] | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    await this.atenciones.validarAccesoSede(
+      id,
+      usuario.fid_organizaciones,
+      this.sede(usuario),
+    );
     return this.atenciones.agregarRegistro(
       id,
       usuario.fid_organizaciones,
@@ -207,6 +250,11 @@ export class ControladorAtenciones {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    await this.atenciones.validarAccesoSede(
+      id,
+      usuario.fid_organizaciones,
+      this.sede(usuario),
+    );
     await this.atenciones.editarRegistro(
       id,
       registro,
@@ -229,6 +277,11 @@ export class ControladorAtenciones {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Res({ passthrough: true }) response: Response,
   ) {
+    await this.atenciones.validarAccesoSede(
+      id,
+      usuario.fid_organizaciones,
+      this.sede(usuario),
+    );
     const archivo = await this.atenciones.obtenerAdjunto(
       id,
       registro,
@@ -263,6 +316,11 @@ export class ControladorAtenciones {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    await this.atenciones.validarAccesoSede(
+      id,
+      usuario.fid_organizaciones,
+      this.sede(usuario),
+    );
     await this.atenciones.cambiarEstado(
       id,
       usuario.fid_organizaciones,
@@ -282,6 +340,11 @@ export class ControladorAtenciones {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    await this.atenciones.validarAccesoSede(
+      id,
+      usuario.fid_organizaciones,
+      this.sede(usuario),
+    );
     await this.atenciones.eliminarRegistro(
       id,
       registro,
@@ -301,6 +364,11 @@ export class ControladorAtenciones {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    await this.atenciones.validarAccesoSede(
+      id,
+      usuario.fid_organizaciones,
+      this.sede(usuario),
+    );
     await this.atenciones.eliminar(
       id,
       usuario.fid_organizaciones,

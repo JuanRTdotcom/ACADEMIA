@@ -11,17 +11,79 @@ import type {
   ConsultaMedioEmpresa,
 } from "../entities/marca-empresa";
 import { RepositorioEmpresas } from "../repositories/repositorio-empresas";
+import type { DatosBasicosSede } from "../entities/sede";
 
 @Injectable()
 export class CasoUsoGestionarEmpresaActual {
   constructor(private empresas: RepositorioEmpresas) {}
 
-  resumen(organizacion: string) {
-    return this.empresas.obtenerResumenActual(organizacion);
+  sedes(organizacion: string, idioma: string) {
+    return this.empresas.listarSedesActual(organizacion, idioma);
+  }
+  crearSede(
+    organizacion: string,
+    datos: DatosBasicosSede,
+    sedeOrigen: string,
+    usuario: string,
+    contexto: ContextoSolicitud,
+  ) {
+    return this.empresas.crearSedeActual(datos, {
+      organizacion,
+      usuario,
+      sedeOrigen,
+      contexto,
+    });
+  }
+  actualizarSede(
+    id: string,
+    organizacion: string,
+    datos: DatosBasicosSede,
+    sedeOrigen: string,
+    usuario: string,
+    contexto: ContextoSolicitud,
+  ) {
+    return this.empresas.actualizarSedeActual(id, datos, {
+      organizacion,
+      usuario,
+      sedeOrigen,
+      contexto,
+    });
+  }
+  eliminarSede(
+    id: string,
+    organizacion: string,
+    usuario: string,
+    contexto: ContextoSolicitud,
+  ) {
+    return this.empresas.eliminarSedeActual(id, {
+      organizacion,
+      usuario,
+      contexto,
+    });
+  }
+  seleccionarSede(
+    id: string,
+    organizacion: string,
+    usuario: string,
+    contexto: ContextoSolicitud,
+  ) {
+    return this.empresas.seleccionarSedeActual(id, {
+      organizacion,
+      usuario,
+      contexto,
+    });
   }
 
-  seccion<S extends SeccionEmpresa>(organizacion: string, seccion: S) {
-    return this.empresas.obtenerSeccionActual(organizacion, seccion);
+  resumen(organizacion: string, sede: string | null) {
+    return this.empresas.obtenerResumenActual(organizacion, sede);
+  }
+
+  seccion<S extends SeccionEmpresa>(
+    organizacion: string,
+    seccion: S,
+    sede: string | null,
+  ) {
+    return this.empresas.obtenerSeccionActual(organizacion, seccion, sede);
   }
 
   catalogosUbicacion(organizacion: string) {
@@ -32,6 +94,7 @@ export class CasoUsoGestionarEmpresaActual {
     organizacion: string,
     seccion: S,
     datos: SeccionesEmpresa[S],
+    sede: string | null,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
@@ -39,6 +102,7 @@ export class CasoUsoGestionarEmpresaActual {
       organizacion,
       seccion,
       datos,
+      sede,
       usuario,
       contexto,
     );
@@ -46,30 +110,34 @@ export class CasoUsoGestionarEmpresaActual {
 
   actualizarFiltroColorLogin(
     organizacion: string,
+    sede: string,
     activo: boolean,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     return this.empresas.actualizarFiltroColorLoginActual(
       organizacion,
+      sede,
       activo,
       usuario,
       contexto,
     );
   }
 
-  marca(organizacion: string) {
-    return this.empresas.obtenerMarcaActual(organizacion);
+  marca(organizacion: string, sede: string) {
+    return this.empresas.obtenerMarcaActual(organizacion, sede);
   }
 
   guardarMedio(
     organizacion: string,
+    sede: string,
     comando: ComandoGuardarMedioEmpresa,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     return this.empresas.guardarMedioActual(
       organizacion,
+      sede,
       comando,
       usuario,
       contexto,
@@ -78,12 +146,14 @@ export class CasoUsoGestionarEmpresaActual {
 
   eliminarMedio(
     organizacion: string,
+    sede: string,
     comando: ComandoEliminarMedioEmpresa,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     return this.empresas.eliminarMedioActual(
       organizacion,
+      sede,
       comando,
       usuario,
       contexto,
@@ -92,19 +162,25 @@ export class CasoUsoGestionarEmpresaActual {
 
   compartirMedio(
     organizacion: string,
+    sede: string,
     comando: ComandoCompartirMedioEmpresa,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     return this.empresas.compartirMedioActual(
       organizacion,
+      sede,
       comando,
       usuario,
       contexto,
     );
   }
 
-  leerMedio(organizacion: string, consulta: ConsultaMedioEmpresa) {
-    return this.empresas.obtenerMedioActual(organizacion, consulta);
+  leerMedio(
+    organizacion: string,
+    sede: string,
+    consulta: ConsultaMedioEmpresa,
+  ) {
+    return this.empresas.obtenerMedioActual(organizacion, sede, consulta);
   }
 }

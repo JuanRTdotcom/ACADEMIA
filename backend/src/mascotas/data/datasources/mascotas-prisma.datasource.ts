@@ -35,7 +35,12 @@ export class FuenteDatosMascotasPrisma {
     private fotos: AlmacenFotoMascotaR2,
   ) {}
 
-  private async validarContexto(tx: Tx, organizacion: string, usuario: string) {
+  private async validarContexto(
+    tx: Tx,
+    organizacion: string,
+    usuario: string,
+    sede: string,
+  ) {
     await tx.$queryRaw`SELECT id_organizaciones FROM nucleo.organizaciones WHERE id_organizaciones = ${organizacion}::uuid AND estado = 1 AND eliminado_en IS NULL FOR UPDATE`;
     const actor = await tx.usuarios.findFirst({
       where: {
@@ -45,9 +50,21 @@ export class FuenteDatosMascotasPrisma {
         estado_cuenta: "activo",
         eliminado_en: null,
       },
-      select: { id_usuarios: true },
+      select: {
+        id_usuarios: true,
+        usuarios_sedes: {
+          where: {
+            fid_sedes: sede,
+            estado: 1,
+            sede: { estado: 1, eliminado_en: null },
+          },
+          select: { id_usuarios_sedes: true },
+          take: 1,
+        },
+      },
     });
-    if (!actor) throw new NotFoundException("pets.unavailable");
+    if (!actor || actor.usuarios_sedes.length !== 1)
+      throw new NotFoundException("pets.unavailable");
   }
 
   private async existente(tx: Tx, id: string, organizacion: string) {
@@ -66,6 +83,7 @@ export class FuenteDatosMascotasPrisma {
   private async validarReferencias(
     tx: Tx,
     organizacion: string,
+    sede: string,
     datos: DatosMascota,
     ahora: Date,
   ) {
@@ -87,6 +105,7 @@ export class FuenteDatosMascotasPrisma {
           SELECT id_propietarios FROM personas.propietarios
           WHERE id_propietarios = ${datos.fid_propietarios}::uuid
             AND fid_organizaciones = ${organizacion}::uuid
+            AND fid_sedes_registro = ${sede}::uuid
             AND estado = 1 AND eliminado_en IS NULL
           FOR SHARE`
       : [];
@@ -145,6 +164,7 @@ export class FuenteDatosMascotasPrisma {
   private seleccion() {
     return {
       id_mascotas: true,
+      fid_sedes_registro: true,
       fid_propietarios: true,
       foto_url: true,
       animal_servicio: true,
@@ -175,6 +195,7 @@ export class FuenteDatosMascotasPrisma {
           tipo_documento: { select: { etiqueta: true } },
         },
       },
+      sede_registro: { select: { id_sedes: true, codigo: true, nombre: true } },
       especie: { select: { codigo: true, nombre_es: true, nombre_en: true } },
       subespecie: {
         select: { codigo: true, nombre_es: true, nombre_en: true },
@@ -244,10 +265,16 @@ export class FuenteDatosMascotasPrisma {
     };
   }
 
-  async listar(organizacion: string, filtros: FiltrosMascotas, idioma: string) {
+  async listar(
+    organizacion: string,
+    sede: string,
+    filtros: FiltrosMascotas,
+    idioma: string,
+  ) {
     const q = filtros.q?.trim();
     const base: Prisma.mascotasWhereInput = {
         fid_organizaciones: organizacion,
+        fid_sedes_registro: sede,
         eliminado_en: null,
         organizacion: { estado: 1, eliminado_en: null },
         ...(q
@@ -383,10 +410,11 @@ export class FuenteDatosMascotasPrisma {
     };
   }
 
-  async buscarPropietarios(organizacion: string, q: string) {
+  async buscarPropietarios(organizacion: string, sede: string, q: string) {
     const propietarios = await this.prisma.propietarios.findMany({
       where: {
         fid_organizaciones: organizacion,
+        fid_sedes_registro: sede,
         estado: 1,
         eliminado_en: null,
         OR: [
@@ -461,6 +489,7 @@ export class FuenteDatosMascotasPrisma {
 
   async crear(
     organizacion: string,
+    sede: string,
     datos: DatosMascota,
     foto: ArchivoMascota | null,
     usuario: string,
@@ -472,15 +501,16 @@ export class FuenteDatosMascotasPrisma {
       : null;
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.validarContexto(tx, organizacion, usuario);
+        await this.validarContexto(tx, organizacion, usuario, sede);
         const [{ ahora }] = await tx.$queryRaw<
           Array<{ ahora: Date }>
         >`SELECT CURRENT_TIMESTAMP AS ahora`;
-        await this.validarReferencias(tx, organizacion, datos, ahora);
+        await this.validarReferencias(tx, organizacion, sede, datos, ahora);
         await tx.mascotas.create({
           data: {
             id_mascotas: id,
             fid_organizaciones: organizacion,
+            fid_sedes_registro: sede,
             foto_url: clave,
             ...this.persistencia(datos, usuario),
             created_by: usuario,
@@ -497,6 +527,7 @@ export class FuenteDatosMascotasPrisma {
             metadatos: {
               nombre: datos.nombre,
               con_propietario: Boolean(datos.fid_propietarios),
+              fid_sedes: sede,
             },
           },
           tx,
@@ -512,6 +543,7 @@ export class FuenteDatosMascotasPrisma {
   async actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosMascota,
     foto: ArchivoMascota | null,
     eliminarFoto: boolean,
@@ -523,12 +555,12 @@ export class FuenteDatosMascotasPrisma {
       : null;
     try {
       const anterior = await this.prisma.$transaction(async (tx) => {
-        await this.validarContexto(tx, organizacion, usuario);
+        await this.validarContexto(tx, organizacion, usuario, sede);
         const actual = await this.existente(tx, id, organizacion);
         const [{ ahora }] = await tx.$queryRaw<
           Array<{ ahora: Date }>
         >`SELECT CURRENT_TIMESTAMP AS ahora`;
-        await this.validarReferencias(tx, organizacion, datos, ahora);
+        await this.validarReferencias(tx, organizacion, sede, datos, ahora);
         const siguiente = this.persistencia(datos, usuario);
         const campos = Object.entries(siguiente)
           .filter(
@@ -575,12 +607,13 @@ export class FuenteDatosMascotasPrisma {
   async eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: EliminacionMascota,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
     const foto = await this.prisma.$transaction(async (tx) => {
-      await this.validarContexto(tx, organizacion, usuario);
+      await this.validarContexto(tx, organizacion, usuario, sede);
       const actual = await this.existente(tx, id, organizacion);
       if (actual.fid_propietarios && !datos.confirmar_desvinculacion) {
         const propietario = await tx.propietarios.findFirst({

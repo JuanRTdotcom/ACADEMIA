@@ -25,6 +25,7 @@ export class FuenteDatosServiciosVeterinariaPrisma {
   private async validarContexto(
     tx: ClientePrisma,
     organizacion: string,
+    sede: string,
     usuario: string,
   ): Promise<void> {
     await tx.$queryRaw`SELECT id_organizaciones FROM nucleo.organizaciones WHERE id_organizaciones = ${organizacion}::uuid FOR UPDATE`;
@@ -40,12 +41,24 @@ export class FuenteDatosServiciosVeterinariaPrisma {
       select: { id_usuarios: true },
     });
     if (!actor) throw new NotFoundException("services.unavailable");
+    const asignacion = await tx.usuarios_sedes.findFirst({
+      where: {
+        fid_organizaciones: organizacion,
+        fid_usuarios: usuario,
+        fid_sedes: sede,
+        estado: 1,
+        sede: { estado: 1, eliminado_en: null },
+      },
+      select: { id_usuarios_sedes: true },
+    });
+    if (!asignacion) throw new NotFoundException("services.unavailable");
   }
 
   private async obtenerExistente(
     tx: ClientePrisma,
     id: string,
     organizacion: string,
+    sede: string,
   ) {
     await tx.$queryRaw`
       SELECT id_servicios_veterinaria
@@ -60,6 +73,9 @@ export class FuenteDatosServiciosVeterinariaPrisma {
         id_servicios_veterinaria: id,
         fid_organizaciones: organizacion,
         eliminado_en: null,
+        sedesServiciosVeterinarias: {
+          some: { fid_sedes: sede, estado: 1 },
+        },
       },
     });
     if (!servicio) throw new NotFoundException("services.notFound");
@@ -90,16 +106,18 @@ export class FuenteDatosServiciosVeterinariaPrisma {
 
   async listar(
     organizacion: string,
+    sede: string,
     filtros: FiltrosServiciosVeterinaria,
   ): Promise<CatalogoServiciosVeterinaria> {
-    const empresa = await this.prisma.organizaciones.findFirst({
+    const sucursal = await this.prisma.sedes.findFirst({
       where: {
-        id_organizaciones: organizacion,
+        id_sedes: sede,
+        fid_organizaciones: organizacion,
         estado: 1,
         eliminado_en: null,
       },
       select: {
-        perfil: {
+        entidad_legal: {
           select: {
             moneda: {
               select: { id_parametros: true, codigo: true, etiqueta: true },
@@ -108,7 +126,7 @@ export class FuenteDatosServiciosVeterinariaPrisma {
         },
       },
     });
-    if (!empresa?.perfil?.moneda) {
+    if (!sucursal?.entidad_legal.moneda) {
       throw new NotFoundException("services.unavailable");
     }
     const cursorId = filtros.despues_de ?? filtros.antes_de;
@@ -118,6 +136,9 @@ export class FuenteDatosServiciosVeterinariaPrisma {
             id_servicios_veterinaria: cursorId,
             fid_organizaciones: organizacion,
             eliminado_en: null,
+            sedesServiciosVeterinarias: {
+              some: { fid_sedes: sede, estado: 1 },
+            },
             ...(filtros.consulta
               ? {
                   nombre: {
@@ -138,6 +159,9 @@ export class FuenteDatosServiciosVeterinariaPrisma {
     const condicionBase = {
       fid_organizaciones: organizacion,
       eliminado_en: null,
+      sedesServiciosVeterinarias: {
+        some: { fid_sedes: sede, estado: 1 },
+      },
       ...(filtros.consulta
         ? {
             nombre: {
@@ -192,7 +216,7 @@ export class FuenteDatosServiciosVeterinariaPrisma {
     const servicios = filas.map((servicio) => this.presentar(servicio));
     return {
       servicios,
-      moneda: empresa.perfil.moneda,
+      moneda: sucursal.entidad_legal.moneda,
       total,
       paginacion: {
         anterior:
@@ -208,17 +232,24 @@ export class FuenteDatosServiciosVeterinariaPrisma {
     };
   }
 
-  async buscar(organizacion: string, consulta: string) {
-    const organizacionActiva = await this.prisma.organizaciones.findFirst({
-      where: { id_organizaciones: organizacion, estado: 1, eliminado_en: null },
-      select: { id_organizaciones: true },
+  async buscar(organizacion: string, sede: string, consulta: string) {
+    const sedeActiva = await this.prisma.sedes.findFirst({
+      where: {
+        id_sedes: sede,
+        fid_organizaciones: organizacion,
+        estado: 1,
+        eliminado_en: null,
+      },
+      select: { id_sedes: true },
     });
-    if (!organizacionActiva)
-      throw new NotFoundException("services.unavailable");
+    if (!sedeActiva) throw new NotFoundException("services.unavailable");
     const servicios = await this.prisma.servicios_veterinaria.findMany({
       where: {
         fid_organizaciones: organizacion,
         eliminado_en: null,
+        sedesServiciosVeterinarias: {
+          some: { fid_sedes: sede, estado: 1 },
+        },
         nombre: { contains: consulta, mode: "insensitive" },
       },
       orderBy: [{ created_at: "desc" }, { id_servicios_veterinaria: "desc" }],
@@ -228,12 +259,15 @@ export class FuenteDatosServiciosVeterinariaPrisma {
     return servicios.map((servicio) => this.presentar(servicio));
   }
 
-  async obtener(id: string, organizacion: string) {
+  async obtener(id: string, organizacion: string, sede: string) {
     const servicio = await this.prisma.servicios_veterinaria.findFirst({
       where: {
         id_servicios_veterinaria: id,
         fid_organizaciones: organizacion,
         eliminado_en: null,
+        sedesServiciosVeterinarias: {
+          some: { fid_sedes: sede, estado: 1 },
+        },
         organizacion: { estado: 1, eliminado_en: null },
       },
       select: {
@@ -244,20 +278,31 @@ export class FuenteDatosServiciosVeterinariaPrisma {
         estado: true,
         created_at: true,
         updated_at: true,
-        organizacion: {
+        sedesServiciosVeterinarias: {
           select: {
-            perfil: {
+            sede: {
               select: {
-                moneda: {
-                  select: { id_parametros: true, codigo: true, etiqueta: true },
+                entidad_legal: {
+                  select: {
+                    moneda: {
+                      select: {
+                        id_parametros: true,
+                        codigo: true,
+                        etiqueta: true,
+                      },
+                    },
+                  },
                 },
               },
             },
           },
+          where: { fid_sedes: sede, estado: 1 },
+          take: 1,
         },
       },
     });
-    const moneda = servicio?.organizacion.perfil?.moneda;
+    const moneda =
+      servicio?.sedesServiciosVeterinarias[0]?.sede.entidad_legal.moneda;
     if (!servicio || !moneda) throw new NotFoundException("services.notFound");
     const datos = {
       id_servicios_veterinaria: servicio.id_servicios_veterinaria,
@@ -279,12 +324,13 @@ export class FuenteDatosServiciosVeterinariaPrisma {
 
   async crear(
     organizacion: string,
+    sede: string,
     datos: DatosServicioVeterinaria,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await this.validarContexto(tx, organizacion, usuario);
+      await this.validarContexto(tx, organizacion, sede, usuario);
       const servicio = await tx.servicios_veterinaria.create({
         data: {
           fid_organizaciones: organizacion,
@@ -296,6 +342,16 @@ export class FuenteDatosServiciosVeterinariaPrisma {
         },
         select: { id_servicios_veterinaria: true },
       });
+      await tx.sedes_servicios_veterinaria.create({
+        data: {
+          fid_organizaciones: organizacion,
+          fid_sedes: sede,
+          fid_servicios_veterinaria: servicio.id_servicios_veterinaria,
+          precio: datos.precio ? new Prisma.Decimal(datos.precio) : null,
+          created_by: usuario,
+          updated_by: usuario,
+        },
+      });
       await this.auditoria.registrar(
         {
           accion: "servicios.creado",
@@ -304,7 +360,7 @@ export class FuenteDatosServiciosVeterinariaPrisma {
           fid_organizaciones: organizacion,
           fid_usuarios: usuario,
           peticion: contexto,
-          metadatos: { nombre: datos.nombre, precio: datos.precio },
+          metadatos: { nombre: datos.nombre, precio: datos.precio, sede },
         },
         tx,
       );
@@ -314,13 +370,14 @@ export class FuenteDatosServiciosVeterinariaPrisma {
   async actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosServicioVeterinaria,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await this.validarContexto(tx, organizacion, usuario);
-      const actual = await this.obtenerExistente(tx, id, organizacion);
+      await this.validarContexto(tx, organizacion, sede, usuario);
+      const actual = await this.obtenerExistente(tx, id, organizacion, sede);
       const precio = datos.precio ? new Prisma.Decimal(datos.precio) : null;
       const mismoPrecio =
         actual.precio === null
@@ -341,6 +398,10 @@ export class FuenteDatosServiciosVeterinariaPrisma {
           precio,
           updated_by: usuario,
         },
+      });
+      await tx.sedes_servicios_veterinaria.updateMany({
+        where: { fid_sedes: sede, fid_servicios_veterinaria: id, estado: 1 },
+        data: { precio, updated_by: usuario },
       });
       await this.auditoria.registrar(
         {
@@ -371,13 +432,14 @@ export class FuenteDatosServiciosVeterinariaPrisma {
   async cambiarEstado(
     id: string,
     organizacion: string,
+    sede: string,
     activo: boolean,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await this.validarContexto(tx, organizacion, usuario);
-      const actual = await this.obtenerExistente(tx, id, organizacion);
+      await this.validarContexto(tx, organizacion, sede, usuario);
+      const actual = await this.obtenerExistente(tx, id, organizacion, sede);
       const estado = activo ? 1 : 0;
       if (actual.estado === estado) {
         throw new BadRequestException("services.noChanges");
@@ -404,12 +466,13 @@ export class FuenteDatosServiciosVeterinariaPrisma {
   async eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     usuario: string,
     contexto: ContextoSolicitud,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await this.validarContexto(tx, organizacion, usuario);
-      const actual = await this.obtenerExistente(tx, id, organizacion);
+      await this.validarContexto(tx, organizacion, sede, usuario);
+      const actual = await this.obtenerExistente(tx, id, organizacion, sede);
       await tx.$executeRaw`
         UPDATE nucleo.servicios_veterinaria
         SET estado = 0,

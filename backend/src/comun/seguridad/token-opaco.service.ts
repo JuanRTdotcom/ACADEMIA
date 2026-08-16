@@ -41,10 +41,7 @@ export class ServicioTokenOpaco {
       .join(".");
   }
 
-  descifrar<T extends object>(
-    ambito: string,
-    token: string,
-  ): T | null {
+  descifrar<T extends object>(ambito: string, token: string): T | null {
     try {
       const [version, nonce, cifrado, etiqueta, adicional] = token.split(".");
       if (
@@ -57,16 +54,21 @@ export class ServicioTokenOpaco {
       ) {
         return null;
       }
-      const descifrador = createDecipheriv(
-        ALGORITMO,
-        this.clave,
-        Buffer.from(nonce, "base64url"),
-      );
+      const nonceBuffer = Buffer.from(nonce, "base64url");
+      const cifradoBuffer = Buffer.from(cifrado, "base64url");
+      const etiquetaBuffer = Buffer.from(etiqueta, "base64url");
+      if (
+        nonceBuffer.toString("base64url") !== nonce ||
+        cifradoBuffer.toString("base64url") !== cifrado ||
+        etiquetaBuffer.toString("base64url") !== etiqueta
+      )
+        return null;
+      const descifrador = createDecipheriv(ALGORITMO, this.clave, nonceBuffer);
       descifrador.setAAD(Buffer.from(`${VERSION}:${ambito}`));
-      descifrador.setAuthTag(Buffer.from(etiqueta, "base64url"));
+      descifrador.setAuthTag(etiquetaBuffer);
       const contenido = JSON.parse(
         Buffer.concat([
-          descifrador.update(Buffer.from(cifrado, "base64url")),
+          descifrador.update(cifradoBuffer),
           descifrador.final(),
         ]).toString("utf8"),
       ) as T;

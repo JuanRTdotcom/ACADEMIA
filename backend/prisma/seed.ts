@@ -58,34 +58,109 @@ async function main() {
     // Asegurar que existan los planes base para evitar violación de llave foránea (fid_planes)
     await tx.planes.upsert({
       where: { id_planes: "40000000-0000-4000-8000-000000000001" },
-      update: {},
+      update: {
+        codigo: "INICIAL",
+        nombre: "Plan Inicial",
+        descripcion: "Operación clínica esencial para una veterinaria pequeña.",
+        almacenamiento_max_bytes: 5n * 1024n ** 3n,
+        maximo_sedes: 1,
+        maximo_usuarios: 3,
+        maximo_mensajes_mensuales: 300,
+        maximo_uso_ia_mensual: 50,
+        estado: 1,
+      },
       create: {
         id_planes: "40000000-0000-4000-8000-000000000001",
-        codigo: "BASIC",
-        nombre: "Plan Básico",
-        descripcion: "Plan inicial para consultorios.",
+        codigo: "INICIAL",
+        nombre: "Plan Inicial",
+        descripcion: "Operación clínica esencial para una veterinaria pequeña.",
+        almacenamiento_max_bytes: 5n * 1024n ** 3n,
+        maximo_sedes: 1,
+        maximo_usuarios: 3,
+        maximo_mensajes_mensuales: 300,
+        maximo_uso_ia_mensual: 50,
         estado: 1,
       },
     });
     await tx.planes.upsert({
       where: { id_planes: "40000000-0000-4000-8000-000000000002" },
-      update: {},
+      update: {
+        codigo: "PROFESIONAL",
+        nombre: "Plan Profesional",
+        descripcion:
+          "Gestión clínica y comercial para veterinarias en crecimiento.",
+        almacenamiento_max_bytes: 25n * 1024n ** 3n,
+        maximo_sedes: 3,
+        maximo_usuarios: 15,
+        maximo_mensajes_mensuales: 2000,
+        maximo_uso_ia_mensual: 500,
+        estado: 1,
+      },
       create: {
         id_planes: "40000000-0000-4000-8000-000000000002",
-        codigo: "PREMIUM",
-        nombre: "Plan Premium",
-        descripcion: "Plan intermedio para clínicas.",
+        codigo: "PROFESIONAL",
+        nombre: "Plan Profesional",
+        descripcion:
+          "Gestión clínica y comercial para veterinarias en crecimiento.",
+        almacenamiento_max_bytes: 25n * 1024n ** 3n,
+        maximo_sedes: 3,
+        maximo_usuarios: 15,
+        maximo_mensajes_mensuales: 2000,
+        maximo_uso_ia_mensual: 500,
         estado: 1,
       },
     });
     await tx.planes.upsert({
       where: { id_planes: "40000000-0000-4000-8000-000000000003" },
-      update: {},
+      update: {
+        codigo: "EMPRESARIAL",
+        nombre: "Plan Empresarial",
+        descripcion: "Acceso completo sin límites para cadenas veterinarias.",
+        almacenamiento_max_bytes: null,
+        maximo_sedes: null,
+        maximo_usuarios: null,
+        maximo_mensajes_mensuales: null,
+        maximo_uso_ia_mensual: null,
+        estado: 1,
+      },
       create: {
         id_planes: "40000000-0000-4000-8000-000000000003",
-        codigo: "FULL",
-        nombre: "Plan Completo",
-        descripcion: "Acceso total para grandes cadenas.",
+        codigo: "EMPRESARIAL",
+        nombre: "Plan Empresarial",
+        descripcion: "Acceso completo sin límites para cadenas veterinarias.",
+        almacenamiento_max_bytes: null,
+        maximo_sedes: null,
+        maximo_usuarios: null,
+        maximo_mensajes_mensuales: null,
+        maximo_uso_ia_mensual: null,
+        estado: 1,
+      },
+    });
+    await tx.planes.upsert({
+      where: { id_planes: "40000000-0000-4000-8000-000000000004" },
+      update: {
+        codigo: "DEMO",
+        nombre: "Plan Demo",
+        descripcion:
+          "Acceso temporal a todas las funciones para demostraciones.",
+        almacenamiento_max_bytes: 500n * 1024n ** 2n,
+        maximo_sedes: 1,
+        maximo_usuarios: 5,
+        maximo_mensajes_mensuales: 100,
+        maximo_uso_ia_mensual: 25,
+        estado: 1,
+      },
+      create: {
+        id_planes: "40000000-0000-4000-8000-000000000004",
+        codigo: "DEMO",
+        nombre: "Plan Demo",
+        descripcion:
+          "Acceso temporal a todas las funciones para demostraciones.",
+        almacenamiento_max_bytes: 500n * 1024n ** 2n,
+        maximo_sedes: 1,
+        maximo_usuarios: 5,
+        maximo_mensajes_mensuales: 100,
+        maximo_uso_ia_mensual: 25,
         estado: 1,
       },
     });
@@ -94,12 +169,22 @@ async function main() {
       update: {
         nombre: "Plan del sistema",
         descripcion: "Acceso operativo de la organización propietaria.",
+        almacenamiento_max_bytes: null,
+        maximo_sedes: null,
+        maximo_usuarios: null,
+        maximo_mensajes_mensuales: null,
+        maximo_uso_ia_mensual: null,
         estado: 1,
       },
       create: {
         codigo: "SYSTEM",
         nombre: "Plan del sistema",
         descripcion: "Acceso operativo de la organización propietaria.",
+        almacenamiento_max_bytes: null,
+        maximo_sedes: null,
+        maximo_usuarios: null,
+        maximo_mensajes_mensuales: null,
+        maximo_uso_ia_mensual: null,
         estado: 1,
       },
     });
@@ -276,9 +361,12 @@ async function main() {
         ('Bordetella'), ('Triple felina'), ('Cuádruple felina'),
         ('Leucemia felina')
       ) vacuna(nombre)
-      ON CONFLICT (fid_organizaciones, upper(btrim(nombre)))
-        WHERE eliminado_en IS NULL
-      DO UPDATE SET estado = 1, updated_at = CURRENT_TIMESTAMP, updated_by = 'seed'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM nucleo.vacunas existente
+        WHERE existente.fid_organizaciones = ${organizacion.id_organizaciones}::uuid
+          AND upper(btrim(existente.nombre)) = upper(btrim(vacuna.nombre))
+          AND existente.eliminado_en IS NULL
+      )
     `;
 
     await tx.$executeRaw`
@@ -286,9 +374,12 @@ async function main() {
         (fid_organizaciones, nombre, estado, created_by, updated_by)
       SELECT ${organizacion.id_organizaciones}::uuid, tipo.nombre, 1, 'seed', 'seed'
       FROM (VALUES ('Hospitalización'), ('Ambulatorio')) tipo(nombre)
-      ON CONFLICT (fid_organizaciones, upper(btrim(nombre)))
-        WHERE eliminado_en IS NULL
-      DO UPDATE SET estado = 1, updated_at = CURRENT_TIMESTAMP, updated_by = 'seed'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM nucleo.tipos_hospitalizacion existente
+        WHERE existente.fid_organizaciones = ${organizacion.id_organizaciones}::uuid
+          AND upper(btrim(existente.nombre)) = upper(btrim(tipo.nombre))
+          AND existente.eliminado_en IS NULL
+      )
     `;
 
     await tx.procedimientos_veterinarios.createMany({
@@ -307,9 +398,13 @@ async function main() {
       SELECT ${organizacion.id_organizaciones}::uuid, base.fid_categorias_pruebas_laboratorio, base.nombre, 1, 'seed', 'seed'
       FROM configuracion.catalogo_pruebas_laboratorio_base base
       WHERE base.estado = 1
-      ON CONFLICT (fid_organizaciones, fid_categorias_pruebas_laboratorio, upper(btrim(nombre)))
-        WHERE eliminado_en IS NULL
-      DO UPDATE SET estado = 1, updated_at = CURRENT_TIMESTAMP, updated_by = 'seed'
+        AND NOT EXISTS (
+          SELECT 1 FROM nucleo.pruebas_laboratorio existente
+          WHERE existente.fid_organizaciones = ${organizacion.id_organizaciones}::uuid
+            AND existente.fid_categorias_pruebas_laboratorio = base.fid_categorias_pruebas_laboratorio
+            AND upper(btrim(existente.nombre)) = upper(btrim(base.nombre))
+            AND existente.eliminado_en IS NULL
+        )
     `;
 
     await tx.estudios_diagnosticos.createMany({
@@ -1860,11 +1955,205 @@ async function main() {
       throw new Error("Faltan los catálogos activos de Perú o America/Lima");
     }
 
+    const proveedorFiscal = await tx.proveedores_fiscales.upsert({
+      where: { codigo: "SUNAT" },
+      update: {
+        fid_admin_level_0: pais.id_admin_level_0,
+        nombre: "SUNAT",
+        clave_adaptador: "sunat_peru",
+        estado: 1,
+        updated_by: "seed",
+      },
+      create: {
+        fid_admin_level_0: pais.id_admin_level_0,
+        codigo: "SUNAT",
+        nombre: "SUNAT",
+        clave_adaptador: "sunat_peru",
+        created_by: "seed",
+        updated_by: "seed",
+      },
+    });
+    const tipoRuc = await tx.tipos_identificacion_fiscal.upsert({
+      where: {
+        fid_admin_level_0_codigo: {
+          fid_admin_level_0: pais.id_admin_level_0,
+          codigo: "RUC",
+        },
+      },
+      update: {
+        nombre: "RUC",
+        patron: "^[0-9]{11}$",
+        longitud_minima: 11,
+        longitud_maxima: 11,
+        estado: 1,
+        updated_by: "seed",
+      },
+      create: {
+        fid_admin_level_0: pais.id_admin_level_0,
+        codigo: "RUC",
+        nombre: "RUC",
+        patron: "^[0-9]{11}$",
+        longitud_minima: 11,
+        longitud_maxima: 11,
+        created_by: "seed",
+        updated_by: "seed",
+      },
+    });
+    const entidadLegalPrincipal = await tx.entidades_legales.upsert({
+      where: {
+        fid_organizaciones_codigo: {
+          fid_organizaciones: organizacion.id_organizaciones,
+          codigo: "PRINCIPAL",
+        },
+      },
+      update: {
+        es_principal: true,
+        fid_admin_level_0: pais.id_admin_level_0,
+        fid_tipos_identificacion_fiscal: tipoRuc.id_tipos_identificacion_fiscal,
+        razon_social: ORG_NOMBRE,
+        fid_parametros_moneda: monedaPredeterminada.id_parametros,
+        fid_proveedores_fiscales: proveedorFiscal.id_proveedores_fiscales,
+        estado: 1,
+        eliminado_en: null,
+        updated_by: usuario.id_usuarios,
+      },
+      create: {
+        fid_organizaciones: organizacion.id_organizaciones,
+        codigo: "PRINCIPAL",
+        es_principal: true,
+        fid_admin_level_0: pais.id_admin_level_0,
+        fid_tipos_identificacion_fiscal: tipoRuc.id_tipos_identificacion_fiscal,
+        razon_social: ORG_NOMBRE,
+        fid_parametros_moneda: monedaPredeterminada.id_parametros,
+        fid_proveedores_fiscales: proveedorFiscal.id_proveedores_fiscales,
+        created_by: usuario.id_usuarios,
+        updated_by: usuario.id_usuarios,
+      },
+    });
+
+    const sedePrincipal = await tx.sedes.upsert({
+      where: {
+        fid_organizaciones_codigo: {
+          fid_organizaciones: organizacion.id_organizaciones,
+          codigo: "PRINCIPAL",
+        },
+      },
+      update: {
+        fid_entidades_legales: entidadLegalPrincipal.id_entidades_legales,
+        fid_parametros_idioma: idiomaPredeterminado.id_parametros,
+        fid_zonas_horarias: zonaHoraria.id_zonas_horarias,
+        nombre: "Sede principal",
+        es_principal: true,
+        estado: 1,
+        eliminado_en: null,
+        updated_by: usuario.id_usuarios,
+      },
+      create: {
+        fid_organizaciones: organizacion.id_organizaciones,
+        fid_entidades_legales: entidadLegalPrincipal.id_entidades_legales,
+        fid_parametros_idioma: idiomaPredeterminado.id_parametros,
+        fid_zonas_horarias: zonaHoraria.id_zonas_horarias,
+        codigo: "PRINCIPAL",
+        nombre: "Sede principal",
+        es_principal: true,
+        sin_sede_fisica: true,
+        created_by: usuario.id_usuarios,
+        updated_by: usuario.id_usuarios,
+      },
+    });
+    await tx.usuarios_sedes.upsert({
+      where: {
+        fid_usuarios_fid_sedes: {
+          fid_usuarios: usuario.id_usuarios,
+          fid_sedes: sedePrincipal.id_sedes,
+        },
+      },
+      update: { estado: 1, updated_by: usuario.id_usuarios },
+      create: {
+        fid_organizaciones: organizacion.id_organizaciones,
+        fid_usuarios: usuario.id_usuarios,
+        fid_sedes: sedePrincipal.id_sedes,
+        created_by: usuario.id_usuarios,
+        updated_by: usuario.id_usuarios,
+      },
+    });
+    const serviciosSede = await tx.servicios_veterinaria.findMany({
+      where: {
+        fid_organizaciones: organizacion.id_organizaciones,
+        estado: 1,
+        eliminado_en: null,
+      },
+      select: { id_servicios_veterinaria: true },
+    });
+    for (const servicio of serviciosSede)
+      await tx.sedes_servicios_veterinaria.upsert({
+        where: {
+          fid_sedes_fid_servicios_veterinaria: {
+            fid_sedes: sedePrincipal.id_sedes,
+            fid_servicios_veterinaria: servicio.id_servicios_veterinaria,
+          },
+        },
+        update: { estado: 1, updated_by: usuario.id_usuarios },
+        create: {
+          fid_organizaciones: organizacion.id_organizaciones,
+          fid_sedes: sedePrincipal.id_sedes,
+          fid_servicios_veterinaria: servicio.id_servicios_veterinaria,
+          created_by: usuario.id_usuarios,
+          updated_by: usuario.id_usuarios,
+        },
+      });
+    await tx.almacenes.upsert({
+      where: {
+        fid_organizaciones_codigo: {
+          fid_organizaciones: organizacion.id_organizaciones,
+          codigo: "ALM-PRINCIPAL",
+        },
+      },
+      update: {
+        fid_sedes: sedePrincipal.id_sedes,
+        estado: 1,
+        eliminado_en: null,
+        updated_by: usuario.id_usuarios,
+      },
+      create: {
+        fid_organizaciones: organizacion.id_organizaciones,
+        fid_sedes: sedePrincipal.id_sedes,
+        codigo: "ALM-PRINCIPAL",
+        nombre: "Almacén principal",
+        es_principal: true,
+        created_by: usuario.id_usuarios,
+        updated_by: usuario.id_usuarios,
+      },
+    });
+    await tx.cajas.upsert({
+      where: {
+        fid_organizaciones_codigo: {
+          fid_organizaciones: organizacion.id_organizaciones,
+          codigo: "CAJ-PRINCIPAL",
+        },
+      },
+      update: {
+        fid_sedes: sedePrincipal.id_sedes,
+        estado: 1,
+        eliminado_en: null,
+        updated_by: usuario.id_usuarios,
+      },
+      create: {
+        fid_organizaciones: organizacion.id_organizaciones,
+        fid_sedes: sedePrincipal.id_sedes,
+        codigo: "CAJ-PRINCIPAL",
+        nombre: "Caja principal",
+        created_by: usuario.id_usuarios,
+        updated_by: usuario.id_usuarios,
+      },
+    });
+
     await tx.preferencias_usuario.upsert({
       where: { fid_usuarios: usuario.id_usuarios },
       update: {
         fid_admin_level_0: pais.id_admin_level_0,
         fid_zonas_horarias: zonaHoraria.id_zonas_horarias,
+        fid_sedes: sedePrincipal.id_sedes,
         estado: 1,
         updated_by: usuario.id_usuarios,
       },
@@ -1872,6 +2161,7 @@ async function main() {
         fid_usuarios: usuario.id_usuarios,
         fid_admin_level_0: pais.id_admin_level_0,
         fid_zonas_horarias: zonaHoraria.id_zonas_horarias,
+        fid_sedes: sedePrincipal.id_sedes,
         created_by: usuario.id_usuarios,
         updated_by: usuario.id_usuarios,
       },

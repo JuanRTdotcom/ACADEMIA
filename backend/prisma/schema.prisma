@@ -85,20 +85,24 @@ model organizaciones_modulos {
 }
 
 model planes {
-  id_planes                String           @id @default(uuid()) @db.Uuid
-  codigo                   String           @unique
-  nombre                   String
-  descripcion              String?
-  almacenamiento_max_bytes BigInt?
-  estado                   Int              @default(1)
-  created_at               DateTime         @default(now()) @db.Timestamptz(3)
-  created_by               String?
-  updated_at               DateTime         @default(now()) @db.Timestamptz(3)
-  updated_by               String?
-  eliminado_en             DateTime?        @db.Timestamptz(3)
-  organizaciones           organizaciones[]
-  planes_modulos           planes_modulos[]
-  renovaciones             renovaciones[]
+  id_planes                 String           @id @default(uuid()) @db.Uuid
+  codigo                    String           @unique
+  nombre                    String
+  descripcion               String?
+  almacenamiento_max_bytes  BigInt?
+  maximo_sedes              Int?
+  maximo_usuarios           Int?
+  maximo_mensajes_mensuales Int?
+  maximo_uso_ia_mensual     Int?
+  estado                    Int              @default(1)
+  created_at                DateTime         @default(now()) @db.Timestamptz(3)
+  created_by                String?
+  updated_at                DateTime         @default(now()) @db.Timestamptz(3)
+  updated_by                String?
+  eliminado_en              DateTime?        @db.Timestamptz(3)
+  organizaciones            organizaciones[]
+  planes_modulos            planes_modulos[]
+  renovaciones              renovaciones[]
 
   @@schema("configuracion")
 }
@@ -148,12 +152,19 @@ model parametros {
   updated_at                              DateTime                            @default(now()) @db.Timestamptz(3)
   updated_by                              String?
   color_hex                               String?                             @db.VarChar(7)
+  valor_entero                            BigInt?
   traducciones                            parametros_traducciones[]
   perfiles_idioma                         perfil_organizacion[]               @relation("perfil_idioma")
   perfiles_moneda                         perfil_organizacion[]               @relation("perfil_moneda")
   perfiles_tipo_persona_fiscal            perfil_organizacion[]               @relation("perfil_tipo_persona_fiscal")
   perfiles_tipo_documento_fiscal          perfil_organizacion[]               @relation("perfil_tipo_documento_fiscal")
   perfiles_responsabilidad_fiscal         perfil_organizacion[]               @relation("perfil_responsabilidad_fiscal")
+  entidades_legales_moneda                entidades_legales[]                 @relation("entidad_legal_moneda")
+  entidades_legales_tipo_persona          entidades_legales[]                 @relation("entidad_legal_tipo_persona")
+  entidades_legales_responsabilidad       entidades_legales[]                 @relation("entidad_legal_responsabilidad")
+  sedes_idioma                            sedes[]                             @relation("sede_idioma")
+  sedes_especies                          sedes_especies_atendidas[]
+  horarios_soporte_sedes                  horarios_soporte_sedes[]            @relation("horario_soporte_sede_dia_semana")
   organizaciones_especies                 organizaciones_especies_atendidas[]
   propietarios_tipo_documento             propietarios[]                      @relation("propietario_tipo_documento")
   propietarios_como_conocio               propietarios[]                      @relation("propietario_como_conocio")
@@ -184,6 +195,9 @@ model parametros {
   comprobantes_tipo_documento_cliente     comprobantes_electronicos[]         @relation("comprobante_tipo_documento_cliente")
   series_comprobante_tipo                 series_comprobante[]                @relation("serie_comprobante_tipo")
   intentos_envio_estado                   intentos_envio_comprobante[]        @relation("intento_envio_estado")
+  horarios_sedes_dia_semana               horarios_atencion_sedes[]           @relation("horario_sede_dia_semana")
+  sesiones_caja_estado                    sesiones_caja[]                     @relation("sesion_caja_estado")
+  movimientos_caja_tipo                   movimientos_caja[]                  @relation("movimiento_caja_tipo")
 
   @@unique([codigo_grupo, codigo])
   @@schema("configuracion")
@@ -206,26 +220,30 @@ model parametros_traducciones {
 }
 
 model admin_level_0 {
-  id_admin_level_0        String                    @id @default(uuid()) @db.Uuid
-  codigo_iso2             String                    @unique @db.Char(2)
-  nombre_es               String
-  nombre_en               String
-  etiqueta_admin_level_1  String                    @db.VarChar(50)
-  etiqueta_admin_level_2  String?                   @db.VarChar(50)
-  etiqueta_admin_level_3  String                    @db.VarChar(50)
-  estado                  Int                       @default(1)
-  created_at              DateTime                  @default(now()) @db.Timestamptz(3)
-  created_by              String?
-  updated_at              DateTime                  @default(now()) @db.Timestamptz(3)
-  updated_by              String?
-  admin_level_1           admin_level_1[]
-  preferencias_usuario    preferencias_usuario[]
-  personas_procedencia    personas[]                @relation("persona_pais_procedencia")
-  personas_residencia     personas[]                @relation("persona_pais_residencia")
-  personas_nacionalidades personas_nacionalidades[]
-  perfiles_organizacion   perfil_organizacion[]     @relation("perfil_organizacion_pais")
-  propietarios            propietarios[]
-  rangos_geo_ip           rangos_geo_ip[]
+  id_admin_level_0            String                        @id @default(uuid()) @db.Uuid
+  codigo_iso2                 String                        @unique @db.Char(2)
+  nombre_es                   String
+  nombre_en                   String
+  etiqueta_admin_level_1      String                        @db.VarChar(50)
+  etiqueta_admin_level_2      String?                       @db.VarChar(50)
+  etiqueta_admin_level_3      String                        @db.VarChar(50)
+  estado                      Int                           @default(1)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(3)
+  created_by                  String?
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(3)
+  updated_by                  String?
+  admin_level_1               admin_level_1[]
+  preferencias_usuario        preferencias_usuario[]
+  personas_procedencia        personas[]                    @relation("persona_pais_procedencia")
+  personas_residencia         personas[]                    @relation("persona_pais_residencia")
+  personas_nacionalidades     personas_nacionalidades[]
+  perfiles_organizacion       perfil_organizacion[]         @relation("perfil_organizacion_pais")
+  propietarios                propietarios[]
+  rangos_geo_ip               rangos_geo_ip[]
+  sedes                       sedes[]
+  proveedores_fiscales        proveedores_fiscales[]
+  tipos_identificacion_fiscal tipos_identificacion_fiscal[]
+  entidades_legales           entidades_legales[]
 
   @@schema("configuracion")
 }
@@ -286,6 +304,7 @@ model admin_level_3 {
   personas_residencia   personas[]            @relation("persona_admin_level_3_residencia")
   perfiles_organizacion perfil_organizacion[] @relation("perfil_organizacion_admin_level_3")
   propietarios          propietarios[]
+  sedes                 sedes[]
 
   @@unique([fid_admin_level_1, codigo])
   @@index([fid_admin_level_1])
@@ -298,6 +317,7 @@ model preferencias_usuario {
   fid_usuarios            String          @unique @db.Uuid
   fid_admin_level_0       String?         @db.Uuid
   fid_zonas_horarias      String?         @db.Uuid
+  fid_sedes               String?         @db.Uuid
   tema                    String?
   idioma                  String?
   menu_colapsado          Boolean         @default(false)
@@ -311,9 +331,11 @@ model preferencias_usuario {
   usuario                 usuarios        @relation(fields: [fid_usuarios], references: [id_usuarios], onDelete: Cascade)
   pais                    admin_level_0?  @relation(fields: [fid_admin_level_0], references: [id_admin_level_0])
   zona_horaria            zonas_horarias? @relation(fields: [fid_zonas_horarias], references: [id_zonas_horarias])
+  sede                    sedes?          @relation(fields: [fid_sedes], references: [id_sedes], onDelete: SetNull)
 
   @@index([fid_admin_level_0])
   @@index([fid_zonas_horarias])
+  @@index([fid_sedes])
   @@schema("seguridad")
 }
 
@@ -346,6 +368,7 @@ model zonas_horarias {
   updated_by            String?
   preferencias_usuario  preferencias_usuario[]
   perfiles_organizacion perfil_organizacion[]
+  sedes                 sedes[]
 
   @@schema("system")
 }
@@ -426,7 +449,7 @@ model organizaciones {
   updated_by                        String?
   eliminado_en                      DateTime?                           @db.Timestamptz(3)
   eliminado_por                     String?
-  fid_planes                        String                              @default("40000000-0000-4000-8000-000000000003") @db.Uuid
+  fid_planes                        String                              @default("40000000-0000-4000-8000-000000000004") @db.Uuid
   suscripcion_inicia_en             DateTime?                           @db.Timestamptz(3)
   suscripcion_expira_en             DateTime?                           @db.Timestamptz(3)
   duracion_cita_estimada            Int                                 @default(20)
@@ -471,9 +494,418 @@ model organizaciones {
   detalles_comprobante              detalles_comprobante[]
   intentos_envio_comprobante        intentos_envio_comprobante[]
   especies_atendidas                organizaciones_especies_atendidas[]
+  entidades_legales                 entidades_legales[]
+  sedes                             sedes[]
+  usuarios_sedes                    usuarios_sedes[]
+  almacenes                         almacenes[]
+  cajas                             cajas[]
+  sesiones_caja                     sesiones_caja[]
+  movimientos_caja                  movimientos_caja[]
   plan                              planes                              @relation(fields: [fid_planes], references: [id_planes])
 
   @@index([eliminado_en, estado, nombre])
+  @@schema("nucleo")
+}
+
+model proveedores_fiscales {
+  id_proveedores_fiscales    String                       @id @default(uuid()) @db.Uuid
+  fid_admin_level_0          String                       @db.Uuid
+  codigo                     String                       @unique @db.VarChar(40)
+  nombre                     String                       @db.VarChar(120)
+  clave_adaptador            String                       @unique @db.VarChar(80)
+  estado                     Int                          @default(1)
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(3)
+  created_by                 String?
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(3)
+  updated_by                 String?
+  pais                       admin_level_0                @relation(fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
+  entidades_legales          entidades_legales[]
+  comprobantes_electronicos  comprobantes_electronicos[]
+  intentos_envio_comprobante intentos_envio_comprobante[]
+
+  @@unique([id_proveedores_fiscales, fid_admin_level_0])
+  @@index([fid_admin_level_0, estado])
+  @@schema("configuracion")
+}
+
+model tipos_identificacion_fiscal {
+  id_tipos_identificacion_fiscal String              @id @default(uuid()) @db.Uuid
+  fid_admin_level_0              String              @db.Uuid
+  codigo                         String              @db.VarChar(30)
+  nombre                         String              @db.VarChar(80)
+  patron                         String?             @db.VarChar(200)
+  longitud_minima                Int?
+  longitud_maxima                Int?
+  estado                         Int                 @default(1)
+  created_at                     DateTime            @default(now()) @db.Timestamptz(3)
+  created_by                     String?
+  updated_at                     DateTime            @default(now()) @db.Timestamptz(3)
+  updated_by                     String?
+  pais                           admin_level_0       @relation(fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
+  entidades_legales              entidades_legales[]
+
+  @@unique([id_tipos_identificacion_fiscal, fid_admin_level_0])
+  @@unique([fid_admin_level_0, codigo])
+  @@index([fid_admin_level_0, estado])
+  @@schema("configuracion")
+}
+
+model entidades_legales {
+  id_entidades_legales                  String                       @id @default(uuid()) @db.Uuid
+  fid_organizaciones                    String                       @db.Uuid
+  codigo                                String                       @db.VarChar(30)
+  es_principal                          Boolean                      @default(false)
+  fid_admin_level_0                     String                       @db.Uuid
+  fid_tipos_identificacion_fiscal       String?                      @db.Uuid
+  numero_identificacion_fiscal          String?                      @db.VarChar(30)
+  razon_social                          String?                      @db.VarChar(150)
+  fid_parametros_tipo_persona           String?                      @db.Uuid
+  fid_parametros_responsabilidad_fiscal String?                      @db.Uuid
+  fid_parametros_moneda                 String                       @db.Uuid
+  fid_proveedores_fiscales              String?                      @db.Uuid
+  afecto_impuesto                       Boolean                      @default(false)
+  direccion_fiscal                      String?                      @db.VarChar(250)
+  telefono_fiscal                       String?                      @db.VarChar(30)
+  correo_fiscal                         String?                      @db.VarChar(120)
+  estado                                Int                          @default(1)
+  created_at                            DateTime                     @default(now()) @db.Timestamptz(3)
+  created_by                            String?
+  updated_at                            DateTime                     @default(now()) @db.Timestamptz(3)
+  updated_by                            String?
+  eliminado_en                          DateTime?                    @db.Timestamptz(3)
+  eliminado_por                         String?                      @db.Uuid
+  organizacion                          organizaciones               @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  pais                                  admin_level_0                @relation(fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
+  tipo_identificacion_fiscal            tipos_identificacion_fiscal? @relation(fields: [fid_tipos_identificacion_fiscal, fid_admin_level_0], references: [id_tipos_identificacion_fiscal, fid_admin_level_0], onDelete: Restrict)
+  tipo_persona                          parametros?                  @relation("entidad_legal_tipo_persona", fields: [fid_parametros_tipo_persona], references: [id_parametros], onDelete: Restrict)
+  responsabilidad_fiscal                parametros?                  @relation("entidad_legal_responsabilidad", fields: [fid_parametros_responsabilidad_fiscal], references: [id_parametros], onDelete: Restrict)
+  moneda                                parametros                   @relation("entidad_legal_moneda", fields: [fid_parametros_moneda], references: [id_parametros], onDelete: Restrict)
+  proveedor_fiscal                      proveedores_fiscales?        @relation(fields: [fid_proveedores_fiscales, fid_admin_level_0], references: [id_proveedores_fiscales, fid_admin_level_0], onDelete: Restrict)
+  sedes                                 sedes[]
+  series_comprobante                    series_comprobante[]
+  comprobantes_electronicos             comprobantes_electronicos[]
+
+  @@unique([id_entidades_legales, fid_organizaciones])
+  @@unique([fid_organizaciones, codigo])
+  @@index([fid_organizaciones, eliminado_en, estado])
+  @@index([fid_admin_level_0])
+  @@index([fid_tipos_identificacion_fiscal])
+  @@index([fid_parametros_moneda])
+  @@index([fid_proveedores_fiscales])
+  @@schema("nucleo")
+}
+
+model sedes {
+  id_sedes                       String                        @id @default(uuid()) @db.Uuid
+  fid_organizaciones             String                        @db.Uuid
+  fid_entidades_legales          String                        @db.Uuid
+  codigo                         String                        @db.VarChar(30)
+  nombre                         String                        @db.VarChar(120)
+  es_principal                   Boolean                       @default(false)
+  sin_sede_fisica                Boolean                       @default(false)
+  direccion                      String?                       @db.VarChar(250)
+  referencia                     String?                       @db.VarChar(200)
+  fid_admin_level_0              String?                       @db.Uuid
+  fid_admin_level_3              String?                       @db.Uuid
+  latitud                        Decimal?                      @db.Decimal(10, 8)
+  longitud                       Decimal?                      @db.Decimal(11, 8)
+  telefono                       String?                       @db.VarChar(30)
+  telefono_secundario            String?                       @db.VarChar(30)
+  correo_contacto                String?                       @db.VarChar(120)
+  correo_contacto_secundario     String?                       @db.VarChar(120)
+  fid_parametros_idioma          String                        @db.Uuid
+  fid_zonas_horarias             String                        @db.Uuid
+  agenda_activa                  Boolean                       @default(true)
+  duracion_cita_estimada         Int                           @default(20)
+  sitio_web                      String?
+  facebook_url                   String?                       @db.VarChar(200)
+  instagram_url                  String?                       @db.VarChar(200)
+  tiktok_url                     String?                       @db.VarChar(200)
+  youtube_url                    String?                       @db.VarChar(200)
+  linkedin_url                   String?                       @db.VarChar(200)
+  x_url                          String?                       @db.VarChar(200)
+  escudo_url                     String?
+  escudo_oscuro_url              String?
+  escudo_misma_imagen            Boolean                       @default(true)
+  login_escudo_url               String?
+  login_escudo_oscuro_url        String?
+  login_escudo_misma_imagen      Boolean                       @default(true)
+  imagotipo_url                  String?
+  imagotipo_oscuro_url           String?
+  imagotipo_misma_imagen         Boolean                       @default(true)
+  color_primario                 String?
+  ui_cabecera_claro              String?                       @db.VarChar(7)
+  ui_cabecera_oscuro             String?                       @db.VarChar(7)
+  ui_esquinero_claro             String?                       @db.VarChar(7)
+  ui_esquinero_oscuro            String?                       @db.VarChar(7)
+  ui_menu_claro                  String?                       @db.VarChar(7)
+  ui_menu_oscuro                 String?                       @db.VarChar(7)
+  ui_mostrar_escudo_menu         Boolean                       @default(false)
+  ui_mostrar_nombre_empresa_menu Boolean                       @default(true)
+  ui_ocultar_esquinero_expandido Boolean                       @default(false)
+  ui_esquinero_fondo_activo      Boolean                       @default(false)
+  ui_cabecera_ocultar_borde      Boolean                       @default(false)
+  ui_menu_ocultar_borde          Boolean                       @default(false)
+  ui_tamano_escudo_menu          Int                           @default(100) @db.SmallInt
+  soporte_correo                 String?                       @db.VarChar(120)
+  soporte_telefono               String?                       @db.VarChar(30)
+  soporte_whatsapp               String?                       @db.VarChar(30)
+  login_usar_filtro_color        Boolean                       @default(true)
+  login_mostrar_etiqueta         Boolean                       @default(true)
+  login_mostrar_destacados       Boolean                       @default(true)
+  login_mostrar_comunidad        Boolean                       @default(true)
+  login_etiqueta                 String?                       @db.VarChar(60)
+  login_titulo                   String?                       @db.VarChar(120)
+  login_subtitulo                String?                       @db.VarChar(240)
+  login_destacado_1              String?                       @db.VarChar(120)
+  login_destacado_2              String?                       @db.VarChar(120)
+  login_destacado_3              String?                       @db.VarChar(120)
+  login_destacado_icono_1        String                        @default("book") @db.VarChar(40)
+  login_destacado_icono_2        String                        @default("users") @db.VarChar(40)
+  login_destacado_icono_3        String                        @default("award") @db.VarChar(40)
+  login_texto_comunidad          String?                       @db.VarChar(120)
+  estado                         Int                           @default(1)
+  created_at                     DateTime                      @default(now()) @db.Timestamptz(3)
+  created_by                     String?
+  updated_at                     DateTime                      @default(now()) @db.Timestamptz(3)
+  updated_by                     String?
+  eliminado_en                   DateTime?                     @db.Timestamptz(3)
+  eliminado_por                  String?                       @db.Uuid
+  organizacion                   organizaciones                @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  entidad_legal                  entidades_legales             @relation(fields: [fid_entidades_legales, fid_organizaciones], references: [id_entidades_legales, fid_organizaciones], onDelete: Restrict)
+  pais                           admin_level_0?                @relation(fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
+  admin_level_3                  admin_level_3?                @relation(fields: [fid_admin_level_3], references: [id_admin_level_3], onDelete: Restrict)
+  idioma                         parametros                    @relation("sede_idioma", fields: [fid_parametros_idioma], references: [id_parametros], onDelete: Restrict)
+  zona_horaria                   zonas_horarias                @relation(fields: [fid_zonas_horarias], references: [id_zonas_horarias], onDelete: Restrict)
+  usuarios                       usuarios_sedes[]
+  servicios                      sedes_servicios_veterinaria[]
+  horarios                       horarios_atencion_sedes[]
+  horarios_soporte               horarios_soporte_sedes[]
+  almacenes                      almacenes[]
+  cajas                          cajas[]
+  atenciones                     atenciones[]
+  ventas                         ventas[]
+  citas                          citas[]
+  preferencias_usuario           preferencias_usuario[]
+  series_comprobante             series_comprobante[]
+  comprobantes_electronicos      comprobantes_electronicos[]
+  propietarios_registrados       propietarios[]                @relation("propietarios_sede_registro")
+  mascotas_registradas           mascotas[]                    @relation("mascotas_sede_registro")
+  especies_atendidas             sedes_especies_atendidas[]
+  imagenes_login                 imagenes_login_sede[]
+
+  @@unique([id_sedes, fid_organizaciones])
+  @@unique([fid_organizaciones, codigo])
+  @@index([fid_organizaciones, eliminado_en, created_at(sort: Desc), id_sedes(sort: Desc)])
+  @@index([fid_entidades_legales])
+  @@index([fid_admin_level_0])
+  @@index([fid_admin_level_3])
+  @@schema("nucleo")
+}
+
+model imagenes_login_sede {
+  id_imagenes_login_sede String   @id @default(uuid()) @db.Uuid
+  fid_organizaciones     String   @db.Uuid
+  fid_sedes              String   @db.Uuid
+  clave_objeto           String
+  orden                  Int
+  texto_alternativo      String?  @db.VarChar(120)
+  estado                 Int      @default(1)
+  created_at             DateTime @default(now()) @db.Timestamptz(3)
+  created_by             String?
+  updated_at             DateTime @default(now()) @db.Timestamptz(3)
+  updated_by             String?
+  sede                   sedes    @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Cascade)
+
+  @@unique([fid_sedes, orden])
+  @@index([fid_organizaciones, fid_sedes, estado, orden])
+  @@index([clave_objeto])
+  @@schema("nucleo")
+}
+
+model horarios_soporte_sedes {
+  id_horarios_soporte_sedes String     @id @default(uuid()) @db.Uuid
+  fid_organizaciones        String     @db.Uuid
+  fid_sedes                 String     @db.Uuid
+  fid_parametros_dia_semana String     @db.Uuid
+  hora_apertura             String?    @db.VarChar(5)
+  hora_cierre               String?    @db.VarChar(5)
+  cerrado                   Boolean    @default(false)
+  estado                    Int        @default(1)
+  created_at                DateTime   @default(now()) @db.Timestamptz(3)
+  created_by                String?
+  updated_at                DateTime   @default(now()) @db.Timestamptz(3)
+  updated_by                String?
+  sede                      sedes      @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Cascade)
+  dia_semana                parametros @relation("horario_soporte_sede_dia_semana", fields: [fid_parametros_dia_semana], references: [id_parametros], onDelete: Restrict)
+
+  @@unique([fid_sedes, fid_parametros_dia_semana])
+  @@index([fid_organizaciones, fid_sedes, estado])
+  @@index([fid_parametros_dia_semana])
+  @@schema("nucleo")
+}
+
+model usuarios_sedes {
+  id_usuarios_sedes  String         @id @default(uuid()) @db.Uuid
+  fid_organizaciones String         @db.Uuid
+  fid_usuarios       String         @db.Uuid
+  fid_sedes          String         @db.Uuid
+  estado             Int            @default(1)
+  created_at         DateTime       @default(now()) @db.Timestamptz(3)
+  created_by         String?
+  updated_at         DateTime       @default(now()) @db.Timestamptz(3)
+  updated_by         String?
+  organizacion       organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  usuario            usuarios       @relation(fields: [fid_usuarios, fid_organizaciones], references: [id_usuarios, fid_organizaciones], onDelete: Cascade)
+  sede               sedes          @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Cascade)
+
+  @@unique([fid_usuarios, fid_sedes])
+  @@index([fid_organizaciones, fid_usuarios, estado])
+  @@index([fid_sedes, estado])
+  @@schema("seguridad")
+}
+
+model sedes_servicios_veterinaria {
+  id_sedes_servicios_veterinaria String                @id @default(uuid()) @db.Uuid
+  fid_organizaciones             String                @db.Uuid
+  fid_sedes                      String                @db.Uuid
+  fid_servicios_veterinaria      String                @db.Uuid
+  precio                         Decimal?              @db.Decimal(12, 2)
+  estado                         Int                   @default(1)
+  created_at                     DateTime              @default(now()) @db.Timestamptz(3)
+  created_by                     String?
+  updated_at                     DateTime              @default(now()) @db.Timestamptz(3)
+  updated_by                     String?
+  sede                           sedes                 @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Cascade)
+  servicio                       servicios_veterinaria @relation(fields: [fid_servicios_veterinaria, fid_organizaciones], references: [id_servicios_veterinaria, fid_organizaciones], onDelete: Restrict)
+
+  @@unique([fid_sedes, fid_servicios_veterinaria])
+  @@index([fid_organizaciones, fid_sedes, estado])
+  @@index([fid_servicios_veterinaria])
+  @@schema("nucleo")
+}
+
+model horarios_atencion_sedes {
+  id_horarios_atencion_sedes String     @id @default(uuid()) @db.Uuid
+  fid_organizaciones         String     @db.Uuid
+  fid_sedes                  String     @db.Uuid
+  fid_parametros_dia_semana  String     @db.Uuid
+  turno                      Int        @default(1)
+  hora_apertura              String?    @db.VarChar(5)
+  hora_cierre                String?    @db.VarChar(5)
+  cerrado                    Boolean    @default(false)
+  estado                     Int        @default(1)
+  created_at                 DateTime   @default(now()) @db.Timestamptz(3)
+  created_by                 String?
+  updated_at                 DateTime   @default(now()) @db.Timestamptz(3)
+  updated_by                 String?
+  sede                       sedes      @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Cascade)
+  dia_semana                 parametros @relation("horario_sede_dia_semana", fields: [fid_parametros_dia_semana], references: [id_parametros], onDelete: Restrict)
+
+  @@unique([fid_sedes, fid_parametros_dia_semana, turno])
+  @@index([fid_organizaciones, fid_sedes, estado])
+  @@index([fid_parametros_dia_semana])
+  @@schema("nucleo")
+}
+
+model almacenes {
+  id_almacenes       String                   @id @default(uuid()) @db.Uuid
+  fid_organizaciones String                   @db.Uuid
+  fid_sedes          String                   @db.Uuid
+  codigo             String                   @db.VarChar(30)
+  nombre             String                   @db.VarChar(120)
+  es_principal       Boolean                  @default(false)
+  estado             Int                      @default(1)
+  created_at         DateTime                 @default(now()) @db.Timestamptz(3)
+  created_by         String?
+  updated_at         DateTime                 @default(now()) @db.Timestamptz(3)
+  updated_by         String?
+  eliminado_en       DateTime?                @db.Timestamptz(3)
+  eliminado_por      String?                  @db.Uuid
+  organizacion       organizaciones           @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  sede               sedes                    @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
+  lotes              lotes_productos[]
+  movimientos        movimientos_inventario[]
+
+  @@unique([id_almacenes, fid_organizaciones])
+  @@unique([fid_organizaciones, codigo])
+  @@index([fid_sedes, estado])
+  @@schema("nucleo")
+}
+
+model cajas {
+  id_cajas           String          @id @default(uuid()) @db.Uuid
+  fid_organizaciones String          @db.Uuid
+  fid_sedes          String          @db.Uuid
+  codigo             String          @db.VarChar(30)
+  nombre             String          @db.VarChar(120)
+  estado             Int             @default(1)
+  created_at         DateTime        @default(now()) @db.Timestamptz(3)
+  created_by         String?
+  updated_at         DateTime        @default(now()) @db.Timestamptz(3)
+  updated_by         String?
+  eliminado_en       DateTime?       @db.Timestamptz(3)
+  eliminado_por      String?         @db.Uuid
+  organizacion       organizaciones  @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  sede               sedes           @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
+  sesiones           sesiones_caja[]
+
+  @@unique([id_cajas, fid_organizaciones])
+  @@unique([fid_organizaciones, codigo])
+  @@index([fid_sedes, estado])
+  @@schema("nucleo")
+}
+
+model sesiones_caja {
+  id_sesiones_caja      String             @id @default(uuid()) @db.Uuid
+  fid_organizaciones    String             @db.Uuid
+  fid_cajas             String             @db.Uuid
+  fid_usuarios_apertura String             @db.Uuid
+  fid_usuarios_cierre   String?            @db.Uuid
+  fid_parametros_estado String             @db.Uuid
+  monto_apertura        Decimal            @db.Decimal(14, 2)
+  monto_cierre          Decimal?           @db.Decimal(14, 2)
+  abierta_en            DateTime           @default(now()) @db.Timestamptz(3)
+  cerrada_en            DateTime?          @db.Timestamptz(3)
+  observaciones         String?            @db.VarChar(500)
+  estado                Int                @default(1)
+  created_at            DateTime           @default(now()) @db.Timestamptz(3)
+  created_by            String?
+  updated_at            DateTime           @default(now()) @db.Timestamptz(3)
+  updated_by            String?
+  organizacion          organizaciones     @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  caja                  cajas              @relation(fields: [fid_cajas, fid_organizaciones], references: [id_cajas, fid_organizaciones], onDelete: Restrict)
+  usuario_apertura      usuarios           @relation("sesion_caja_usuario_apertura", fields: [fid_usuarios_apertura, fid_organizaciones], references: [id_usuarios, fid_organizaciones], onDelete: Restrict)
+  usuario_cierre        usuarios?          @relation("sesion_caja_usuario_cierre", fields: [fid_usuarios_cierre, fid_organizaciones], references: [id_usuarios, fid_organizaciones], onDelete: Restrict)
+  estado_sesion         parametros         @relation("sesion_caja_estado", fields: [fid_parametros_estado], references: [id_parametros], onDelete: Restrict)
+  movimientos           movimientos_caja[]
+  ventas                ventas[]
+
+  @@unique([id_sesiones_caja, fid_organizaciones])
+  @@index([fid_cajas, estado, abierta_en])
+  @@index([fid_parametros_estado])
+  @@schema("nucleo")
+}
+
+model movimientos_caja {
+  id_movimientos_caja String         @id @default(uuid()) @db.Uuid
+  fid_organizaciones  String         @db.Uuid
+  fid_sesiones_caja   String         @db.Uuid
+  fid_parametros_tipo String         @db.Uuid
+  monto               Decimal        @db.Decimal(14, 2)
+  concepto            String         @db.VarChar(250)
+  referencia          String?        @db.VarChar(120)
+  estado              Int            @default(1)
+  created_at          DateTime       @default(now()) @db.Timestamptz(3)
+  created_by          String?
+  updated_at          DateTime       @default(now()) @db.Timestamptz(3)
+  updated_by          String?
+  organizacion        organizaciones @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  sesion_caja         sesiones_caja  @relation(fields: [fid_sesiones_caja, fid_organizaciones], references: [id_sesiones_caja, fid_organizaciones], onDelete: Restrict)
+  tipo                parametros     @relation("movimiento_caja_tipo", fields: [fid_parametros_tipo], references: [id_parametros], onDelete: Restrict)
+
+  @@index([fid_sesiones_caja, created_at])
+  @@index([fid_parametros_tipo])
   @@schema("nucleo")
 }
 
@@ -557,6 +989,7 @@ model lotes_productos {
   id_lotes_productos  String                   @id @default(uuid()) @db.Uuid
   fid_organizaciones  String                   @db.Uuid
   fid_productos       String                   @db.Uuid
+  fid_almacenes       String                   @db.Uuid
   numero_lote         String                   @db.VarChar(100)
   fecha_vencimiento   DateTime?                @db.Date
   costo_unitario      Decimal?                 @db.Decimal(12, 4)
@@ -572,10 +1005,12 @@ model lotes_productos {
   organizacion        organizaciones           @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
   producto            productos                @relation(fields: [fid_productos, fid_organizaciones], references: [id_productos, fid_organizaciones], onDelete: Restrict)
   movimientos         movimientos_inventario[]
+  almacen             almacenes                @relation(fields: [fid_almacenes, fid_organizaciones], references: [id_almacenes, fid_organizaciones], onDelete: Restrict)
 
   @@unique([id_lotes_productos, fid_organizaciones])
   @@unique([fid_organizaciones, fid_productos, numero_lote])
   @@index([fid_productos, fecha_vencimiento])
+  @@index([fid_almacenes])
   @@schema("nucleo")
 }
 
@@ -586,6 +1021,7 @@ model movimientos_inventario {
   fid_lotes_productos       String?          @db.Uuid
   fid_parametros_tipo       String           @db.Uuid
   fid_detalles_venta        String?          @db.Uuid
+  fid_almacenes             String           @db.Uuid
   cantidad                  Decimal          @db.Decimal(12, 3)
   costo_unitario            Decimal?         @db.Decimal(12, 4)
   observaciones             String?          @db.VarChar(500)
@@ -599,12 +1035,14 @@ model movimientos_inventario {
   lote                      lotes_productos? @relation(fields: [fid_lotes_productos, fid_organizaciones], references: [id_lotes_productos, fid_organizaciones], onDelete: Restrict)
   tipo                      parametros       @relation("movimiento_inventario_tipo", fields: [fid_parametros_tipo], references: [id_parametros], onDelete: Restrict)
   detalle_venta             detalles_venta?  @relation(fields: [fid_detalles_venta, fid_organizaciones], references: [id_detalles_venta, fid_organizaciones], onDelete: Restrict)
+  almacen                   almacenes        @relation(fields: [fid_almacenes, fid_organizaciones], references: [id_almacenes, fid_organizaciones], onDelete: Restrict)
 
   @@index([fid_organizaciones, created_at])
   @@index([fid_productos])
   @@index([fid_lotes_productos])
   @@index([fid_parametros_tipo])
   @@index([fid_detalles_venta])
+  @@index([fid_almacenes])
   @@schema("nucleo")
 }
 
@@ -616,6 +1054,8 @@ model ventas {
   fid_atenciones           String?                     @db.Uuid
   fid_usuarios_responsable String                      @db.Uuid
   fid_parametros_estado    String                      @db.Uuid
+  fid_sedes                String                      @db.Uuid
+  fid_sesiones_caja        String?                     @db.Uuid
   numero                   BigInt
   subtotal                 Decimal                     @db.Decimal(14, 2)
   descuento                Decimal                     @default(0) @db.Decimal(14, 2)
@@ -639,6 +1079,8 @@ model ventas {
   detalles                 detalles_venta[]
   pagos                    pagos_venta[]
   comprobantes             comprobantes_electronicos[]
+  sede                     sedes                       @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
+  sesion_caja              sesiones_caja?              @relation(fields: [fid_sesiones_caja, fid_organizaciones], references: [id_sesiones_caja, fid_organizaciones], onDelete: Restrict)
 
   @@unique([id_ventas, fid_organizaciones])
   @@unique([fid_organizaciones, numero])
@@ -649,6 +1091,8 @@ model ventas {
   @@index([fid_atenciones])
   @@index([fid_usuarios_responsable])
   @@index([fid_parametros_estado])
+  @@index([fid_sedes, created_at])
+  @@index([fid_sesiones_caja])
   @@schema("nucleo")
 }
 
@@ -714,6 +1158,7 @@ model citas {
   fid_mascotas             String?        @db.Uuid
   fid_usuarios_responsable String?        @db.Uuid
   fid_parametros_estado    String         @db.Uuid
+  fid_sedes                String         @db.Uuid
   inicia_en                DateTime       @db.Timestamptz(3)
   termina_en               DateTime       @db.Timestamptz(3)
   motivo                   String         @db.VarChar(250)
@@ -730,6 +1175,7 @@ model citas {
   mascota                  mascotas?      @relation(fields: [fid_mascotas, fid_organizaciones], references: [id_mascotas, fid_organizaciones], onDelete: Restrict)
   responsable              usuarios?      @relation("cita_responsable", fields: [fid_usuarios_responsable, fid_organizaciones], references: [id_usuarios, fid_organizaciones], onDelete: Restrict)
   estado_cita              parametros     @relation("cita_estado", fields: [fid_parametros_estado], references: [id_parametros], onDelete: Restrict)
+  sede                     sedes          @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
 
   @@unique([id_citas, fid_organizaciones])
   @@index([fid_organizaciones, inicia_en, eliminado_en])
@@ -737,6 +1183,7 @@ model citas {
   @@index([fid_mascotas])
   @@index([fid_usuarios_responsable])
   @@index([fid_parametros_estado])
+  @@index([fid_sedes, inicia_en])
   @@schema("nucleo")
 }
 
@@ -805,6 +1252,8 @@ model documentos_mascota {
 model series_comprobante {
   id_series_comprobante String                      @id @default(uuid()) @db.Uuid
   fid_organizaciones    String                      @db.Uuid
+  fid_entidades_legales String                      @db.Uuid
+  fid_sedes             String                      @db.Uuid
   fid_parametros_tipo   String                      @db.Uuid
   serie                 String                      @db.VarChar(4)
   correlativo_actual    BigInt                      @default(0)
@@ -816,11 +1265,15 @@ model series_comprobante {
   eliminado_en          DateTime?                   @db.Timestamptz(3)
   eliminado_por         String?                     @db.Uuid
   organizacion          organizaciones              @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  entidad_legal         entidades_legales           @relation(fields: [fid_entidades_legales, fid_organizaciones], references: [id_entidades_legales, fid_organizaciones], onDelete: Restrict)
+  sede                  sedes                       @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
   tipo                  parametros                  @relation("serie_comprobante_tipo", fields: [fid_parametros_tipo], references: [id_parametros], onDelete: Restrict)
   comprobantes          comprobantes_electronicos[]
 
   @@unique([id_series_comprobante, fid_organizaciones])
-  @@unique([fid_organizaciones, fid_parametros_tipo, serie])
+  @@unique([fid_entidades_legales, fid_sedes, fid_parametros_tipo, serie])
+  @@index([fid_entidades_legales])
+  @@index([fid_sedes])
   @@index([fid_parametros_tipo])
   @@schema("facturacion")
 }
@@ -828,6 +1281,9 @@ model series_comprobante {
 model comprobantes_electronicos {
   id_comprobantes_electronicos          String                       @id @default(uuid()) @db.Uuid
   fid_organizaciones                    String                       @db.Uuid
+  fid_entidades_legales                 String                       @db.Uuid
+  fid_sedes                             String                       @db.Uuid
+  fid_proveedores_fiscales              String?                      @db.Uuid
   fid_ventas                            String                       @db.Uuid
   fid_series_comprobante                String                       @db.Uuid
   fid_parametros_tipo                   String                       @db.Uuid
@@ -857,6 +1313,9 @@ model comprobantes_electronicos {
   eliminado_en                          DateTime?                    @db.Timestamptz(3)
   eliminado_por                         String?                      @db.Uuid
   organizacion                          organizaciones               @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
+  entidad_legal                         entidades_legales            @relation(fields: [fid_entidades_legales, fid_organizaciones], references: [id_entidades_legales, fid_organizaciones], onDelete: Restrict)
+  sede                                  sedes                        @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
+  proveedor_fiscal                      proveedores_fiscales?        @relation(fields: [fid_proveedores_fiscales], references: [id_proveedores_fiscales], onDelete: Restrict)
   venta                                 ventas                       @relation(fields: [fid_ventas, fid_organizaciones], references: [id_ventas, fid_organizaciones], onDelete: Restrict)
   serie_comprobante                     series_comprobante           @relation(fields: [fid_series_comprobante, fid_organizaciones], references: [id_series_comprobante, fid_organizaciones], onDelete: Restrict)
   tipo                                  parametros                   @relation("comprobante_tipo", fields: [fid_parametros_tipo], references: [id_parametros], onDelete: Restrict)
@@ -867,7 +1326,10 @@ model comprobantes_electronicos {
   intentos                              intentos_envio_comprobante[]
 
   @@unique([id_comprobantes_electronicos, fid_organizaciones])
-  @@unique([fid_organizaciones, fid_parametros_tipo, serie, correlativo])
+  @@unique([fid_entidades_legales, fid_parametros_tipo, serie, correlativo])
+  @@index([fid_entidades_legales])
+  @@index([fid_sedes])
+  @@index([fid_proveedores_fiscales])
   @@index([fid_ventas])
   @@index([fid_series_comprobante])
   @@index([fid_parametros_estado])
@@ -906,6 +1368,7 @@ model intentos_envio_comprobante {
   id_intentos_envio_comprobante String                    @id @default(uuid()) @db.Uuid
   fid_organizaciones            String                    @db.Uuid
   fid_comprobantes_electronicos String                    @db.Uuid
+  fid_proveedores_fiscales      String?                   @db.Uuid
   fid_parametros_estado         String                    @db.Uuid
   proveedor                     String                    @db.VarChar(80)
   solicitud_id                  String?                   @db.VarChar(160)
@@ -918,10 +1381,12 @@ model intentos_envio_comprobante {
   updated_by                    String?
   organizacion                  organizaciones            @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Restrict)
   comprobante                   comprobantes_electronicos @relation(fields: [fid_comprobantes_electronicos, fid_organizaciones], references: [id_comprobantes_electronicos, fid_organizaciones], onDelete: Restrict)
+  proveedor_fiscal              proveedores_fiscales?     @relation(fields: [fid_proveedores_fiscales], references: [id_proveedores_fiscales], onDelete: Restrict)
   estado_envio                  parametros                @relation("intento_envio_estado", fields: [fid_parametros_estado], references: [id_parametros], onDelete: Restrict)
 
   @@index([fid_comprobantes_electronicos, created_at])
   @@index([fid_parametros_estado])
+  @@index([fid_proveedores_fiscales])
   @@schema("facturacion")
 }
 
@@ -1058,21 +1523,41 @@ model organizaciones_especies_atendidas {
   @@schema("nucleo")
 }
 
+model sedes_especies_atendidas {
+  id_sedes_especies_atendidas String     @id @default(uuid()) @db.Uuid
+  fid_organizaciones          String     @db.Uuid
+  fid_sedes                   String     @db.Uuid
+  fid_parametros              String     @db.Uuid
+  estado                      Int        @default(1)
+  created_at                  DateTime   @default(now()) @db.Timestamptz(3)
+  created_by                  String?
+  updated_at                  DateTime   @default(now()) @db.Timestamptz(3)
+  updated_by                  String?
+  sede                        sedes      @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Cascade)
+  parametro                   parametros @relation(fields: [fid_parametros], references: [id_parametros], onDelete: Restrict)
+
+  @@unique([fid_sedes, fid_parametros])
+  @@index([fid_organizaciones, fid_sedes, estado])
+  @@index([fid_parametros])
+  @@schema("nucleo")
+}
+
 model servicios_veterinaria {
-  id_servicios_veterinaria String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  fid_organizaciones       String           @db.Uuid
-  nombre                   String           @db.VarChar(120)
-  descripcion              String?          @db.VarChar(500)
-  precio                   Decimal?         @db.Decimal(10, 2)
-  estado                   Int              @default(1)
-  created_at               DateTime         @default(now()) @db.Timestamptz(3)
-  created_by               String?
-  updated_at               DateTime         @default(now()) @db.Timestamptz(3)
-  updated_by               String?
-  eliminado_en             DateTime?        @db.Timestamptz(3)
-  eliminado_por            String?          @db.Uuid
-  organizacion             organizaciones   @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade, onUpdate: Cascade, map: "servicios_veterinaria_fid_organizaciones_fkey")
-  detalles_venta           detalles_venta[]
+  id_servicios_veterinaria   String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fid_organizaciones         String                        @db.Uuid
+  nombre                     String                        @db.VarChar(120)
+  descripcion                String?                       @db.VarChar(500)
+  precio                     Decimal?                      @db.Decimal(10, 2)
+  estado                     Int                           @default(1)
+  created_at                 DateTime                      @default(now()) @db.Timestamptz(3)
+  created_by                 String?
+  updated_at                 DateTime                      @default(now()) @db.Timestamptz(3)
+  updated_by                 String?
+  eliminado_en               DateTime?                     @db.Timestamptz(3)
+  eliminado_por              String?                       @db.Uuid
+  organizacion               organizaciones                @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade, onUpdate: Cascade, map: "servicios_veterinaria_fid_organizaciones_fkey")
+  detalles_venta             detalles_venta[]
+  sedesServiciosVeterinarias sedes_servicios_veterinaria[]
 
   @@unique([id_servicios_veterinaria, fid_organizaciones])
   @@index([fid_organizaciones, estado], map: "servicios_veterinaria_organizacion_estado_idx")
@@ -1084,6 +1569,7 @@ model servicios_veterinaria {
 model propietarios {
   id_propietarios               String          @id @default(uuid()) @db.Uuid
   fid_organizaciones            String          @db.Uuid
+  fid_sedes_registro            String          @db.Uuid
   fid_parametros_tipo_documento String          @db.Uuid
   numero_documento              String          @db.VarChar(40)
   nombre_completo               String          @db.VarChar(150)
@@ -1109,6 +1595,7 @@ model propietarios {
   eliminado_en                  DateTime?       @db.Timestamptz(3)
   eliminado_por                 String?         @db.Uuid
   organizacion                  organizaciones  @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  sede_registro                 sedes           @relation("propietarios_sede_registro", fields: [fid_sedes_registro, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
   tipo_documento                parametros      @relation("propietario_tipo_documento", fields: [fid_parametros_tipo_documento], references: [id_parametros], onDelete: Restrict)
   como_conocio                  parametros?     @relation("propietario_como_conocio", fields: [fid_parametros_como_conocio], references: [id_parametros], onDelete: Restrict)
   pais                          admin_level_0?  @relation(fields: [fid_admin_level_0], references: [id_admin_level_0], onDelete: Restrict)
@@ -1123,6 +1610,7 @@ model propietarios {
   @@index([fid_organizaciones, eliminado_en, nombre_completo])
   @@index([fid_organizaciones, eliminado_en, created_at], map: "propietarios_organizacion_eliminado_creado_idx")
   @@index([fid_organizaciones, eliminado_en, created_at(sort: Desc), id_propietarios(sort: Desc)], map: "propietarios_cursor_idx")
+  @@index([fid_sedes_registro, eliminado_en, created_at(sort: Desc), id_propietarios(sort: Desc)])
   @@index([fid_parametros_tipo_documento])
   @@index([fid_parametros_como_conocio])
   @@index([fid_admin_level_0])
@@ -1221,6 +1709,7 @@ model razas_animales {
 model mascotas {
   id_mascotas                        String                @id @default(uuid()) @db.Uuid
   fid_organizaciones                 String                @db.Uuid
+  fid_sedes_registro                 String                @db.Uuid
   fid_propietarios                   String?               @db.Uuid
   foto_url                           String?
   animal_servicio                    Boolean               @default(false)
@@ -1247,6 +1736,7 @@ model mascotas {
   eliminado_en                       DateTime?             @db.Timestamptz(3)
   eliminado_por                      String?               @db.Uuid
   organizacion                       organizaciones        @relation(fields: [fid_organizaciones], references: [id_organizaciones], onDelete: Cascade)
+  sede_registro                      sedes                 @relation("mascotas_sede_registro", fields: [fid_sedes_registro, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
   propietario                        propietarios?         @relation(fields: [fid_propietarios, fid_organizaciones], references: [id_propietarios, fid_organizaciones], onDelete: Restrict)
   especie                            especies_animales     @relation(fields: [fid_especies_animales], references: [id_especies_animales], onDelete: Restrict)
   subespecie                         subespecies_animales? @relation(fields: [fid_subespecies_animales, fid_especies_animales], references: [id_subespecies_animales, fid_especies_animales], onDelete: Restrict)
@@ -1267,6 +1757,7 @@ model mascotas {
   @@index([fid_organizaciones, eliminado_en, nombre])
   @@index([fid_organizaciones, eliminado_en, created_at], map: "mascotas_organizacion_eliminado_creado_idx")
   @@index([fid_organizaciones, eliminado_en, created_at(sort: Desc), id_mascotas(sort: Desc)], map: "mascotas_cursor_idx")
+  @@index([fid_sedes_registro, eliminado_en, created_at(sort: Desc), id_mascotas(sort: Desc)])
   @@index([fid_propietarios])
   @@index([fid_especies_animales])
   @@index([fid_subespecies_animales])
@@ -1287,6 +1778,7 @@ model atenciones {
   fid_propietarios         String?              @db.Uuid
   fid_usuarios_responsable String               @db.Uuid
   fid_parametros_estado    String               @db.Uuid
+  fid_sedes                String               @db.Uuid
   fecha_atencion           DateTime             @db.Date
   llegada_en               DateTime             @default(now()) @db.Timestamptz(3)
   inicio_en                DateTime?            @db.Timestamptz(3)
@@ -1305,6 +1797,7 @@ model atenciones {
   estado_atencion          parametros           @relation("atencion_estado", fields: [fid_parametros_estado], references: [id_parametros], onDelete: Restrict)
   registros                registros_atencion[]
   ventas                   ventas[]
+  sede                     sedes                @relation(fields: [fid_sedes, fid_organizaciones], references: [id_sedes, fid_organizaciones], onDelete: Restrict)
 
   @@unique([id_atenciones, fid_organizaciones])
   @@index([fid_organizaciones, fecha_atencion, eliminado_en, llegada_en])
@@ -1313,6 +1806,7 @@ model atenciones {
   @@index([fid_propietarios])
   @@index([fid_usuarios_responsable])
   @@index([fid_parametros_estado])
+  @@index([fid_sedes, fecha_atencion, llegada_en])
   @@schema("personas")
 }
 
@@ -2168,6 +2662,9 @@ model usuarios {
   registros_remitidos             registros_atencion[]                @relation("registro_usuario_remitente")
   citas_responsable               citas[]                             @relation("cita_responsable")
   ventas_responsable              ventas[]                            @relation("venta_responsable")
+  usuarios_sedes                  usuarios_sedes[]
+  sesiones_caja_apertura          sesiones_caja[]                     @relation("sesion_caja_usuario_apertura")
+  sesiones_caja_cierre            sesiones_caja[]                     @relation("sesion_caja_usuario_cierre")
 
   // PostgreSQL conserva unicidad solo para filas no eliminadas (índice parcial).
   // Prisma no representa índices parciales, por eso aquí queda como índice normal.

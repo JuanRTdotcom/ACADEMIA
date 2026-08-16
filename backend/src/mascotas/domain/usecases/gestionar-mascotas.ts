@@ -11,14 +11,14 @@ import { RepositorioMascotas } from "../repositories/repositorio-mascotas";
 @Injectable()
 export class CasoUsoGestionarMascotas {
   constructor(private mascotas: RepositorioMascotas) {}
-  listar(organizacion: string, filtros: FiltrosMascotas, idioma: string) {
-    return this.mascotas.listar(organizacion, filtros, idioma);
+  listar(organizacion: string, sede: string, filtros: FiltrosMascotas, idioma: string) {
+    return this.mascotas.listar(organizacion, sede, filtros, idioma);
   }
   opciones(idioma: string) {
     return this.mascotas.opciones(idioma);
   }
-  buscarPropietarios(organizacion: string, q: string) {
-    return this.mascotas.buscarPropietarios(organizacion, q);
+  buscarPropietarios(organizacion: string, sede: string, q: string) {
+    return this.mascotas.buscarPropietarios(organizacion, sede, q);
   }
   obtener(id: string, organizacion: string) {
     return this.mascotas.obtener(id, organizacion);
@@ -28,16 +28,18 @@ export class CasoUsoGestionarMascotas {
   }
   crear(
     organizacion: string,
+    sede: string,
     datos: DatosMascota,
     foto: ArchivoMascota | null,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.mascotas.crear(organizacion, datos, foto, usuario, contexto);
+    return this.mascotas.crear(organizacion, sede, datos, foto, usuario, contexto);
   }
   actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosMascota,
     foto: ArchivoMascota | null,
     eliminarFoto: boolean,
@@ -47,6 +49,7 @@ export class CasoUsoGestionarMascotas {
     return this.mascotas.actualizar(
       id,
       organizacion,
+      sede,
       datos,
       foto,
       eliminarFoto,
@@ -57,10 +60,11 @@ export class CasoUsoGestionarMascotas {
   eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: EliminacionMascota,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.mascotas.eliminar(id, organizacion, datos, usuario, contexto);
+    return this.mascotas.eliminar(id, organizacion, sede, datos, usuario, contexto);
   }
 }

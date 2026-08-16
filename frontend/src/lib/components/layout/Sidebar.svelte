@@ -31,6 +31,7 @@
     darkShieldVersion?: string | null;
     imagotypeVersion?: string | null;
     darkImagotypeVersion?: string | null;
+    mediaBase?: string;
     onClose?: () => void;
   }
   let {
@@ -52,6 +53,7 @@
     darkShieldVersion = null,
     imagotypeVersion = null,
     darkImagotypeVersion = null,
+    mediaBase = '/media/tenant',
     onClose,
   }: Props = $props();
 
@@ -208,7 +210,7 @@
       >
         {#if compactBrand && activeShieldVersion}
           <img
-            src={`/media/tenant/${activeShieldType}/${activeShieldVersion}`}
+            src={`${mediaBase}/${activeShieldType}/${activeShieldVersion}`}
             alt={tenantName}
             class="size-11 object-contain"
             width="44"
@@ -218,7 +220,7 @@
           />
         {:else if !compactBrand && activeImagotypeVersion}
           <img
-            src={`/media/tenant/${activeImagotypeType}/${activeImagotypeVersion}`}
+            src={`${mediaBase}/${activeImagotypeType}/${activeImagotypeVersion}`}
             alt={tenantName}
             class="h-full w-full object-contain object-center p-1"
             width="640"
@@ -253,7 +255,7 @@
           class="flex min-w-0 flex-col items-center gap-2.5 px-3 text-center"
         >
           <img
-            src={`/media/tenant/${activeShieldType}/${activeShieldVersion}`}
+            src={`${mediaBase}/${activeShieldType}/${activeShieldVersion}`}
             alt={tenantName}
             class="object-contain"
             style:width={`${shieldSize}px`}

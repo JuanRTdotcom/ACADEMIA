@@ -291,7 +291,7 @@
 								<td class="px-4 py-4"><p class="max-w-[220px] truncate text-sm text-slate">{company.perfil?.razon_social || '—'}</p></td>
 								<td class="px-4 py-4"><p class="max-w-[220px] truncate text-sm text-slate">{company.perfil?.correo_contacto || '—'}</p><p class="mt-0.5 text-xs text-stone">{company.perfil?.telefono || '—'}</p></td>
 								<td class="px-4 py-4">
-									<Badge variant={company.plan?.codigo === 'FULL' ? 'outline-sky' : company.plan?.codigo === 'PREMIUM' ? 'tag-purple' : 'neutral'}>
+									<Badge variant={company.plan?.codigo === 'EMPRESARIAL' ? 'outline-sky' : company.plan?.codigo === 'PROFESIONAL' ? 'tag-purple' : 'neutral'}>
 										{company.plan?.nombre || '—'}
 									</Badge>
 								</td>

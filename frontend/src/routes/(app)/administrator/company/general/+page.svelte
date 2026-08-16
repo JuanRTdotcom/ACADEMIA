@@ -3,6 +3,7 @@
 	import { Card, Icon, i18n } from '$lib';
 	let { data }: PageProps = $props();
 	const fields = $derived([
+		{ label: i18n.t('companies.section.branch'), value: data.sede?.nombre, icon: 'map-pin' },
 		{ label: i18n.t('companies.field.name'), value: data.section.nombre, icon: 'building-2' },
 		{ label: i18n.t('companies.field.slug'), value: data.section.slug, icon: 'link' },
 		{ label: i18n.t('companies.field.razonSocial'), value: data.section.razon_social, icon: 'file-text' },

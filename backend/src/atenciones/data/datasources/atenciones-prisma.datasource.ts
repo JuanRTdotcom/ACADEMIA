@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -35,6 +36,19 @@ export class FuenteDatosAtencionesPrisma {
     private config: ConfigService,
     private adjuntos: AlmacenAdjuntosAtencionR2,
   ) {}
+
+  async validarAccesoSede(id: string, organizacion: string, sede: string) {
+    const existe = await this.prisma.atenciones.count({
+      where: {
+        id_atenciones: id,
+        fid_organizaciones: organizacion,
+        fid_sedes: sede,
+        estado: 1,
+        eliminado_en: null,
+      },
+    });
+    if (existe !== 1) throw new NotFoundException("attentions.notFound");
+  }
 
   private async guardarAdjuntos(
     organizacion: string,
@@ -105,7 +119,11 @@ export class FuenteDatosAtencionesPrisma {
     if (!actor) throw new NotFoundException("attentions.unavailable");
   }
 
-  private async tiempoTenant(tx: Tx, organizacion: string) {
+  private async tiempoTenant(
+    tx: Tx,
+    organizacion: string,
+    sede: string | null = null,
+  ) {
     const [tiempo] = await tx.$queryRaw<
       Array<{ fecha: Date; fecha_anterior: Date; zona: string }>
     >`
@@ -113,11 +131,19 @@ export class FuenteDatosAtencionesPrisma {
              ((CURRENT_TIMESTAMP AT TIME ZONE zona.nombre_iana)::date - 1) AS fecha_anterior,
              zona.nombre_iana AS zona
       FROM nucleo.organizaciones organizacion
-      JOIN nucleo.perfil_organizacion perfil
-        ON perfil.fid_organizaciones = organizacion.id_organizaciones
-       AND perfil.estado = 1
+      JOIN nucleo.sedes sede
+        ON sede.fid_organizaciones = organizacion.id_organizaciones
+       AND sede.id_sedes = COALESCE(
+         ${sede}::uuid,
+         (SELECT principal.id_sedes FROM nucleo.sedes principal
+          WHERE principal.fid_organizaciones = organizacion.id_organizaciones
+            AND principal.es_principal AND principal.estado = 1
+            AND principal.eliminado_en IS NULL LIMIT 1)
+       )
+       AND sede.estado = 1
+       AND sede.eliminado_en IS NULL
       JOIN system.zonas_horarias zona
-        ON zona.id_zonas_horarias = perfil.fid_zonas_horarias
+        ON zona.id_zonas_horarias = sede.fid_zonas_horarias
        AND zona.estado = 1
       WHERE organizacion.id_organizaciones = ${organizacion}::uuid
         AND organizacion.estado = 1
@@ -1297,63 +1323,99 @@ export class FuenteDatosAtencionesPrisma {
 
   async listarHoy(
     organizacion: string,
+    sede: string,
     filtros: FiltrosAtenciones,
     idioma: string,
   ) {
     const { fecha, fecha_anterior } = await this.tiempoTenant(
       this.prisma,
       organizacion,
+      sede,
     );
     const q = filtros.q?.trim();
     const base: Prisma.atencionesWhereInput = {
-        fid_organizaciones: organizacion,
-        fecha_atencion: filtros.incluir_ayer
-          ? { gte: fecha_anterior, lte: fecha }
-          : fecha,
-        estado: 1,
-        eliminado_en: null,
-        ...(q
-          ? {
-              OR: [
-                { mascota: { nombre: { contains: q, mode: "insensitive" } } },
-                {
-                  propietario: {
-                    nombre_completo: { contains: q, mode: "insensitive" },
-                  },
+      fid_organizaciones: organizacion,
+      fid_sedes: sede,
+      fecha_atencion: filtros.incluir_ayer
+        ? { gte: fecha_anterior, lte: fecha }
+        : fecha,
+      estado: 1,
+      eliminado_en: null,
+      ...(q
+        ? {
+            OR: [
+              { mascota: { nombre: { contains: q, mode: "insensitive" } } },
+              {
+                propietario: {
+                  nombre_completo: { contains: q, mode: "insensitive" },
                 },
-                {
-                  propietario: {
-                    numero_documento: { contains: q, mode: "insensitive" },
-                  },
+              },
+              {
+                propietario: {
+                  numero_documento: { contains: q, mode: "insensitive" },
                 },
-              ],
-            }
-          : {}),
+              },
+            ],
+          }
+        : {}),
     };
     const atras = Boolean(filtros.antes_de);
     const cursorId = filtros.antes_de ?? filtros.despues_de;
     const cursor = cursorId
-      ? await this.prisma.atenciones.findFirst({ where: { AND: [base, { id_atenciones: cursorId }] }, select: { fecha_atencion: true, llegada_en: true, id_atenciones: true } })
+      ? await this.prisma.atenciones.findFirst({
+          where: { AND: [base, { id_atenciones: cursorId }] },
+          select: {
+            fecha_atencion: true,
+            llegada_en: true,
+            id_atenciones: true,
+          },
+        })
       : null;
-    if (cursorId && !cursor) throw new BadRequestException("attentions.invalidCursor");
-    const condicion: Prisma.atencionesWhereInput = cursor ? { OR: atras
-      ? [
-          { fecha_atencion: { gt: cursor.fecha_atencion } },
-          { fecha_atencion: cursor.fecha_atencion, llegada_en: { gt: cursor.llegada_en } },
-          { fecha_atencion: cursor.fecha_atencion, llegada_en: cursor.llegada_en, id_atenciones: { gt: cursor.id_atenciones } },
-        ]
-      : [
-          { fecha_atencion: { lt: cursor.fecha_atencion } },
-          { fecha_atencion: cursor.fecha_atencion, llegada_en: { lt: cursor.llegada_en } },
-          { fecha_atencion: cursor.fecha_atencion, llegada_en: cursor.llegada_en, id_atenciones: { lt: cursor.id_atenciones } },
-        ]
-    } : {};
+    if (cursorId && !cursor)
+      throw new BadRequestException("attentions.invalidCursor");
+    const condicion: Prisma.atencionesWhereInput = cursor
+      ? {
+          OR: atras
+            ? [
+                { fecha_atencion: { gt: cursor.fecha_atencion } },
+                {
+                  fecha_atencion: cursor.fecha_atencion,
+                  llegada_en: { gt: cursor.llegada_en },
+                },
+                {
+                  fecha_atencion: cursor.fecha_atencion,
+                  llegada_en: cursor.llegada_en,
+                  id_atenciones: { gt: cursor.id_atenciones },
+                },
+              ]
+            : [
+                { fecha_atencion: { lt: cursor.fecha_atencion } },
+                {
+                  fecha_atencion: cursor.fecha_atencion,
+                  llegada_en: { lt: cursor.llegada_en },
+                },
+                {
+                  fecha_atencion: cursor.fecha_atencion,
+                  llegada_en: cursor.llegada_en,
+                  id_atenciones: { lt: cursor.id_atenciones },
+                },
+              ],
+        }
+      : {};
     const [filas, total] = await Promise.all([
       this.prisma.atenciones.findMany({
         where: { AND: [base, condicion] },
         orderBy: atras
-          ? [{ fecha_atencion: "asc" }, { llegada_en: "asc" }, { id_atenciones: "asc" }]
-          : [{ fecha_atencion: "desc" }, { llegada_en: "desc" }, { id_atenciones: "desc" }],
+          ? [
+              { fecha_atencion: "asc" },
+              { llegada_en: "asc" },
+              { id_atenciones: "asc" },
+            ]
+          : [
+              { fecha_atencion: "desc" },
+              { llegada_en: "desc" },
+              { id_atenciones: "desc" },
+            ],
         take: 11,
         select: this.seleccionAtencion(),
       }),
@@ -1369,8 +1431,14 @@ export class FuenteDatosAtencionesPrisma {
       atenciones: items.map((item) => this.presentar(item, idioma)),
       total,
       paginacion: {
-        anterior: items.length && (atras ? hayMas : Boolean(filtros.despues_de)) ? items[0]!.id_atenciones : null,
-        siguiente: items.length && (atras || hayMas) ? items.at(-1)!.id_atenciones : null,
+        anterior:
+          items.length && (atras ? hayMas : Boolean(filtros.despues_de))
+            ? items[0]!.id_atenciones
+            : null,
+        siguiente:
+          items.length && (atras || hayMas)
+            ? items.at(-1)!.id_atenciones
+            : null,
       },
     };
   }
@@ -1749,11 +1817,12 @@ export class FuenteDatosAtencionesPrisma {
     };
   }
 
-  async buscarPropietarios(organizacion: string, q: string) {
+  async buscarPropietarios(organizacion: string, sede: string, q: string) {
     return {
       propietarios: await this.prisma.propietarios.findMany({
         where: {
           fid_organizaciones: organizacion,
+          fid_sedes_registro: sede,
           estado: 1,
           eliminado_en: null,
           OR: [
@@ -1790,6 +1859,7 @@ export class FuenteDatosAtencionesPrisma {
 
   async mascotasPropietario(
     organizacion: string,
+    sede: string,
     propietario: string,
     idioma: string,
   ) {
@@ -1797,6 +1867,7 @@ export class FuenteDatosAtencionesPrisma {
       where: {
         id_propietarios: propietario,
         fid_organizaciones: organizacion,
+        fid_sedes_registro: sede,
         estado: 1,
         eliminado_en: null,
       },
@@ -1806,6 +1877,7 @@ export class FuenteDatosAtencionesPrisma {
     const mascotas = await this.prisma.mascotas.findMany({
       where: {
         fid_organizaciones: organizacion,
+        fid_sedes_registro: sede,
         fid_propietarios: propietario,
         estado: 1,
         eliminado_en: null,
@@ -1851,6 +1923,7 @@ export class FuenteDatosAtencionesPrisma {
 
   async ultimoRegistroMascota(
     organizacion: string,
+    sede: string,
     mascota: string,
     tipoId: string,
   ) {
@@ -1859,6 +1932,7 @@ export class FuenteDatosAtencionesPrisma {
         where: {
           id_mascotas: mascota,
           fid_organizaciones: organizacion,
+          fid_sedes_registro: sede,
           estado: 1,
           eliminado_en: null,
         },
@@ -1881,14 +1955,17 @@ export class FuenteDatosAtencionesPrisma {
       JOIN personas.atenciones atencion
         ON atencion.id_atenciones = registro.fid_atenciones
        AND atencion.fid_organizaciones = registro.fid_organizaciones
-      JOIN nucleo.perfil_organizacion perfil
-        ON perfil.fid_organizaciones = registro.fid_organizaciones
-       AND perfil.estado = 1
+      JOIN nucleo.sedes sede
+        ON sede.id_sedes = atencion.fid_sedes
+       AND sede.fid_organizaciones = atencion.fid_organizaciones
+       AND sede.estado = 1
+       AND sede.eliminado_en IS NULL
       JOIN system.zonas_horarias zona
-        ON zona.id_zonas_horarias = perfil.fid_zonas_horarias
+        ON zona.id_zonas_horarias = sede.fid_zonas_horarias
        AND zona.estado = 1
       WHERE registro.fid_organizaciones = ${organizacion}::uuid
         AND atencion.fid_mascotas = ${mascota}::uuid
+        AND atencion.fid_sedes = ${sede}::uuid
         AND registro.fid_tipos_registro_atencion = ${tipoId}::uuid
         AND registro.estado = 1
         AND registro.eliminado_en IS NULL
@@ -1905,6 +1982,7 @@ export class FuenteDatosAtencionesPrisma {
 
   async historialMascota(
     organizacion: string,
+    sede: string,
     mascotaId: string,
     idioma: string,
   ) {
@@ -1912,6 +1990,7 @@ export class FuenteDatosAtencionesPrisma {
       where: {
         id_mascotas: mascotaId,
         fid_organizaciones: organizacion,
+        fid_sedes_registro: sede,
         estado: 1,
         eliminado_en: null,
       },
@@ -1947,6 +2026,7 @@ export class FuenteDatosAtencionesPrisma {
     const atenciones = await this.prisma.atenciones.findMany({
       where: {
         fid_organizaciones: organizacion,
+        fid_sedes: sede,
         fid_mascotas: mascotaId,
         estado: 1,
         eliminado_en: null,
@@ -2010,6 +2090,7 @@ export class FuenteDatosAtencionesPrisma {
 
   async crear(
     organizacion: string,
+    sede: string,
     datos: DatosCrearAtencion,
     adjuntos: ArchivoAdjuntoAtencion[],
     usuario: string,
@@ -2027,6 +2108,18 @@ export class FuenteDatosAtencionesPrisma {
     try {
       return await this.prisma.$transaction(async (tx) => {
         await this.validarContexto(tx, organizacion, usuario);
+        const asignacion = await tx.usuarios_sedes.findFirst({
+          where: {
+            fid_usuarios: usuario,
+            fid_sedes: sede,
+            fid_organizaciones: organizacion,
+            estado: 1,
+            sede: { estado: 1, eliminado_en: null },
+          },
+          select: { id_usuarios_sedes: true },
+        });
+        if (!asignacion)
+          throw new ForbiddenException("attentions.invalidBranch");
         const mascota = await tx.mascotas.findFirst({
           where: {
             id_mascotas: datos.fid_mascotas,
@@ -2047,11 +2140,12 @@ export class FuenteDatosAtencionesPrisma {
         });
         if (!estado)
           throw new BadRequestException("attentions.invalidConfiguration");
-        const tiempo = await this.tiempoTenant(tx, organizacion);
+        const tiempo = await this.tiempoTenant(tx, organizacion, sede);
         const atencion = await tx.atenciones.create({
           data: {
             id_atenciones: idAtencion,
             fid_organizaciones: organizacion,
+            fid_sedes: sede,
             fid_mascotas: mascota.id_mascotas,
             fid_propietarios: mascota.fid_propietarios,
             fid_usuarios_responsable: usuario,
@@ -2133,7 +2227,11 @@ export class FuenteDatosAtencionesPrisma {
           ["finalizada", "cancelada"].includes(atencion.estado_atencion.codigo)
         )
           throw new BadRequestException("attentions.closed");
-        const tiempo = await this.tiempoTenant(tx, organizacion);
+        const tiempo = await this.tiempoTenant(
+          tx,
+          organizacion,
+          atencion.fid_sedes,
+        );
         const { registro, tipo } = await this.crearRegistro(
           tx,
           id,
@@ -2368,7 +2466,7 @@ export class FuenteDatosAtencionesPrisma {
               original.fid_registros_atencion_origen ?? undefined,
           },
           usuario,
-          (await this.tiempoTenant(tx, organizacion)).zona,
+          (await this.tiempoTenant(tx, organizacion, atencion.fid_sedes)).zona,
           temporalId,
           adjuntosTemporales,
         );

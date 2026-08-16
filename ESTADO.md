@@ -2849,3 +2849,159 @@ Docs relacionados: `backend/ARCHITECTURE.md` · `backend/CONVENTIONS.md` · `bac
 - El overlay conserva las filas y aplica solo blur durante navegación. Las cabeceras usan mayúsculas y mayor peso; el contenido mantiene peso normal y color uniforme. Ventas ubica Registrar pago al inicio y preselecciona la venta elegida.
 - Se preservaron permisos `operations.inventory.*`, `operations.sales.*` y `operations.billing.*`, tenant de sesión, rate limiting, validaciones, transacciones y auditoría de las mutaciones existentes. Series continúa como opción de formulario porque aún no existe un listado independiente que paginar.
 - Verificación sin abrir puertos: migración aplicada, Prisma válido, build Nest correcto, DTO Operaciones 3/3 y `svelte-check` 0 errores/0 advertencias.
+## 2026-08-15 — Base multisedes operativa
+
+- Se incorporaron sedes normalizadas por veterinaria, asignaciones usuario–sede, servicios y horarios por sede, almacenes y cajas base, sesiones y movimientos de caja.
+- La creación futura de veterinarias provisiona atómicamente su sede, almacén y caja principal antes de permitir crear usuarios.
+- La migración convierte cada veterinaria histórica en una sede principal, conserva sus servicios/horarios, asigna sus usuarios y relaciona atenciones, ventas, citas, lotes y kardex existentes sin perder avances.
+- El administrador dispone de la nueva pantalla Sedes y de asignación de sedes en alta/edición de empleados. El header permite cambiar la sede activa autorizada.
+- Atenciones, agenda, ventas e inventario aplican alcance de sede activa en backend; propietarios, mascotas e historial permanecen tenant-wide deliberadamente.
+- Se añadieron permisos de Sedes a módulos, planes activos, ADMIN y SUPERADMIN. Creación, edición, eliminación y selección quedan validadas desde PostgreSQL y auditadas.
+- Verificación: migración desplegada, Prisma validado/generado, build backend, 11 pruebas focalizadas, `svelte-check` 0/0 y build frontend correctos.
+
+## 2026-08-15 — Capacidades comerciales de los planes
+
+- `configuracion.planes` incorpora `maximo_sedes` y `maximo_usuarios`; ambas capacidades y `almacenamiento_max_bytes` usan `NULL` para representar ausencia de límite y restricciones PostgreSQL para rechazar valores no positivos.
+- Se consolidaron los planes Demo (1 sede, 5 usuarios, 2 GB), Inicial (1 sede, 3 usuarios, 5 GB), Profesional (3 sedes, 15 usuarios, 25 GB), Empresarial (sin límites) y Sistema (sin límites). Demo, Profesional y Empresarial reciben todos los módulos tenant; Inicial conserva la operación clínica y excluye `operations.*`.
+- Demo quedó como plan técnico predeterminado de una nueva veterinaria hasta que el superadministrador registre su suscripción. La duración continúa definida por las fechas de cada renovación, evitando duplicar esa regla en el plan.
+- La creación de sedes y la creación/reactivación de usuarios validan el cupo efectivo del plan bajo bloqueo de la organización en la misma transacción. Un downgrade conserva todos los datos existentes y solo impide superar nuevamente el cupo.
+- SUMAQ SYSTEM conserva el plan interno Sistema, todos los módulos, almacenamiento/sedes/usuarios ilimitados y una renovación respaldada en base con vigencia de cien años.
+- El formulario de Planes permite administrar almacenamiento, sedes y usuarios; vacío significa sin límite. Se corrigieron además tres `ON CONFLICT` obsoletos del seed tras permitirse nombres repetidos en catálogos y una relación Prisma accidental entre productos y servicios por sede, dejando `prisma db seed` nuevamente operativo.
+- Verificación: migración aplicada y 162 migraciones al día, seed correcto, Prisma validado/generado, build Nest, 8 pruebas focalizadas, `svelte-check` 0/0 y build SvelteKit correctos.
+
+## 2026-08-15 — Cuotas mensuales y unidades de almacenamiento
+
+- `configuracion.planes` incorpora `maximo_mensajes_mensuales` y `maximo_uso_ia_mensual`; ambas aceptan únicamente enteros positivos o `NULL` para ilimitado y se incluyen en API, auditoría, alta, edición y listado de Planes.
+- Demo queda en 500 MB, 100 mensajes WhatsApp/SMS y 25 usos de IA; Inicial en 5 GB, 300 y 50; Profesional en 25 GB, 2000 y 500; Empresarial y Sistema permanecen ilimitados.
+- El almacenamiento continúa normalizado en bytes. La UI permite capturarlo en KB, MB o GB, elige automáticamente la unidad exacta al editar y acepta desde 1 KB sin pérdida por redondeo.
+- No se crearon contadores especulativos: los módulos futuros de mensajería e IA deberán reservar/contabilizar consumo contra estas capacidades cuando se implementen.
+- Verificación sin abrir puertos: migración 163 aplicada, seed correcto, Prisma validado/generado, 111 pruebas backend correctas, build Nest, `svelte-check` 0/0 y build SvelteKit correctos.
+
+## 2026-08-15 — Unidades de almacenamiento normalizadas en parámetros
+
+- La implementación anterior de KB/MB/GB como constantes técnicas quedó reemplazada. Las tres opciones pertenecen al grupo `unidades_almacenamiento` de `configuracion.parametros`, con UUID, traducciones, orden y su factor en bytes dentro de `valor_entero`.
+- `GET /plans/storage-units` entrega únicamente los parámetros activos y localizados. El formulario presenta ese catálogo, elige la unidad exacta al editar y envía su UUID; no contiene opciones ni factores escritos en código.
+- Crear o editar un plan resuelve nuevamente el UUID dentro de la transacción, exige grupo y estado activos, multiplica por el factor de PostgreSQL y rechaza unidades inexistentes o resultados fuera del entero seguro. La cuota final continúa almacenada en bytes.
+- Verificación sin abrir puertos: migración 164 aplicada, seed correcto, parámetros KB/MB/GB consultados desde PostgreSQL, 114 pruebas backend, build Nest, `svelte-check` 0/0 y build SvelteKit correctos.
+
+## 2026-08-15 — Entidades legales y fiscalidad peruana por sede
+
+- Se separaron los límites del SaaS: organización/tenant, entidad legal/fiscal y sede/operación. Las migraciones `20260815170000_legal_entities_peru` y `20260815171000_fiscal_country_integrity` quedaron desplegadas sin eliminar columnas históricas de `perfil_organizacion`, que se mantienen temporalmente como compatibilidad.
+- Se crearon `configuracion.proveedores_fiscales`, `configuracion.tipos_identificacion_fiscal` y `nucleo.entidades_legales`. Perú inicia con RUC y SUNAT; patrón y longitud del RUC viven en PostgreSQL. Las FK compuestas impiden combinar un identificador o proveedor con una entidad de otro país.
+- Cada veterinaria existente recibió una entidad legal principal y cada sede quedó relacionada con ella, idioma y zona horaria. Las nuevas veterinarias provisionan esos registros atómicamente; el seed es idempotente y conserva la misma estructura.
+- El formulario Sedes permite elegir entidad legal, idioma y zona horaria. Backend valida sesión, tenant, estado, maestros activos, pertenencia de entidad y coincidencia de país antes de guardar; las mutaciones conservan transacción y auditoría existentes.
+- Internacionalización escribe moneda en la entidad legal principal e idioma/zona en la sede principal. Perfil fiscal lee y actualiza la entidad legal principal, valida el RUC desde su maestro y mantiene sincronizados los campos heredados durante la transición.
+- Series y comprobantes ahora registran entidad legal y sede; la moneda y el proveedor fiscal se obtienen de la entidad legal, la fecha fiscal usa la zona de la sede y la numeración se aísla por entidad–sede. Atenciones también calcula el día civil desde la sede activa.
+- Verificación sin abrir puertos: 166 migraciones aplicadas, seed correcto, integridad PostgreSQL sin sedes incompletas ni proveedores cruzados, 9 pruebas DTO focalizadas, build Nest y `svelte-check` con 0 errores/0 advertencias.
+
+## 2026-08-15 — Alcance de sede activo en toda la operación
+
+- Se cerró la arquitectura multisedes sin convertir sucursales en empresas duplicadas: la organización sigue siendo el tenant y cada sede relaciona su propia operación, configuración local y entidad legal. Sedes quedó como módulo independiente de Administrador; Suscripción solo se presenta en la sede principal.
+- El selector de sede quedó centrado y con contraste estable en el header. Solo muestra asignaciones activas del usuario, persiste la preferencia en PostgreSQL e invalida la página para que SSR, proxies y endpoints trabajen con el nuevo contexto.
+- Contacto/ubicación, Internacionalización, Agenda/disponibilidad, Perfil fiscal y especies atendidas se leen y guardan contra la sede activa. Marca y catálogos tenant continúan compartidos. Se añadió correo secundario y la tabla normalizada `nucleo.sedes_especies_atendidas`.
+- Propietarios y mascotas incorporaron `fid_sedes_registro` obligatorio, retroalimentado con la sede principal para datos históricos. Listados, búsquedas, altas, Atenciones, ficha comercial e historial operativo exigen la sede activa; la entidad sigue siendo única por organización y el historial conserva la sede real de cada atención.
+- Usuarios se listan por sede activa y solo pueden asignarse a sedes que el administrador posee. Atenciones, ventas, citas, inventario, recordatorios, reportes y comprobantes electrónicos aplican sede en consultas, referencias y cursores opacos. Una sede con operación, propietarios o mascotas relacionados no admite baja.
+- La migración `20260815180000_branch_registration_scope` quedó aplicada; el esquema registra 167 migraciones al día. Verificación sin abrir puertos: Prisma format/validate/generate, build Nest, 34 suites y 116 pruebas backend, `svelte-check` 0 errores/0 advertencias. También se endureció la decodificación canónica de tokens opacos para rechazar representaciones Base64URL alteradas equivalentes.
+
+## 2026-08-15 — Sedes como mantenedor independiente y alta básica
+
+- Sedes dejó de pertenecer visualmente a las pestañas de Veterinaria y pasó a `/administrator/branches`. La tabla compacta no incorpora buscador porque su cardinalidad ya está limitada por el plan; presenta nombre, código, usuarios, tipo, acciones y el consumo `actual/máximo` o ilimitado.
+- Alta y edición solicitan exclusivamente nombre y código en un modal pequeño. Backend conserva el límite transaccional del plan, duplicados, tenant, permisos y auditoría. La sede nueva asigna automáticamente al creador y provisiona almacén/caja, pero queda sin dirección, contacto, agenda, horarios ni servicios para que se configure al seleccionarla desde el header.
+- El selector de sede del header aumentó su ancho y adoptó el tratamiento visual de los botones: superficie sólida, borde de contraste, altura de 44 px, iconos Lucide y flecha propia. La migración `20260815181000_branches_catalog_route` actualiza la ruta del módulo en base.
+
+## 2026-08-15 — Sede principal protegida y Servicios aislados por sede
+
+- La migración `20260815182000_main_branch_code` normaliza el código de toda sede principal a `PRINCIPAL`, reserva ese código mediante restricción PostgreSQL y quedó aplicada como la migración 169. El mantenedor oculta edición/baja de la principal y el backend rechaza una actualización forzada.
+- El cupo de sedes continúa validándose bajo bloqueo transaccional contra `maximo_sedes`; el código conserva la unicidad por organización y los campos de alta/edición se muestran verticalmente.
+- Servicios dejó de depender solo de la organización: el controlador extrae la sede activa de la sesión, el cursor queda ligado también a ella y todas las consultas y mutaciones filtran la relación activa `sedes_servicios_veterinaria`. Crear un servicio valida en PostgreSQL que el actor esté asignado a la sede y crea servicio+relación+auditoría en la misma transacción; ningún UUID de sede llega desde la UI del formulario.
+- El selector del header muestra `Nombre (CÓDIGO)` con fondo transparente, borde y contraste equivalentes al botón de idioma. En alta de usuarios, Sedes aparece primero con una selección visual más clara.
+- Usuarios impide autogestión administrativa: el usuario autenticado no recibe acciones de editar, estado, contraseña o baja, y el backend bloquea también GET/PATCH/DELETE directos contra su propia cuenta.
+- Verificación sin abrir puertos: 169 migraciones aplicadas, build Nest, 34 suites/116 pruebas backend, `svelte-check` 0/0 y build SvelteKit correctos.
+
+## 2026-08-15 — Recarga completa al cambiar de sede
+
+- El selector ya no usa únicamente `invalidateAll()`. Después de que el backend confirma y persiste la sede activa, ejecuta `window.location.reload()` para reconstruir layout, contexto, permisos y página desde la nueva sede sin conservar estado local del módulo anterior.
+- El pin de sede, el indicador de carga y la flecha del select heredan el mismo `currentColor` que el texto según el contraste claro, oscuro o predeterminado del header.
+
+## 2026-08-16 — Configuración completa e independiente por sede
+
+- Se corrigió la configuración que aún dependía de `perfil_organizacion`. Contacto, Internacionalización, Atención veterinaria, Agenda, Perfil fiscal, Presencia digital, Identidad visual, Comunicaciones e Inicio de sesión leen y escriben ahora la sede activa obtenida exclusivamente de la sesión.
+- La migración `20260816120000_branch_company_configuration` copia a cada sede los valores visuales, digitales, de soporte y acceso existentes, sin borrar el perfil histórico. Las portadas se relacionan mediante `nucleo.imagenes_login_sede` y los horarios de soporte mediante `nucleo.horarios_soporte_sedes`.
+- Cada sede secundaria existente recibió una copia independiente de su entidad legal actual. Las nuevas sedes crean también su propia entidad legal y copian como punto de partida la configuración y medios de la sede de origen, conservando independencia posterior.
+- Carga, eliminación, reutilización y lectura de escudos, imagotipos, escudos de acceso y portadas quedaron vinculadas a la sede activa, con permisos, bloqueo, auditoría y limpieza de R2 que comprueba referencias de todas las sedes antes de eliminar un objeto compartido.
+- `/auth/me` incluye la apariencia segura de la sede activa. El layout autenticado aplica sus colores e imágenes mediante un proxy privado; cambiar de sede y recargar reconstruye también la identidad visual correcta. El acceso público sin sesión mantiene la sede principal como representación del tenant.
+- Agenda y disponibilidad incorporó el flujo de formulario mejorado compartido: estado de carga en el botón, respuesta de error localizada, Sonner de éxito/error y actualización del estado base únicamente después de guardar correctamente.
+- La migración quedó aplicada como la número 170. Verificación sin abrir puertos: Prisma generado, build Nest correcto, 34 suites/116 pruebas backend, `svelte-check` 0 errores/0 advertencias y build SvelteKit correcto.
+
+## 2026-08-16 — Sede activa integrada en Veterinaria
+
+- Se retiró el card global que repetía la sede activa sobre toda la configuración. El tab Veterinaria (`/administrator/company/general`) queda primero y muestra un único dato adicional `Sede` con el nombre de la sede seleccionada.
+- La sede continúa resolviéndose desde el contexto SSR autenticado; no se incorporaron identificadores de sede en la URL ni entradas editables.
+- Verificación sin abrir puertos: `svelte-check` finalizó con 0 errores y 0 advertencias.
+
+## 2026-08-16 — Explicación visible del IGV
+
+- El perfil fiscal presenta `Afecto al IGV` dentro de un control delimitado, con una explicación visible sobre su uso como valor predeterminado en ventas y servicios gravados. El texto mantiene traducción español/inglés y el switch conserva su etiqueta accesible.
+
+## 2026-08-16 — Sedes nuevas vacías e identidad institucional compartida
+
+- Se reemplazó la copia amplia de configuración al crear una sede. Ya no se heredan datos fiscales, presencia digital, contacto, agenda, servicios, especies, comunicaciones, horarios de soporte, branding de acceso ni portadas. La entidad legal secundaria nace sin documento, razón social, responsabilidad, proveedor ni contactos fiscales; conserva únicamente país y los maestros predeterminados obligatorios de Perú, español, Lima y PEN.
+- La sede conserva su asignación inicial al creador y provisiona almacén y caja propios dentro de la misma transacción. La identidad visual se obtiene siempre de la sede principal al crearla: escudo, imagotipo, color y apariencia de la interfaz.
+- Identidad visual queda bloqueada en sedes secundarias tanto en UI como en los endpoints de sección, carga, eliminación y reutilización de medios. Una modificación autorizada desde la principal se sincroniza transaccionalmente con todas las sedes activas; Inicio de sesión continúa siendo editable por sede.
+- La migración `20260816130000_branch_clean_defaults_identity` alineó la identidad de las sedes secundarias existentes con su principal sin borrar configuración operativa ya registrada y quedó desplegada como migración 171.
+- Se agregó una prueba focalizada sobre la creación limpia. Verificación sin abrir puertos: Prisma válido y al día, build Nest correcto, 35 suites/117 pruebas backend, `svelte-check` 0/0, build SvelteKit y `git diff --check` correctos.
+## 2026-08-16 — Corrección del alta de sedes vacías
+
+- Se diagnosticó en PostgreSQL que el alta básica intentaba insertar una sede con `sin_sede_fisica=false` y dirección nula, violando `sedes_direccion_ck` y produciendo el mensaje genérico de error inesperado.
+- La sede secundaria ahora nace con `sin_sede_fisica=true` mientras su ubicación está vacía. Al completar Contacto y ubicación siguen aplicándose las validaciones existentes de dirección, país, ubigeo y coordenadas.
+- Verificación sin abrir puertos: prueba focalizada de creación de sede correcta y build Nest correcto.
+
+## 2026-08-16 — Cantidad de sedes en Usuarios
+
+- El listado de Usuarios del administrador incorpora la columna `Sedes` y muestra cuántas sedes activas tiene asignadas cada cuenta; la vista móvil presenta el mismo dato junto a sus roles y estado.
+- El conteo se resuelve desde `seguridad.usuarios_sedes` en la consulta paginada existente, limitado a la organización y excluyendo asignaciones o sedes inactivas/eliminadas. No se realizan consultas adicionales por fila.
+- Verificación sin abrir puertos: build Nest correcto y `svelte-check` con 0 errores y 0 advertencias.
+
+## 2026-08-16 — Sedes asignadas visibles en Usuarios
+
+- La columna Sedes dejó de mostrar solo un total y ahora lista el nombre de cada sede activa asignada al usuario. La adaptación móvil conserva la misma información en un bloque compacto.
+- El backend obtiene las asignaciones activas dentro de la consulta paginada existente, limitadas al tenant y sin consultas adicionales por fila.
+
+## 2026-08-16 — Configuración local sin herencia visual indebida
+
+- Se eliminó el fallback del perfil histórico de organización cuando existe una sede activa. Una sede secundaria con contacto, correos, teléfonos o presencia digital nulos ahora recibe campos vacíos y debe completarlos de forma independiente.
+- La misma regla evita que otras configuraciones locales vacías, como fiscal, comunicaciones o acceso, presenten datos de la principal por compatibilidad. Sin contexto de sede se conserva el fallback histórico necesario para rutas antiguas.
+- Identidad visual ya no aparece en las pestañas de una sede secundaria. Una navegación directa redirige a Veterinaria y el backend mantiene el rechazo transaccional de cualquier modificación fuera de la principal.
+- Se agregó una regresión focalizada para contacto y presencia digital. Verificación sin abrir puertos: 2 pruebas focalizadas correctas, build Nest correcto y `svelte-check` con 0 errores y 0 advertencias.
+
+## 2026-08-16 — Razón social y RUC institucionales en Información básica
+
+- Información básica vuelve a mostrar Razón social y RUC institucionales cuando la entidad legal secundaria todavía no tiene valores propios. Esta herencia es solo de lectura y no repone contacto, presencia digital ni otras configuraciones locales.
+- La regresión de aislamiento de sedes cubre también esta excepción institucional.
+
+## 2026-08-16 — Inicio de sesión exclusivo de la sede principal
+
+- El tab Inicio de sesión se oculta para sedes secundarias y su ruta directa redirige a Información básica, igual que Identidad visual.
+- Backend exige sede principal para leer las secciones Identidad/Inicio de sesión y el agregado de branding. También bloquea cambios de textos, filtro de color, portadas, escudos de acceso, eliminación de medios y reutilización de variantes desde una secundaria.
+- No se borraron medios ni configuraciones históricas. Verificación sin abrir puertos: 2 suites/4 pruebas focalizadas correctas, build Nest correcto y `svelte-check` con 0 errores y 0 advertencias.
+
+## 2026-08-16 — Horarios retirados de Comunicaciones
+
+- Comunicaciones quedó limitada a correo, teléfono y WhatsApp de soporte. Se retiraron de su formulario los horarios, sus validaciones frontend/backend y su persistencia desde ese endpoint.
+- Agenda y disponibilidad es ahora la única sección autorizada para leer, validar y guardar los horarios de atención de cada sede. Los registros históricos de horarios de soporte no se eliminaron de la base para evitar una pérdida destructiva; simplemente dejaron de formar parte del contrato activo de Comunicaciones.
+- Se actualizó la descripción localizada de la sección. Verificación sin abrir puertos: 2 suites/10 pruebas focalizadas correctas, build Nest correcto y `svelte-check` con 0 errores y 0 advertencias.
+
+## 2026-08-16 — Alcance “Todas las sedes” en el selector y Servicios
+
+- El selector central incorpora `Todas las sedes` y conserva la elección en `seguridad.preferencias_usuario.todas_sedes`. La migración `20260816140000_user_all_branches_scope` quedó desplegada como la número 172.
+- El contexto autenticado sigue reconstruyéndose en cada petición. Cuando el alcance total está activo, Servicios obtiene exclusivamente los UUID de `seguridad.usuarios_sedes` vigentes del usuario; no acepta una lista de sedes proveniente del navegador y liga los cursores opacos al usuario, tenant y alcance.
+- El listado y buscador de Servicios muestran la unión de los registros disponibles y señalan las sedes relacionadas. El alcance total es deliberadamente de solo lectura: UI oculta alta/edición/estado/baja y backend rechaza directamente cualquier mutación hasta seleccionar una sede concreta.
+- Se mantuvo la sede concreta previa como referencia para apariencia y configuración local, evitando inventar una sede agregada o mezclar monedas/configuraciones. El patrón queda preparado para adaptar otros listados de forma explícita.
+- Verificación sin abrir puertos: Prisma format/validate/generate, migración aplicada, build Nest, 35 suites/120 pruebas backend, `svelte-check` 0 errores/0 advertencias, build SvelteKit y `git diff --check` correctos.
+
+## 2026-08-16 — Restauración de una sede activa única
+
+- Se revirtió la opción global `Todas las sedes` del header porque mezclaba el contexto operativo con una necesidad de consulta consolidada. El selector vuelve a exigir una única sede concreta y Servicios vuelve a filtrar, buscar, paginar y mutar exclusivamente dentro de ella.
+- `/auth/me`, DTO, preferencia, token opaco y UI dejaron de transportar el alcance agregado. La migración `20260816141000_remove_user_all_branches_scope` elimina la bandera temporal sin alterar asignaciones ni la sede activa de ningún usuario.
+- `Todas las sedes` queda como patrón futuro de filtro local de solo lectura para reportes o listados que lo necesiten; nunca como una sede artificial ni como contexto para mutaciones.
+- La migración de reversión quedó desplegada como la número 173. Verificación sin abrir puertos: Prisma format/validate/generate, build Nest, 35 suites/118 pruebas backend, `svelte-check` 0 errores/0 advertencias, build SvelteKit y `git diff --check` correctos.

@@ -4,6 +4,8 @@ import { companyMessage, companyRequest } from "$lib/server/companies";
 
 export const load: PageServerLoad = async (event) => {
   const parentData = await event.parent();
+  if (!parentData.usuario.sede_activa?.es_principal)
+    error(403, "companies.branches.mainOnly");
   const companyId = parentData.empresa.id_organizaciones;
   try {
     const [generalResponse, renewalsResponse] = await Promise.all([

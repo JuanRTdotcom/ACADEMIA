@@ -6,8 +6,13 @@
 	let { children, data }: LayoutProps = $props();
 	const base = '/administrator/company';
 	const tabs = $derived(data.usuario.modulos
-		.filter((modulo) => modulo.ruta?.startsWith(`${base}/`))
-		.map((modulo) => ({ path: modulo.ruta!.slice(base.length + 1), key: modulo.nombre, icon: modulo.icono ?? 'circle' })));
+		.filter((modulo) =>
+			modulo.ruta?.startsWith(`${base}/`) &&
+			modulo.ruta !== `${base}/branches` &&
+			(![`${base}/subscription`, `${base}/identity`, `${base}/login-branding`].includes(modulo.ruta) || data.usuario.sede_activa?.es_principal)
+		)
+		.map((modulo) => ({ path: modulo.ruta!.slice(base.length + 1), key: modulo.nombre, icon: modulo.icono ?? 'circle' }))
+		.sort((a, b) => Number(b.path === 'general') - Number(a.path === 'general')));
 	const active = (path: string) => page.url.pathname === `${base}/${path}`;
 	const activeTab = $derived(tabs.find((tab) => active(tab.path)) ?? tabs[0]);
 	const breadcrumbItems = $derived([
@@ -29,7 +34,7 @@
 		<div class="flex flex-wrap items-start justify-between gap-5">
 			<div class="flex min-w-0 items-stretch gap-5">
 				{#if shieldVersion}
-					<img src={`/media/tenant/${shieldType}/${shieldVersion}`} alt="" class="aspect-square min-h-28 w-28 shrink-0 self-stretch rounded-md border border-hairline bg-surface object-contain p-2 max-[560px]:min-h-20 max-[560px]:w-20" />
+					<img src={`/media/company/view/${shieldType}/${shieldVersion}`} alt="" class="aspect-square min-h-28 w-28 shrink-0 self-stretch rounded-md border border-hairline bg-surface object-contain p-2 max-[560px]:min-h-20 max-[560px]:w-20" />
 				{:else}
 					<span class="grid aspect-square min-h-28 w-28 shrink-0 self-stretch place-items-center rounded-md border border-hairline bg-surface text-primary max-[560px]:min-h-20 max-[560px]:w-20"><Icon name="building-2" size={36} /></span>
 				{/if}

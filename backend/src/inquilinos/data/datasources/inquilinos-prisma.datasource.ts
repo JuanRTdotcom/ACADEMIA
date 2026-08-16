@@ -43,6 +43,59 @@ export class FuenteDatosInquilinosPrisma {
         slug: true,
         nombre: true,
         perfil: { include: { idioma: { select: { codigo: true } } } },
+        sedes: {
+          where: { es_principal: true, estado: 1, eliminado_en: null },
+          take: 1,
+          select: {
+            idioma: { select: { codigo: true } },
+            color_primario: true,
+            escudo_url: true,
+            escudo_oscuro_url: true,
+            escudo_misma_imagen: true,
+            imagotipo_url: true,
+            imagotipo_oscuro_url: true,
+            imagotipo_misma_imagen: true,
+            login_escudo_url: true,
+            login_escudo_oscuro_url: true,
+            login_escudo_misma_imagen: true,
+            ui_cabecera_claro: true,
+            ui_cabecera_oscuro: true,
+            ui_esquinero_claro: true,
+            ui_esquinero_oscuro: true,
+            ui_menu_claro: true,
+            ui_menu_oscuro: true,
+            ui_mostrar_escudo_menu: true,
+            ui_mostrar_nombre_empresa_menu: true,
+            ui_ocultar_esquinero_expandido: true,
+            ui_esquinero_fondo_activo: true,
+            ui_cabecera_ocultar_borde: true,
+            ui_menu_ocultar_borde: true,
+            ui_tamano_escudo_menu: true,
+            login_usar_filtro_color: true,
+            login_mostrar_etiqueta: true,
+            login_mostrar_destacados: true,
+            login_mostrar_comunidad: true,
+            login_etiqueta: true,
+            login_titulo: true,
+            login_subtitulo: true,
+            login_destacado_1: true,
+            login_destacado_2: true,
+            login_destacado_3: true,
+            login_destacado_icono_1: true,
+            login_destacado_icono_2: true,
+            login_destacado_icono_3: true,
+            login_texto_comunidad: true,
+            imagenes_login: {
+              where: { estado: 1 },
+              orderBy: [{ orden: "asc" }, { created_at: "asc" }],
+              select: {
+                id_imagenes_login_sede: true,
+                clave_objeto: true,
+                texto_alternativo: true,
+              },
+            },
+          },
+        },
         imagenes_login: {
           where: { estado: 1 },
           orderBy: [{ orden: "asc" }, { created_at: "asc" }],
@@ -58,7 +111,21 @@ export class FuenteDatosInquilinosPrisma {
       throw new NotFoundException("tenant.notFound");
     }
 
-    const p = organizacion.perfil?.estado === 1 ? organizacion.perfil : null;
+    const sedePrincipal = organizacion.sedes[0] ?? null;
+    const p =
+      sedePrincipal ??
+      (organizacion.perfil?.estado === 1 ? organizacion.perfil : null);
+    const portadas = sedePrincipal
+      ? sedePrincipal.imagenes_login.map((imagen) => ({
+          id: imagen.id_imagenes_login_sede,
+          version: versionDesde(imagen.clave_objeto)!,
+          texto_alternativo: imagen.texto_alternativo ?? "",
+        }))
+      : organizacion.imagenes_login.map((imagen) => ({
+          id: imagen.id_imagenes_login_organizacion,
+          version: versionDesde(imagen.clave_objeto)!,
+          texto_alternativo: imagen.texto_alternativo ?? "",
+        }));
     return {
       slug: organizacion.slug,
       nombre: organizacion.nombre,
@@ -78,11 +145,7 @@ export class FuenteDatosInquilinosPrisma {
         login_escudo_version: versionDesde(p?.login_escudo_url),
         login_escudo_oscuro_version: versionDesde(p?.login_escudo_oscuro_url),
         login_escudo_misma_imagen: p?.login_escudo_misma_imagen ?? true,
-        portadas: organizacion.imagenes_login.map((imagen) => ({
-          id: imagen.id_imagenes_login_organizacion,
-          version: versionDesde(imagen.clave_objeto)!,
-          texto_alternativo: imagen.texto_alternativo ?? "",
-        })),
+        portadas,
       },
       interfaz: {
         cabecera_claro: colorValido(p?.ui_cabecera_claro),
@@ -155,6 +218,22 @@ export class FuenteDatosInquilinosPrisma {
             login_escudo_oscuro_url: true,
           },
         },
+        sedes: {
+          where: { es_principal: true, estado: 1, eliminado_en: null },
+          take: 1,
+          select: {
+            escudo_url: true,
+            escudo_oscuro_url: true,
+            imagotipo_url: true,
+            imagotipo_oscuro_url: true,
+            login_escudo_url: true,
+            login_escudo_oscuro_url: true,
+            imagenes_login: {
+              where: { estado: 1 },
+              select: { clave_objeto: true },
+            },
+          },
+        },
         imagenes_login: {
           where: { estado: 1 },
           select: { clave_objeto: true },
@@ -164,24 +243,26 @@ export class FuenteDatosInquilinosPrisma {
     if (!organizacion || organizacion.estado !== 1)
       throw new NotFoundException("tenant.notFound");
     let clave: string | null = null;
+    const sedePrincipal = organizacion.sedes[0] ?? null;
     if (tipo === "portada") {
       clave =
-        organizacion.imagenes_login.find(
+        (sedePrincipal?.imagenes_login ?? organizacion.imagenes_login).find(
           (imagen) => versionDesde(imagen.clave_objeto) === version,
         )?.clave_objeto ?? null;
-    } else if (organizacion.perfil?.estado === 1) {
+    } else if (sedePrincipal || organizacion.perfil?.estado === 1) {
+      const marca = sedePrincipal ?? organizacion.perfil!;
       clave =
         tipo === "escudo"
-          ? organizacion.perfil.escudo_url
+          ? marca.escudo_url
           : tipo === "escudo_oscuro"
-            ? organizacion.perfil.escudo_oscuro_url
+            ? marca.escudo_oscuro_url
             : tipo === "imagotipo"
-              ? organizacion.perfil.imagotipo_url
+              ? marca.imagotipo_url
               : tipo === "imagotipo_oscuro"
-                ? organizacion.perfil.imagotipo_oscuro_url
+                ? marca.imagotipo_oscuro_url
                 : tipo === "login_escudo"
-                  ? organizacion.perfil.login_escudo_url
-                  : organizacion.perfil.login_escudo_oscuro_url;
+                  ? marca.login_escudo_url
+                  : marca.login_escudo_oscuro_url;
     }
     if (!clave || versionDesde(clave) !== version)
       throw new NotFoundException("companies.media.notFound");

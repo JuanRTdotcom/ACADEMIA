@@ -9,7 +9,7 @@
   let { data }: PageProps = $props();
   type RoleOption = { id_roles: string; nombre: string; codigo: string; icono: string; permisos: string[] };
   let saving = $state(false); let attempted = $state(false);
-  let form = $state({ fid_organizaciones: '', usuario: '', nombres: '', apellido_paterno: '', apellido_materno: '', correoPrefix: '', contrasenia_temporal: '', confirmacion_contrasenia: '', fid_roles: [] as string[], fid_permisos: [] as string[] });
+  let form = $state({ fid_organizaciones: '', usuario: '', nombres: '', apellido_paterno: '', apellido_materno: '', correoPrefix: '', contrasenia_temporal: '', confirmacion_contrasenia: '', fid_roles: [] as string[], fid_permisos: [] as string[], fid_sedes: [] as string[] });
   let roleToAdd = $state('');
   const roles = $derived(data.roles as RoleOption[]);
   const modules = $derived(data.modulos);
@@ -23,6 +23,7 @@
   $effect(() => {
     if (data.usuario?.fid_organizaciones && !form.fid_organizaciones) {
       form.fid_organizaciones = data.usuario.fid_organizaciones;
+      form.fid_sedes = (data.sedes ?? []).filter((sede: any) => sede.es_principal).map((sede: any) => sede.id_sedes);
     }
   });
 
@@ -52,12 +53,13 @@
     if (!n(form.nombres, 50)) e.nombres = 'users.validation.name'; if (!n(form.apellido_paterno, 30)) e.apellido_paterno = 'users.validation.name'; if (!n(form.apellido_materno, 30)) e.apellido_materno = 'users.validation.name';
     if (!fullCorreo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fullCorreo) || fullCorreo.length > 254) e.correo = 'users.validation.email';
     if (form.fid_roles.length === 0) e.roles = 'users.validation.roles';
+    if (form.fid_sedes.length === 0) e.sedes = 'users.validation.branches';
     if (form.contrasenia_temporal.length < 8 || form.contrasenia_temporal.length > 20 || !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s]).+$/.test(form.contrasenia_temporal)) e.contrasenia_temporal = 'users.validation.password';
     if (form.confirmacion_contrasenia !== form.contrasenia_temporal) e.confirmacion_contrasenia = 'users.validation.passwordMatch'; return e;
   });
   const valid = $derived(Object.keys(errors).length === 0);
   const message = (result: any) => result.type === 'failure' && typeof result.data?.userMessage === 'string' ? result.data.userMessage : 'users.saveError';
-  const create: SubmitFunction = () => { attempted = true; if (!valid) { toast.error(i18n.t('notifications.type.error'), { description: i18n.t('users.invalidData') }); return () => {}; } saving = true; return async ({ result, update }) => { if (result.type === 'success') { await update({ reset: false, invalidateAll: false }); form = { fid_organizaciones: data.usuario.fid_organizaciones, usuario: '', nombres: '', apellido_paterno: '', apellido_materno: '', correoPrefix: '', contrasenia_temporal: '', confirmacion_contrasenia: '', fid_roles: [], fid_permisos: [] }; roleToAdd = ''; attempted = false; saving = false; toast.success(i18n.t('notifications.type.success'), { description: i18n.t('users.created') }); return; } toast.error(i18n.t('notifications.type.error'), { description: i18n.t(message(result)) }); saving = false; }; };
+  const create: SubmitFunction = () => { attempted = true; if (!valid) { toast.error(i18n.t('notifications.type.error'), { description: i18n.t('users.invalidData') }); return () => {}; } saving = true; return async ({ result, update }) => { if (result.type === 'success') { await update({ reset: false, invalidateAll: false }); form = { fid_organizaciones: data.usuario.fid_organizaciones, usuario: '', nombres: '', apellido_paterno: '', apellido_materno: '', correoPrefix: '', contrasenia_temporal: '', confirmacion_contrasenia: '', fid_roles: [], fid_permisos: [], fid_sedes: (data.sedes ?? []).filter((sede: any) => sede.es_principal).map((sede: any) => sede.id_sedes) }; roleToAdd = ''; attempted = false; saving = false; toast.success(i18n.t('notifications.type.success'), { description: i18n.t('users.created') }); return; } toast.error(i18n.t('notifications.type.error'), { description: i18n.t(message(result)) }); saving = false; }; };
 </script>
 
 <svelte:head><title>{i18n.t('users.createTitle')} · Sumaq System</title></svelte:head>
@@ -65,6 +67,23 @@
 <section class="flex w-full flex-col gap-6">
   <div><h1 class="text-[28px] tracking-[-0.02em] text-ink">{i18n.t('users.createTitle')}</h1><p class="mt-1.5 max-w-[62ch] text-steel">{i18n.t('users.createDescription')}</p></div>
   <form method="POST" action="?/create" use:enhance={create} class="flex flex-col gap-5">
+    <Card class="overflow-hidden border-primary/20">
+      <div class="mb-5 flex items-start gap-3 border-b border-hairline pb-4">
+        <span class="grid size-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="map-pin" size={20} /></span>
+        <div><h2 class="text-base font-semibold text-ink">{i18n.t('users.branches')}</h2><p class="mt-1 text-sm text-steel">{i18n.t('users.branchesHelp')}</p></div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {#each data.sedes ?? [] as sede (sede.id_sedes)}
+          <label class="group flex cursor-pointer items-center gap-3 rounded-lg border p-3.5 transition-colors {form.fid_sedes.includes(sede.id_sedes) ? 'border-primary bg-primary-soft/45' : 'border-hairline bg-canvas hover:border-primary/40'}">
+            <input class="sr-only" type="checkbox" name="fid_sedes" value={sede.id_sedes} checked={form.fid_sedes.includes(sede.id_sedes)} onchange={(event) => form.fid_sedes = event.currentTarget.checked ? [...form.fid_sedes, sede.id_sedes] : form.fid_sedes.filter((id) => id !== sede.id_sedes)} />
+            <Icon name={form.fid_sedes.includes(sede.id_sedes) ? 'circle-check' : 'circle'} size={19} class={form.fid_sedes.includes(sede.id_sedes) ? 'text-primary' : 'text-stone'} />
+            <span class="min-w-0 flex-1"><strong class="block truncate text-sm font-semibold text-ink">{sede.nombre}</strong><span class="mt-0.5 block truncate text-xs text-steel">{sede.codigo}</span></span>
+            {#if sede.es_principal}<span class="rounded-full bg-canvas px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">{i18n.t('companies.branches.main')}</span>{/if}
+          </label>
+        {/each}
+      </div>
+      {#if attempted && errors.sedes}<p class="mt-3 text-xs text-danger">{i18n.t(errors.sedes)}</p>{/if}
+    </Card>
     <Card>
       <div class="mb-5"><h2 class="text-base font-semibold text-ink">{i18n.t('users.roles')}</h2><p class="mt-1 text-sm text-steel">{i18n.t('users.rolesHelp')}</p></div>
       <div class="grid gap-4 lg:grid-cols-3">

@@ -96,7 +96,7 @@
 									</div>
 								</td>
 								<td class="px-4 py-4 text-sm font-medium text-slate">
-									<Badge variant={renewal.codigo_plan === 'FULL' ? 'outline-sky' : renewal.codigo_plan === 'PREMIUM' ? 'tag-purple' : 'neutral'}>
+									<Badge variant={renewal.codigo_plan === 'EMPRESARIAL' ? 'outline-sky' : renewal.codigo_plan === 'PROFESIONAL' ? 'tag-purple' : 'neutral'}>
 										{renewal.nombre_plan}
 									</Badge>
 								</td>

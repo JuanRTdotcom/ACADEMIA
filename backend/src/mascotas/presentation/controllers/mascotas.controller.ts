@@ -43,6 +43,12 @@ export class ControladorMascotas {
     private tokens: ServicioTokenOpaco,
   ) {}
 
+  private sede(usuario: UsuarioAutenticado) {
+    const sede = usuario.contexto.sede_activa?.id_sedes;
+    if (!sede) throw new BadRequestException("pets.branchRequired");
+    return sede;
+  }
+
   @Get()
   @Permisos("clinic.pets.read")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -50,9 +56,12 @@ export class ControladorMascotas {
     @Query() filtros: DtoListarMascotas,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
-    const posicion = leerPosicionCatalogo(this.tokens, "clinic-pets", filtros.p, usuario.fid_organizaciones, filtros.q, "pets.invalidCursor");
+    const sede = this.sede(usuario);
+    const ambito = `clinic-pets:${sede}`;
+    const posicion = leerPosicionCatalogo(this.tokens, ambito, filtros.p, usuario.fid_organizaciones, filtros.q, "pets.invalidCursor");
     const listado = await this.mascotas.listar(
       usuario.fid_organizaciones,
+      sede,
       {
         q: filtros.q,
         despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined,
@@ -60,7 +69,7 @@ export class ControladorMascotas {
       },
       usuario.idioma,
     );
-    return protegerPaginacionCatalogo(this.tokens, "clinic-pets", listado, usuario.fid_organizaciones, filtros.q);
+    return protegerPaginacionCatalogo(this.tokens, ambito, listado, usuario.fid_organizaciones, filtros.q);
   }
 
   @Get("options")
@@ -79,6 +88,7 @@ export class ControladorMascotas {
   ) {
     return this.mascotas.buscarPropietarios(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       filtros.q,
     );
   }
@@ -142,6 +152,7 @@ export class ControladorMascotas {
       throw new BadRequestException("pets.ownerDecisionRequired");
     const resultado = await this.mascotas.crear(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       this.datos(dto),
       archivo ? this.archivo(archivo) : null,
       usuario.sub,
@@ -169,6 +180,7 @@ export class ControladorMascotas {
     await this.mascotas.actualizar(
       id,
       usuario.fid_organizaciones,
+      this.sede(usuario),
       this.datos(dto),
       archivo ? this.archivo(archivo) : null,
       dto.eliminar_foto ?? false,
@@ -191,6 +203,7 @@ export class ControladorMascotas {
     await this.mascotas.eliminar(
       id,
       usuario.fid_organizaciones,
+      this.sede(usuario),
       dto,
       usuario.sub,
       crearContextoSolicitud(req),

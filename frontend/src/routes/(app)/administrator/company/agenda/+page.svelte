@@ -1,17 +1,38 @@
 <script lang="ts">
-	import { untrack } from 'svelte'; import type { PageProps } from './$types'; import { Button, Card, Input, Switch, Icon } from '$lib';
+	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
+	import { untrack } from 'svelte';
+	import { toast } from 'svelte-sonner';
+	import type { PageProps } from './$types';
+	import { Button, Card, Input, Switch, Icon, i18n } from '$lib';
 	type Shift = { dia_semana: number; turno: number; cerrado: boolean; hora_apertura: string | null; hora_cierre: string | null };
 	let { data }: PageProps = $props(); let values = $state(untrack(() => ({ ...data.section, duracion_cita_estimada: String(data.section.duracion_cita_estimada), horarios: data.section.horarios.map((h) => ({ ...h })) }))); let baseline = $state(JSON.stringify(values));
+	let saving = $state(false);
 	const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']; const valid = $derived(Number(values.duracion_cita_estimada) >= 5 && values.horarios.every((h) => h.cerrado || Boolean(h.hora_apertura && h.hora_cierre && h.hora_apertura < h.hora_cierre))); const dirty = $derived(JSON.stringify(values) !== baseline);
 	function add(day: number) { const turns = values.horarios.filter((h) => h.dia_semana === day); if (turns.length < 3) values.horarios.push({ dia_semana: day, turno: Math.max(0, ...turns.map((h) => h.turno)) + 1, cerrado: false, hora_apertura: '14:00', hora_cierre: '18:00' }); }
 	function remove(shift: Shift) { values.horarios = values.horarios.filter((h) => h !== shift); }
 	function copyToRemaining(day: number) { const source = values.horarios.filter((h) => h.dia_semana === day); values.horarios = [...values.horarios.filter((h) => h.dia_semana <= day), ...Array.from({ length: 7 - day }, (_, index) => source.map((h) => ({ ...h, dia_semana: day + index + 1 })) ).flat()]; }
+	const submit: SubmitFunction = ({ cancel }) => {
+		if (!valid || !dirty || saving) { cancel(); return; }
+		saving = true;
+		return async ({ result, update }) => {
+			if (result.type === 'success') {
+				await update({ invalidateAll: false, reset: false });
+				baseline = JSON.stringify(values);
+				toast.success(i18n.t('notifications.type.success'), { description: i18n.t('companies.updated') });
+			} else {
+				const key = (result.type === 'failure' ? result.data?.companyMessage : undefined) ?? 'companies.saveError';
+				toast.error(i18n.t('notifications.type.error'), { description: i18n.t(key) });
+			}
+			saving = false;
+		};
+	};
 </script>
-<form method="POST" class="flex flex-col gap-5">
+<form method="POST" use:enhance={submit} aria-busy={saving} class="flex flex-col gap-5">
 	<input type="hidden" name="horarios" value={JSON.stringify(values.horarios)} />
 	<Card padding="xl"><div class="mb-5"><h2 class="text-lg text-ink">Disponibilidad</h2><p class="mt-1 text-[13px] leading-relaxed text-steel">Indica los días y turnos en los que la veterinaria puede atender.</p></div><div class="divide-y divide-hairline rounded-md border border-hairline">
 		{#each days as day, index}<section class="grid grid-cols-2 gap-4 px-4 py-3 max-[650px]:grid-cols-1"><div><h3 class="text-sm font-semibold text-ink">{day}</h3><div class="mt-2 flex flex-wrap gap-2"><Button type="button" size="sm" variant="secondary" disabled={values.horarios.filter((h) => h.dia_semana === index + 1).length >= 3} onclick={() => add(index + 1)}><Icon name="plus" size={16} />Turno</Button>{#if index < 6}<Button type="button" size="sm" variant="ghost" onclick={() => copyToRemaining(index + 1)}><Icon name="copy" size={16} />Copiar al resto</Button>{/if}</div></div><div class="space-y-2">{#each values.horarios.filter((h) => h.dia_semana === index + 1) as shift (shift.turno)}<div class="grid grid-cols-[auto_1fr_1fr_auto] items-center gap-2 rounded-md bg-surface px-2 py-1.5 max-[560px]:grid-cols-[auto_1fr_auto]"><Switch checked={!shift.cerrado} label={`Turno ${shift.turno}`} onchange={(open) => { shift.cerrado = !open; shift.hora_apertura = open ? '08:00' : null; shift.hora_cierre = open ? '13:00' : null; }} /><input aria-label="Hora de inicio" type="time" disabled={shift.cerrado} value={shift.hora_apertura ?? ''} onchange={(e) => shift.hora_apertura = e.currentTarget.value || null} class="h-9 rounded-md border border-hairline bg-canvas px-2" /><input aria-label="Hora de cierre" type="time" disabled={shift.cerrado} value={shift.hora_cierre ?? ''} onchange={(e) => shift.hora_cierre = e.currentTarget.value || null} class="h-9 rounded-md border border-hairline bg-canvas px-2 max-[560px]:col-start-2" /><Button type="button" size="sm" variant="ghost" onclick={() => remove(shift)} aria-label="Eliminar turno"><Icon name="trash-2" size={16} /></Button></div>{/each}</div></section>{/each}
 	</div></Card>
 	<Card padding="xl"><div class="mb-5"><h2 class="text-lg text-ink">Agenda</h2><p class="mt-1 text-[13px] leading-relaxed text-steel">Configura si la web puede recibir solicitudes y la duración que tendrá cada cita.</p></div><div class="rounded-lg border border-hairline bg-surface p-4"><div class="flex items-center justify-between gap-5 max-[560px]:items-start"><div><h3 class="text-sm font-semibold text-ink">Recibir solicitudes de citas</h3><p class="mt-1 max-w-[68ch] text-sm leading-relaxed text-steel">Al activarlo, los clientes podrán solicitar citas según la disponibilidad definida arriba.</p></div><div class="shrink-0"><Switch name="agenda_activa" bind:checked={values.agenda_activa} label="Activar agenda" /></div></div></div><div class="mt-4 max-w-sm"><Input name="duracion_cita_estimada" label="Duración estimada de cita (minutos)" type="number" min="5" max="480" bind:value={values.duracion_cita_estimada} /></div></Card>
-	<div class="flex justify-end"><Button type="submit" disabled={!valid || !dirty}><Icon name="save" size={18} />Guardar cambios</Button></div>
+	<div class="flex justify-end"><Button type="submit" loading={saving} disabled={!valid || !dirty || saving}>{#if !saving}<Icon name="save" size={18} />{/if}Guardar cambios</Button></div>
 </form>

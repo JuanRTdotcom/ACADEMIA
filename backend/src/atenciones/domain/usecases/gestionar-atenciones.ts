@@ -13,37 +13,68 @@ import { RepositorioAtenciones } from "../repositories/repositorio-atenciones";
 @Injectable()
 export class CasoUsoGestionarAtenciones {
   constructor(private atenciones: RepositorioAtenciones) {}
-  listarHoy(organizacion: string, filtros: FiltrosAtenciones, idioma: string) {
-    return this.atenciones.listarHoy(organizacion, filtros, idioma);
+  validarAccesoSede(id: string, organizacion: string, sede: string) {
+    return this.atenciones.validarAccesoSede(id, organizacion, sede);
+  }
+  listarHoy(
+    organizacion: string,
+    sede: string,
+    filtros: FiltrosAtenciones,
+    idioma: string,
+  ) {
+    return this.atenciones.listarHoy(organizacion, sede, filtros, idioma);
   }
   opciones(organizacion: string, idioma: string) {
     return this.atenciones.opciones(organizacion, idioma);
   }
-  buscarPropietarios(organizacion: string, q: string) {
-    return this.atenciones.buscarPropietarios(organizacion, q);
+  buscarPropietarios(organizacion: string, sede: string, q: string) {
+    return this.atenciones.buscarPropietarios(organizacion, sede, q);
   }
   mascotasPropietario(
     organizacion: string,
+    sede: string,
     propietario: string,
     idioma: string,
   ) {
     return this.atenciones.mascotasPropietario(
       organizacion,
+      sede,
       propietario,
       idioma,
     );
   }
-  ultimoRegistroMascota(organizacion: string, mascota: string, tipo: string) {
-    return this.atenciones.ultimoRegistroMascota(organizacion, mascota, tipo);
+  ultimoRegistroMascota(
+    organizacion: string,
+    sede: string,
+    mascota: string,
+    tipo: string,
+  ) {
+    return this.atenciones.ultimoRegistroMascota(
+      organizacion,
+      sede,
+      mascota,
+      tipo,
+    );
   }
-  historialMascota(organizacion: string, mascota: string, idioma: string) {
-    return this.atenciones.historialMascota(organizacion, mascota, idioma);
+  historialMascota(
+    organizacion: string,
+    sede: string,
+    mascota: string,
+    idioma: string,
+  ) {
+    return this.atenciones.historialMascota(
+      organizacion,
+      sede,
+      mascota,
+      idioma,
+    );
   }
   obtener(id: string, organizacion: string, idioma: string) {
     return this.atenciones.obtener(id, organizacion, idioma);
   }
   crear(
     organizacion: string,
+    sede: string,
     datos: DatosCrearAtencion,
     adjuntos: ArchivoAdjuntoAtencion[],
     usuario: string,
@@ -51,6 +82,7 @@ export class CasoUsoGestionarAtenciones {
   ) {
     return this.atenciones.crear(
       organizacion,
+      sede,
       datos,
       adjuntos,
       usuario,

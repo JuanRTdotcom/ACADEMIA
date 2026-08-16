@@ -30,7 +30,7 @@
 	}
 	onMount(() => { const temporizador = window.setInterval(() => ahora = new Date(), 60_000); return () => window.clearInterval(temporizador); });
 </script>
-<CompanySectionCard title="Internacionalización" subtitle="Idioma, zona horaria y moneda operativa de la veterinaria." {valid} {dirty} protectedCompany={data.protegida} onSaved={saved}>
+<CompanySectionCard title="Internacionalización" subtitle="Valores predeterminados de la entidad legal y la sede principal. Cada sede puede personalizarlos desde Sedes." {valid} {dirty} protectedCompany={data.protegida} onSaved={saved}>
 	<div class="col-span-6 max-[620px]:col-span-12"><Select name="fid_parametros_idioma" label={i18n.t('companies.field.idioma')} icon="languages" bind:value={values.fid_parametros_idioma} required>{#each data.catalogos.idiomas as item (item.id_parametros)}<option value={item.id_parametros}>{item.etiqueta}</option>{/each}</Select></div>
 	<div class="col-span-6 max-[620px]:col-span-12">
 		<Select name="fid_zonas_horarias" label={i18n.t('companies.field.zona')} icon="clock" bind:value={values.fid_zonas_horarias} required>{#each data.catalogos.zonas_horarias as zone (zone.id_zonas_horarias)}<option value={zone.id_zonas_horarias}>{zone.nombre_iana} — {desfaseUtc(zone.nombre_iana)}</option>{/each}</Select>

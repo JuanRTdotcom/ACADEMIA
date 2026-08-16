@@ -12,6 +12,32 @@ export class RepositorioEmpresasDatos extends RepositorioEmpresas {
     super();
   }
 
+  listarSedesActual(
+    ...argumentos: Parameters<RepositorioEmpresas["listarSedesActual"]>
+  ) {
+    return this.fuenteDatos.listarSedesActual(...argumentos);
+  }
+  crearSedeActual(
+    ...argumentos: Parameters<RepositorioEmpresas["crearSedeActual"]>
+  ) {
+    return this.fuenteDatos.crearSedeActual(...argumentos);
+  }
+  actualizarSedeActual(
+    ...argumentos: Parameters<RepositorioEmpresas["actualizarSedeActual"]>
+  ) {
+    return this.fuenteDatos.actualizarSedeActual(...argumentos);
+  }
+  eliminarSedeActual(
+    ...argumentos: Parameters<RepositorioEmpresas["eliminarSedeActual"]>
+  ) {
+    return this.fuenteDatos.eliminarSedeActual(...argumentos);
+  }
+  seleccionarSedeActual(
+    ...argumentos: Parameters<RepositorioEmpresas["seleccionarSedeActual"]>
+  ) {
+    return this.fuenteDatos.seleccionarSedeActual(...argumentos);
+  }
+
   listar(...argumentos: Parameters<RepositorioEmpresas["listar"]>) {
     return this.fuenteDatos.listar(...argumentos);
   }
@@ -73,10 +99,11 @@ export class RepositorioEmpresasDatos extends RepositorioEmpresas {
   }
 
   obtenerSeccionActual<S extends SeccionEmpresa>(
-    idOrganizacion: string,
-    seccion: S,
+    ...argumentos: Parameters<RepositorioEmpresas["obtenerSeccionActual"]>
   ): Promise<SeccionesEmpresa[S]> {
-    return this.fuenteDatos.obtenerSeccionActual(idOrganizacion, seccion);
+    return this.fuenteDatos.obtenerSeccionActual(...argumentos) as Promise<
+      SeccionesEmpresa[S]
+    >;
   }
 
   obtenerCatalogosUbicacionActual(

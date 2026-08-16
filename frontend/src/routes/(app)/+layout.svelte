@@ -118,7 +118,8 @@
 		)?.[1]
 	);
 	const title = $derived(titleKey ? i18n.t(titleKey) : 'Sumaq System');
-	const tenantAppearance = $derived(companyAppearancePreview.value ?? data.tenant.interfaz);
+	const activeBranchAppearance = $derived(data.usuario.sede_activa?.apariencia ?? null);
+	const tenantAppearance = $derived(companyAppearancePreview.value ?? activeBranchAppearance ?? data.tenant.interfaz);
 </script>
 
 <div class="flex min-h-dvh bg-surface">
@@ -136,11 +137,12 @@
 		cornerBackgroundEnabled={tenantAppearance.esquinero_fondo_activo}
 		hideRightBorder={tenantAppearance.menu_ocultar_borde}
 		shieldSizePercent={tenantAppearance.tamano_escudo_menu}
-		primaryColor={companyAppearancePreview.value?.color_primario ?? data.tenant.marca.color_primario}
-		shieldVersion={data.tenant.marca.escudo_version}
-		darkShieldVersion={data.tenant.marca.escudo_oscuro_version}
-		imagotypeVersion={data.tenant.marca.imagotipo_version}
-		darkImagotypeVersion={data.tenant.marca.imagotipo_oscuro_version}
+		primaryColor={companyAppearancePreview.value?.color_primario ?? activeBranchAppearance?.color_primario ?? data.tenant.marca.color_primario}
+		shieldVersion={activeBranchAppearance?.escudo_version ?? data.tenant.marca.escudo_version}
+		darkShieldVersion={activeBranchAppearance?.escudo_oscuro_version ?? data.tenant.marca.escudo_oscuro_version}
+		imagotypeVersion={activeBranchAppearance?.imagotipo_version ?? data.tenant.marca.imagotipo_version}
+		darkImagotypeVersion={activeBranchAppearance?.imagotipo_oscuro_version ?? data.tenant.marca.imagotipo_oscuro_version}
+		mediaBase={activeBranchAppearance ? '/media/company/view' : '/media/tenant'}
 		onClose={() => (mobileOpen = false)}
 	/>
 	<div class="flex-1 min-w-0 flex flex-col">
@@ -149,6 +151,8 @@
 			{title}
 			usuario={usuarioCabecera}
 			organizacionNombre={data.tenant.nombre}
+			sedes={data.usuario.sedes}
+			sedeActiva={data.usuario.sede_activa}
 			lightColor={tenantAppearance.cabecera_claro}
 			darkColor={tenantAppearance.cabecera_oscuro}
 			hideBottomBorder={tenantAppearance.cabecera_ocultar_borde}

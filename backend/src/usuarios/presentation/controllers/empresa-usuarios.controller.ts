@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   NotFoundException,
@@ -19,7 +20,10 @@ import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/
 import { Permisos } from "../../../autenticacion/presentation/decorators/permisos.decorador";
 import { UsuarioActual } from "../../../autenticacion/presentation/decorators/usuario-actual.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
-import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
+import {
+  leerPosicionCatalogo,
+  protegerPaginacionCatalogo,
+} from "../../../comun/seguridad/paginacion-catalogo";
 import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
 import { PrismaService } from "../../../comun/prisma.service";
 import { CasoUsoGestionarUsuarios } from "../../domain/usecases/gestionar-usuarios";
@@ -37,6 +41,11 @@ export class ControladorEmpresaUsuarios {
     private readonly prisma: PrismaService,
     private readonly tokens: ServicioTokenOpaco,
   ) {}
+
+  private impedirAutogestion(id: string, actor: UsuarioAutenticado): void {
+    if (id === actor.sub)
+      throw new ForbiddenException("users.cannotManageSelf");
+  }
 
   private async validarRolesAsignables(roles: string[]): Promise<void> {
     const restringidos = await this.prisma.roles.count({
@@ -57,9 +66,34 @@ export class ControladorEmpresaUsuarios {
     @Query() query: DtoListarUsuarios,
     @UsuarioActual() actor: UsuarioAutenticado,
   ) {
-    const posicion = leerPosicionCatalogo(this.tokens, "company-users.pagination", query.p, actor.fid_organizaciones, query.q, "users.invalidCursor");
-    const catalogo = await this.usuarios.listarDeEmpresa(actor.fid_organizaciones, { despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined, antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined, consulta: query.q });
-    return protegerPaginacionCatalogo(this.tokens, "company-users.pagination", catalogo, actor.fid_organizaciones, query.q);
+    const sede = actor.contexto.sede_activa?.id_sedes;
+    if (!sede) throw new BadRequestException("users.branchRequired");
+    const ambito = `company-users.pagination:${sede}`;
+    const posicion = leerPosicionCatalogo(
+      this.tokens,
+      ambito,
+      query.p,
+      actor.fid_organizaciones,
+      query.q,
+      "users.invalidCursor",
+    );
+    const catalogo = await this.usuarios.listarDeEmpresa(
+      actor.fid_organizaciones,
+      sede,
+      {
+        despues_de:
+          posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+        consulta: query.q,
+      },
+    );
+    return protegerPaginacionCatalogo(
+      this.tokens,
+      ambito,
+      catalogo,
+      actor.fid_organizaciones,
+      query.q,
+    );
   }
 
   @Get("creation-options")
@@ -70,7 +104,7 @@ export class ControladorEmpresaUsuarios {
   )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   opciones(@UsuarioActual() actor: UsuarioAutenticado) {
-    return this.usuarios.opcionesDeEmpresa(actor.fid_organizaciones);
+    return this.usuarios.opcionesDeEmpresa(actor.fid_organizaciones, actor.sub);
   }
 
   @Get(":id")
@@ -80,6 +114,7 @@ export class ControladorEmpresaUsuarios {
     @Param("id", new ParseUUIDPipe()) id: string,
     @UsuarioActual() actor: UsuarioAutenticado,
   ) {
+    this.impedirAutogestion(id, actor);
     const usuario = await this.usuarios.obtener(id, actor.sub);
     if (usuario.fid_organizaciones !== actor.fid_organizaciones) {
       throw new NotFoundException("users.notFound");
@@ -104,7 +139,11 @@ export class ControladorEmpresaUsuarios {
       throw new BadRequestException("users.passwordMismatch");
     }
 
-    await this.usuarios.crear({ ...dto }, actor.sub, crearContextoSolicitud(req));
+    await this.usuarios.crear(
+      { ...dto },
+      actor.sub,
+      crearContextoSolicitud(req),
+    );
     return { ok: true };
   }
 
@@ -118,6 +157,7 @@ export class ControladorEmpresaUsuarios {
     @UsuarioActual() actor: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    this.impedirAutogestion(id, actor);
     const usuario = await this.prisma.usuarios.findFirst({
       where: { id_usuarios: id, eliminado_en: null },
     });
@@ -148,6 +188,7 @@ export class ControladorEmpresaUsuarios {
     @UsuarioActual() actor: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    this.impedirAutogestion(id, actor);
     const usuario = await this.prisma.usuarios.findFirst({
       where: { id_usuarios: id, eliminado_en: null },
     });
@@ -174,6 +215,7 @@ export class ControladorEmpresaUsuarios {
     @UsuarioActual() actor: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    this.impedirAutogestion(id, actor);
     const usuario = await this.prisma.usuarios.findFirst({
       where: { id_usuarios: id, eliminado_en: null },
     });
@@ -199,6 +241,7 @@ export class ControladorEmpresaUsuarios {
     @UsuarioActual() actor: UsuarioAutenticado,
     @Req() req: Request,
   ) {
+    this.impedirAutogestion(id, actor);
     const usuario = await this.prisma.usuarios.findFirst({
       where: { id_usuarios: id, eliminado_en: null },
     });

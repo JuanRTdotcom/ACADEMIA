@@ -6,6 +6,7 @@ import {
 import { PrismaService } from "../../../comun/prisma.service";
 import { ServicioAuditoria } from "../../../comun/auditoria/servicio-auditoria";
 import type { ContextoSolicitud } from "../../../comun/domain/entities/contexto-solicitud";
+import type { Idioma } from "../../../comun/i18n/idiomas";
 import type {
   PlanListado,
   DatosGestionarPlan,
@@ -13,6 +14,7 @@ import type {
 } from "../../domain/entities/plan";
 
 type Tx = Parameters<Parameters<PrismaService["$transaction"]>[0]>[0];
+const GRUPO_UNIDADES_ALMACENAMIENTO = "unidades_almacenamiento";
 
 @Injectable()
 export class FuenteDatosPlanesPrisma {
@@ -31,6 +33,10 @@ export class FuenteDatosPlanesPrisma {
         nombre: true,
         descripcion: true,
         almacenamiento_max_bytes: true,
+        maximo_sedes: true,
+        maximo_usuarios: true,
+        maximo_mensajes_mensuales: true,
+        maximo_uso_ia_mensual: true,
         estado: true,
         created_at: true,
         planes_modulos: {
@@ -57,6 +63,10 @@ export class FuenteDatosPlanesPrisma {
         f.almacenamiento_max_bytes === null
           ? null
           : Number(f.almacenamiento_max_bytes),
+      maximo_sedes: f.maximo_sedes,
+      maximo_usuarios: f.maximo_usuarios,
+      maximo_mensajes_mensuales: f.maximo_mensajes_mensuales,
+      maximo_uso_ia_mensual: f.maximo_uso_ia_mensual,
       estado: f.estado,
       created_at: f.created_at,
       modulos: f.planes_modulos.map((pm) => pm.modulo),
@@ -72,6 +82,10 @@ export class FuenteDatosPlanesPrisma {
         nombre: true,
         descripcion: true,
         almacenamiento_max_bytes: true,
+        maximo_sedes: true,
+        maximo_usuarios: true,
+        maximo_mensajes_mensuales: true,
+        maximo_uso_ia_mensual: true,
         estado: true,
         created_at: true,
         planes_modulos: {
@@ -99,6 +113,10 @@ export class FuenteDatosPlanesPrisma {
         f.almacenamiento_max_bytes === null
           ? null
           : Number(f.almacenamiento_max_bytes),
+      maximo_sedes: f.maximo_sedes,
+      maximo_usuarios: f.maximo_usuarios,
+      maximo_mensajes_mensuales: f.maximo_mensajes_mensuales,
+      maximo_uso_ia_mensual: f.maximo_uso_ia_mensual,
       estado: f.estado,
       created_at: f.created_at,
       modulos: f.planes_modulos.map((pm) => pm.modulo),
@@ -118,16 +136,21 @@ export class FuenteDatosPlanesPrisma {
     if (existe) throw new BadRequestException("plans.codeConflict");
 
     await this.prisma.$transaction(async (tx) => {
+      const almacenamientoMaxBytes = await this.resolverAlmacenamiento(
+        tx,
+        datos,
+      );
       const plan = await tx.planes.create({
         data: {
           codigo: datos.codigo.toUpperCase(),
           nombre: datos.nombre,
           descripcion: datos.descripcion || null,
-          almacenamiento_max_bytes:
-            datos.almacenamiento_max_bytes === null ||
-            datos.almacenamiento_max_bytes === undefined
-              ? null
-              : BigInt(datos.almacenamiento_max_bytes),
+          almacenamiento_max_bytes: almacenamientoMaxBytes,
+          maximo_sedes: datos.maximo_sedes ?? null,
+          maximo_usuarios: datos.maximo_usuarios ?? null,
+          maximo_mensajes_mensuales:
+            datos.maximo_mensajes_mensuales ?? null,
+          maximo_uso_ia_mensual: datos.maximo_uso_ia_mensual ?? null,
           estado: 1,
           created_by: idActor,
           updated_by: idActor,
@@ -145,7 +168,15 @@ export class FuenteDatosPlanesPrisma {
           metadatos: {
             codigo: datos.codigo,
             nombre: datos.nombre,
-            almacenamiento_max_bytes: datos.almacenamiento_max_bytes ?? null,
+            almacenamiento_max_bytes:
+              almacenamientoMaxBytes === null
+                ? null
+                : Number(almacenamientoMaxBytes),
+            maximo_sedes: datos.maximo_sedes ?? null,
+            maximo_usuarios: datos.maximo_usuarios ?? null,
+            maximo_mensajes_mensuales:
+              datos.maximo_mensajes_mensuales ?? null,
+            maximo_uso_ia_mensual: datos.maximo_uso_ia_mensual ?? null,
           },
         },
         tx,
@@ -174,17 +205,22 @@ export class FuenteDatosPlanesPrisma {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      const almacenamientoMaxBytes = await this.resolverAlmacenamiento(
+        tx,
+        datos,
+      );
       await tx.planes.update({
         where: { id_planes: id },
         data: {
           codigo: datos.codigo.toUpperCase(),
           nombre: datos.nombre,
           descripcion: datos.descripcion || null,
-          almacenamiento_max_bytes:
-            datos.almacenamiento_max_bytes === null ||
-            datos.almacenamiento_max_bytes === undefined
-              ? null
-              : BigInt(datos.almacenamiento_max_bytes),
+          almacenamiento_max_bytes: almacenamientoMaxBytes,
+          maximo_sedes: datos.maximo_sedes ?? null,
+          maximo_usuarios: datos.maximo_usuarios ?? null,
+          maximo_mensajes_mensuales:
+            datos.maximo_mensajes_mensuales ?? null,
+          maximo_uso_ia_mensual: datos.maximo_uso_ia_mensual ?? null,
           updated_by: idActor,
         },
       });
@@ -200,7 +236,15 @@ export class FuenteDatosPlanesPrisma {
           metadatos: {
             codigo: datos.codigo,
             nombre: datos.nombre,
-            almacenamiento_max_bytes: datos.almacenamiento_max_bytes ?? null,
+            almacenamiento_max_bytes:
+              almacenamientoMaxBytes === null
+                ? null
+                : Number(almacenamientoMaxBytes),
+            maximo_sedes: datos.maximo_sedes ?? null,
+            maximo_usuarios: datos.maximo_usuarios ?? null,
+            maximo_mensajes_mensuales:
+              datos.maximo_mensajes_mensuales ?? null,
+            maximo_uso_ia_mensual: datos.maximo_uso_ia_mensual ?? null,
           },
         },
         tx,
@@ -401,5 +445,64 @@ export class FuenteDatosPlanesPrisma {
         nombre: true,
       },
     });
+  }
+
+  async unidadesAlmacenamiento(idioma: Idioma) {
+    const unidades = await this.prisma.parametros.findMany({
+      where: {
+        codigo_grupo: GRUPO_UNIDADES_ALMACENAMIENTO,
+        estado: 1,
+        valor_entero: { not: null },
+      },
+      orderBy: [{ orden: "asc" }, { id_parametros: "asc" }],
+      select: {
+        id_parametros: true,
+        codigo: true,
+        etiqueta: true,
+        valor_entero: true,
+        traducciones: {
+          where: { codigo_idioma: idioma },
+          select: { etiqueta: true },
+          take: 1,
+        },
+      },
+    });
+    return unidades.map((unidad) => ({
+      id_parametros: unidad.id_parametros,
+      codigo: unidad.codigo,
+      etiqueta: unidad.traducciones[0]?.etiqueta ?? unidad.etiqueta,
+      factor_bytes: Number(unidad.valor_entero),
+    }));
+  }
+
+  private async resolverAlmacenamiento(
+    tx: Tx,
+    datos: DatosGestionarPlan,
+  ): Promise<bigint | null> {
+    const valor = datos.almacenamiento_valor;
+    const idUnidad = datos.fid_parametros_unidad_almacenamiento;
+    if (valor === null || valor === undefined) {
+      if (idUnidad !== null && idUnidad !== undefined)
+        throw new BadRequestException("plans.invalidStorageUnit");
+      return null;
+    }
+    if (!idUnidad) throw new BadRequestException("plans.invalidStorageUnit");
+
+    const unidad = await tx.parametros.findFirst({
+      where: {
+        id_parametros: idUnidad,
+        codigo_grupo: GRUPO_UNIDADES_ALMACENAMIENTO,
+        estado: 1,
+        valor_entero: { not: null },
+      },
+      select: { valor_entero: true },
+    });
+    if (!unidad?.valor_entero)
+      throw new BadRequestException("plans.invalidStorageUnit");
+
+    const bytes = BigInt(valor) * unidad.valor_entero;
+    if (bytes > BigInt(Number.MAX_SAFE_INTEGER))
+      throw new BadRequestException("plans.invalidStorageUnit");
+    return bytes;
   }
 }

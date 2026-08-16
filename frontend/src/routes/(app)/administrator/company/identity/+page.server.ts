@@ -1,4 +1,4 @@
-import { fail } from "@sveltejs/kit";
+import { fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import {
   formText,
@@ -26,7 +26,9 @@ interface Identity extends Record<string, unknown> {
 }
 const COLOR = /^$|^#[0-9A-Fa-f]{6}$/;
 export const load: PageServerLoad = async (event) => {
-  await event.parent();
+  const parent = await event.parent();
+  if (!parent.usuario.sede_activa?.es_principal)
+    redirect(303, "/administrator/company/general");
   const [section, branding] = await Promise.all([
     loadCompanySection<Identity>(event, "identity"),
     loadCompanyBranding(event),

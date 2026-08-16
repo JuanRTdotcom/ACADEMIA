@@ -42,20 +42,33 @@ const SELECCION_USUARIO = {
       eliminado_en: true,
       suscripcion_inicia_en: true,
       suscripcion_expira_en: true,
-      perfil: { select: { fid_admin_level_0: true, zona_horaria: { select: { nombre_iana: true } } } },
+      perfil: {
+        select: {
+          fid_admin_level_0: true,
+          zona_horaria: { select: { nombre_iana: true } },
+        },
+      },
       plan: {
         select: {
           codigo: true,
           nombre: true,
           planes_modulos: {
             where: { estado: 1, modulo: { estado: 1 } },
-            select: { 
+            select: {
               fid_modulos: true,
-              modulo: { select: { id_modulos: true, codigo: true, nombre: true, icono: true, ruta: true } }
-            }
-          }
-        }
-      }
+              modulo: {
+                select: {
+                  id_modulos: true,
+                  codigo: true,
+                  nombre: true,
+                  icono: true,
+                  ruta: true,
+                },
+              },
+            },
+          },
+        },
+      },
     },
   },
   preferencias_usuario: {
@@ -65,12 +78,49 @@ const SELECCION_USUARIO = {
       menu_colapsado: true,
       fid_admin_level_0: true,
       fid_zonas_horarias: true,
+      fid_sedes: true,
       zona_horaria: {
         select: {
           nombre_iana: true,
         },
       },
       estado: true,
+    },
+  },
+  usuarios_sedes: {
+    where: { estado: 1, sede: { estado: 1, eliminado_en: null } },
+    orderBy: [{ sede: { es_principal: "desc" } }, { sede: { nombre: "asc" } }],
+    select: {
+      sede: {
+        select: {
+          id_sedes: true,
+          codigo: true,
+          nombre: true,
+          es_principal: true,
+          fid_admin_level_0: true,
+          fid_zonas_horarias: true,
+          zona_horaria: { select: { nombre_iana: true } },
+          idioma: { select: { codigo: true } },
+          color_primario: true,
+          ui_cabecera_claro: true,
+          ui_cabecera_oscuro: true,
+          ui_esquinero_claro: true,
+          ui_esquinero_oscuro: true,
+          ui_menu_claro: true,
+          ui_menu_oscuro: true,
+          ui_mostrar_escudo_menu: true,
+          ui_mostrar_nombre_empresa_menu: true,
+          ui_ocultar_esquinero_expandido: true,
+          ui_esquinero_fondo_activo: true,
+          ui_cabecera_ocultar_borde: true,
+          ui_menu_ocultar_borde: true,
+          ui_tamano_escudo_menu: true,
+          escudo_url: true,
+          escudo_oscuro_url: true,
+          imagotipo_url: true,
+          imagotipo_oscuro_url: true,
+        },
+      },
     },
   },
   usuario_mfa: {
@@ -154,9 +204,57 @@ export class FuenteDatosContextoUsuarioPrisma {
     const permisosCalculados = permisosEfectivos(
       usuario.usuarios_roles,
       usuario.usuarios_permisos,
-      usuario.organizacion.plan?.planes_modulos.map(({ fid_modulos }) => fid_modulos) ?? [],
+      usuario.organizacion.plan?.planes_modulos.map(
+        ({ fid_modulos }) => fid_modulos,
+      ) ?? [],
     );
     const permisos = permisosCalculados.map(({ codigo }) => codigo);
+    const sedesInternas = usuario.usuarios_sedes.map(({ sede }) => sede);
+    const sedeActivaInterna =
+      sedesInternas.find((sede) => sede.id_sedes === preferencias?.fid_sedes) ??
+      sedesInternas[0] ??
+      null;
+    const sedes = sedesInternas.map(
+      ({ id_sedes, codigo, nombre, es_principal }) => ({
+        id_sedes,
+        codigo,
+        nombre,
+        es_principal,
+      }),
+    );
+    const version = (clave: string | null) => clave?.split("/").at(-1) ?? null;
+    const sedeActiva = sedeActivaInterna
+      ? {
+          id_sedes: sedeActivaInterna.id_sedes,
+          codigo: sedeActivaInterna.codigo,
+          nombre: sedeActivaInterna.nombre,
+          es_principal: sedeActivaInterna.es_principal,
+          apariencia: {
+            color_primario: sedeActivaInterna.color_primario,
+            cabecera_claro: sedeActivaInterna.ui_cabecera_claro,
+            cabecera_oscuro: sedeActivaInterna.ui_cabecera_oscuro,
+            esquinero_claro: sedeActivaInterna.ui_esquinero_claro,
+            esquinero_oscuro: sedeActivaInterna.ui_esquinero_oscuro,
+            menu_claro: sedeActivaInterna.ui_menu_claro,
+            menu_oscuro: sedeActivaInterna.ui_menu_oscuro,
+            mostrar_escudo_menu: sedeActivaInterna.ui_mostrar_escudo_menu,
+            mostrar_nombre_empresa_menu:
+              sedeActivaInterna.ui_mostrar_nombre_empresa_menu,
+            ocultar_esquinero_expandido:
+              sedeActivaInterna.ui_ocultar_esquinero_expandido,
+            esquinero_fondo_activo: sedeActivaInterna.ui_esquinero_fondo_activo,
+            cabecera_ocultar_borde: sedeActivaInterna.ui_cabecera_ocultar_borde,
+            menu_ocultar_borde: sedeActivaInterna.ui_menu_ocultar_borde,
+            tamano_escudo_menu: sedeActivaInterna.ui_tamano_escudo_menu,
+            escudo_version: version(sedeActivaInterna.escudo_url),
+            escudo_oscuro_version: version(sedeActivaInterna.escudo_oscuro_url),
+            imagotipo_version: version(sedeActivaInterna.imagotipo_url),
+            imagotipo_oscuro_version: version(
+              sedeActivaInterna.imagotipo_oscuro_url,
+            ),
+          },
+        }
+      : null;
     const permisosPorModulo = new Set(
       permisosCalculados.map(({ fid_modulos }) => fid_modulos),
     );
@@ -182,11 +280,15 @@ export class FuenteDatosContextoUsuarioPrisma {
       organizacion: {
         slug: usuario.organizacion.slug,
         nombre: usuario.organizacion.nombre,
-        plan: usuario.organizacion.plan ? {
-          codigo: usuario.organizacion.plan.codigo,
-          nombre: usuario.organizacion.plan.nombre
-        } : { codigo: "FULL", nombre: "Plan Completo" }
+        plan: usuario.organizacion.plan
+          ? {
+              codigo: usuario.organizacion.plan.codigo,
+              nombre: usuario.organizacion.plan.nombre,
+            }
+          : { codigo: "EMPRESARIAL", nombre: "Plan Empresarial" },
       },
+      sedes,
+      sede_activa: sedeActiva,
       roles: usuario.usuarios_roles.map(({ rol }) => ({
         codigo: rol.codigo,
         nombre: rol.nombre,
@@ -199,9 +301,20 @@ export class FuenteDatosContextoUsuarioPrisma {
         tema: preferencias?.tema ?? null,
         idioma: preferencias?.idioma ?? "es",
         menu_colapsado: preferencias?.menu_colapsado ?? false,
-        fid_admin_level_0: preferencias?.fid_admin_level_0 ?? usuario.organizacion.perfil?.fid_admin_level_0 ?? null,
-        fid_zonas_horarias: preferencias?.fid_zonas_horarias ?? null,
-        zona_horaria: preferencias?.zona_horaria?.nombre_iana ?? usuario.organizacion.perfil?.zona_horaria.nombre_iana ?? "America/Lima",
+        fid_admin_level_0:
+          sedeActivaInterna?.fid_admin_level_0 ??
+          preferencias?.fid_admin_level_0 ??
+          usuario.organizacion.perfil?.fid_admin_level_0 ??
+          null,
+        fid_zonas_horarias:
+          sedeActivaInterna?.fid_zonas_horarias ??
+          preferencias?.fid_zonas_horarias ??
+          null,
+        zona_horaria:
+          sedeActivaInterna?.zona_horaria.nombre_iana ??
+          preferencias?.zona_horaria?.nombre_iana ??
+          usuario.organizacion.perfil?.zona_horaria.nombre_iana ??
+          "America/Lima",
       },
       seguridad: {
         segundo_factor_habilitado: usuario.usuario_mfa[0]?.habilitado ?? false,

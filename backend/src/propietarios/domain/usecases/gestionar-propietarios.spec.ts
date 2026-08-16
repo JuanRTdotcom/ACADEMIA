@@ -17,6 +17,7 @@ describe("CasoUsoGestionarPropietarios", () => {
     await caso.eliminar(
       "propietario",
       "veterinaria",
+      "sede",
       { confirmar_desvinculacion: true },
       "usuario",
       contexto,
@@ -24,6 +25,7 @@ describe("CasoUsoGestionarPropietarios", () => {
     expect(eliminar).toHaveBeenCalledWith(
       "propietario",
       "veterinaria",
+      "sede",
       { confirmar_desvinculacion: true },
       "usuario",
       contexto,

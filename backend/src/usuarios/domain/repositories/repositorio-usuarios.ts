@@ -4,10 +4,10 @@ import type { AvatarPerfil } from "../../../perfil/domain/entities/avatar-perfil
 
 export abstract class RepositorioUsuarios {
   abstract listar(busqueda: string): Promise<{ usuarios: UsuarioListado[]; total: number }>;
-  abstract listarDeEmpresa(empresaId: string, filtros: FiltrosUsuariosEmpresa): Promise<{ usuarios: UsuarioListado[]; total: number; paginacion: { anterior: string | null; siguiente: string | null } }>;
+  abstract listarDeEmpresa(empresaId: string, sede: string, filtros: FiltrosUsuariosEmpresa): Promise<{ usuarios: UsuarioListado[]; total: number; paginacion: { anterior: string | null; siguiente: string | null } }>;
   abstract obtener(id: string, actor: string): Promise<UsuarioListado>;
   abstract opciones(): Promise<OpcionesUsuario>;
-  abstract opcionesDeEmpresa(empresaId: string): Promise<OpcionesUsuario>;
+  abstract opcionesDeEmpresa(empresaId: string, actor: string): Promise<OpcionesUsuario>;
   abstract obtenerAvatar(id: string, actor: string): Promise<AvatarPerfil>;
   abstract crear(datos: DatosUsuario, idActor: string, contexto: ContextoSolicitud): Promise<void>;
   abstract actualizar(id: string, datos: Omit<DatosUsuario, "contrasenia_temporal">, idActor: string, contexto: ContextoSolicitud): Promise<void>;

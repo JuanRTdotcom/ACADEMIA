@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+} from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import type { UsuarioAutenticado } from "../../../autenticacion/domain/entities/tipos";
@@ -6,39 +17,405 @@ import { Permisos } from "../../../autenticacion/presentation/decorators/permiso
 import { UsuarioActual } from "../../../autenticacion/presentation/decorators/usuario-actual.decorador";
 import { crearContextoSolicitud } from "../../../comun/presentation/http/crear-contexto-solicitud";
 import { DtoListarCatalogoPaginado } from "../../../comun/presentation/dto/catalogo-paginado.dto";
-import { leerPosicionCatalogo, protegerPaginacionCatalogo } from "../../../comun/seguridad/paginacion-catalogo";
+import {
+  leerPosicionCatalogo,
+  protegerPaginacionCatalogo,
+} from "../../../comun/seguridad/paginacion-catalogo";
 import { ServicioTokenOpaco } from "../../../comun/seguridad/token-opaco.service";
-import { CasoUsoCrearCita, CasoUsoCrearDocumentoMascota, CasoUsoCrearLoteProducto, CasoUsoCrearMovimientoInventario, CasoUsoCrearPagoVenta, CasoUsoCrearProducto, CasoUsoCrearRecordatorio, CasoUsoCrearSerieComprobante, CasoUsoCrearVenta, CasoUsoListarCatalogosOperacion, CasoUsoListarCitas, CasoUsoListarComprobantes, CasoUsoListarProductos, CasoUsoListarRecordatorios, CasoUsoListarVentas, CasoUsoObtenerFichaMascota, CasoUsoObtenerResumenOperacion, CasoUsoPrepararComprobante } from "../../domain/usecases/operaciones.usecases";
-import { DtoCrearCita, DtoCrearDocumentoMascota, DtoCrearLoteProducto, DtoCrearMovimientoInventario, DtoCrearPagoVenta, DtoCrearProducto, DtoCrearRecordatorio, DtoCrearSerieComprobante, DtoCrearVenta, DtoFiltroRecordatorio, DtoPrepararComprobante, DtoRangoCitas } from "../dto/operaciones.dto";
+import {
+  CasoUsoCrearCita,
+  CasoUsoCrearDocumentoMascota,
+  CasoUsoCrearLoteProducto,
+  CasoUsoCrearMovimientoInventario,
+  CasoUsoCrearPagoVenta,
+  CasoUsoCrearProducto,
+  CasoUsoCrearRecordatorio,
+  CasoUsoCrearSerieComprobante,
+  CasoUsoCrearVenta,
+  CasoUsoListarCatalogosOperacion,
+  CasoUsoListarCitas,
+  CasoUsoListarComprobantes,
+  CasoUsoListarProductos,
+  CasoUsoListarRecordatorios,
+  CasoUsoListarVentas,
+  CasoUsoObtenerFichaMascota,
+  CasoUsoObtenerResumenOperacion,
+  CasoUsoPrepararComprobante,
+} from "../../domain/usecases/operaciones.usecases";
+import {
+  DtoCrearCita,
+  DtoCrearDocumentoMascota,
+  DtoCrearLoteProducto,
+  DtoCrearMovimientoInventario,
+  DtoCrearPagoVenta,
+  DtoCrearProducto,
+  DtoCrearRecordatorio,
+  DtoCrearSerieComprobante,
+  DtoCrearVenta,
+  DtoFiltroRecordatorio,
+  DtoPrepararComprobante,
+  DtoRangoCitas,
+} from "../dto/operaciones.dto";
 
-const actor = (usuario: UsuarioAutenticado, req: Request) => ({ organizacion: usuario.fid_organizaciones, usuario: usuario.sub, contexto: crearContextoSolicitud(req) });
+const actor = (usuario: UsuarioAutenticado, req: Request) => {
+  if (!usuario.contexto.sede_activa)
+    throw new BadRequestException("operations.branchRequired");
+  return {
+    organizacion: usuario.fid_organizaciones,
+    usuario: usuario.sub,
+    sede: usuario.contexto.sede_activa.id_sedes,
+    contexto: crearContextoSolicitud(req),
+  };
+};
+
+const sedeActiva = (usuario: UsuarioAutenticado) => {
+  const sede = usuario.contexto.sede_activa?.id_sedes;
+  if (!sede) throw new BadRequestException("operations.branchRequired");
+  return sede;
+};
 
 @Controller("operations")
 @Throttle({ default: { limit: 40, ttl: 60_000 } })
 export class ControladorOperaciones {
-  constructor(private ficha: CasoUsoObtenerFichaMascota, private catalogos: CasoUsoListarCatalogosOperacion, private productos: CasoUsoListarProductos, private crearProducto: CasoUsoCrearProducto, private crearLote: CasoUsoCrearLoteProducto, private crearMovimiento: CasoUsoCrearMovimientoInventario, private ventas: CasoUsoListarVentas, private crearVenta: CasoUsoCrearVenta, private crearPago: CasoUsoCrearPagoVenta, private citas: CasoUsoListarCitas, private crearCita: CasoUsoCrearCita, private recordatorios: CasoUsoListarRecordatorios, private crearRecordatorio: CasoUsoCrearRecordatorio, private crearDocumento: CasoUsoCrearDocumentoMascota, private resumen: CasoUsoObtenerResumenOperacion, private tokens: ServicioTokenOpaco) {}
-  @Get("pets/:id/profile") @Permisos("clinic.pets.read") fichaMascota(@Param("id", new ParseUUIDPipe()) id: string, @UsuarioActual() usuario: UsuarioAutenticado) { return this.ficha.ejecutar(id, usuario.fid_organizaciones, usuario.idioma); }
-  @Get("catalogs") @Permisos("operations.inventory.read", "operations.sales.read", "operations.appointments.read", "operations.reminders.read") listarCatalogos(@UsuarioActual() usuario: UsuarioAutenticado) { return this.catalogos.ejecutar(usuario.fid_organizaciones, usuario.idioma); }
-  @Get("products") @Permisos("operations.inventory.read") async listarProductos(@Query() query: DtoListarCatalogoPaginado, @UsuarioActual() usuario: UsuarioAutenticado) { const posicion = leerPosicionCatalogo(this.tokens, "operations-products.pagination", query.p, usuario.fid_organizaciones, query.q, "operations.invalidCursor"); const listado = await this.productos.ejecutar(usuario.fid_organizaciones, { q: query.q, despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined, antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined }); return protegerPaginacionCatalogo(this.tokens, "operations-products.pagination", listado, usuario.fid_organizaciones, query.q); }
-  @Post("products") @Permisos("operations.inventory.create") @HttpCode(201) guardarProducto(@Body() dto: DtoCrearProducto, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearProducto.ejecutar({ ...dto, fid_categorias_productos: dto.fid_categorias_productos ?? null, descripcion: dto.descripcion || null, sku: dto.sku || null, codigo_barras: dto.codigo_barras || null, costo_referencia: dto.costo_referencia || null }, actor(usuario, req)); }
-  @Post("product-batches") @Permisos("operations.inventory.create") @HttpCode(201) guardarLote(@Body() dto: DtoCrearLoteProducto, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearLote.ejecutar({ ...dto, fecha_vencimiento: dto.fecha_vencimiento ?? null, costo_unitario: dto.costo_unitario || null }, actor(usuario, req)); }
-  @Post("inventory-movements") @Permisos("operations.inventory.update") @HttpCode(201) guardarMovimiento(@Body() dto: DtoCrearMovimientoInventario, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearMovimiento.ejecutar({ ...dto, fid_lotes_productos: dto.fid_lotes_productos ?? null, costo_unitario: dto.costo_unitario || null, observaciones: dto.observaciones || null }, actor(usuario, req)); }
-  @Get("sales") @Permisos("operations.sales.read") async listarVentas(@Query() query: DtoListarCatalogoPaginado, @UsuarioActual() usuario: UsuarioAutenticado) { const posicion = leerPosicionCatalogo(this.tokens, "operations-sales.pagination", query.p, usuario.fid_organizaciones, query.q, "operations.invalidCursor"); const listado = await this.ventas.ejecutar(usuario.fid_organizaciones, { q: query.q, despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined, antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined }); return protegerPaginacionCatalogo(this.tokens, "operations-sales.pagination", listado, usuario.fid_organizaciones, query.q); }
-  @Post("sales") @Permisos("operations.sales.create") @HttpCode(201) guardarVenta(@Body() dto: DtoCrearVenta, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearVenta.ejecutar({ ...dto, fid_propietarios: dto.fid_propietarios ?? null, fid_mascotas: dto.fid_mascotas ?? null, fid_atenciones: dto.fid_atenciones ?? null, observaciones: dto.observaciones || null, lineas: dto.lineas.map((l) => ({ ...l, fid_productos: l.fid_productos ?? null, fid_lotes_productos: l.fid_lotes_productos ?? null, fid_servicios_veterinaria: l.fid_servicios_veterinaria ?? null })) }, actor(usuario, req)); }
-  @Post("sales/payments") @Permisos("operations.sales.update") @HttpCode(201) guardarPago(@Body() dto: DtoCrearPagoVenta, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearPago.ejecutar({ ...dto, referencia: dto.referencia || null }, actor(usuario, req)); }
-  @Get("appointments") @Permisos("operations.appointments.read") listarCitas(@Query() dto: DtoRangoCitas, @UsuarioActual() usuario: UsuarioAutenticado) { return this.citas.ejecutar(usuario.fid_organizaciones, dto.desde, dto.hasta); }
-  @Post("appointments") @Permisos("operations.appointments.create") @HttpCode(201) guardarCita(@Body() dto: DtoCrearCita, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearCita.ejecutar({ ...dto, fid_propietarios: dto.fid_propietarios ?? null, fid_mascotas: dto.fid_mascotas ?? null, fid_usuarios_responsable: dto.fid_usuarios_responsable ?? null, observaciones: dto.observaciones || null }, actor(usuario, req)); }
-  @Get("reminders") @Permisos("operations.reminders.read") listarRecordatorios(@Query() dto: DtoFiltroRecordatorio, @UsuarioActual() usuario: UsuarioAutenticado) { return this.recordatorios.ejecutar(usuario.fid_organizaciones, dto.mascota); }
-  @Post("reminders") @Permisos("operations.reminders.create") @HttpCode(201) guardarRecordatorio(@Body() dto: DtoCrearRecordatorio, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearRecordatorio.ejecutar({ ...dto, fid_propietarios: dto.fid_propietarios ?? null, detalle: dto.detalle || null }, actor(usuario, req)); }
-  @Post("pet-documents") @Permisos("clinic.pets.update") @HttpCode(201) guardarDocumento(@Body() dto: DtoCrearDocumentoMascota, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearDocumento.ejecutar({ ...dto, entidad_emisora: dto.entidad_emisora || null, observaciones: dto.observaciones || null }, actor(usuario, req)); }
-  @Get("reports/summary") @Permisos("operations.reports.read") obtenerResumen(@UsuarioActual() usuario: UsuarioAutenticado) { return this.resumen.ejecutar(usuario.fid_organizaciones); }
+  constructor(
+    private ficha: CasoUsoObtenerFichaMascota,
+    private catalogos: CasoUsoListarCatalogosOperacion,
+    private productos: CasoUsoListarProductos,
+    private crearProducto: CasoUsoCrearProducto,
+    private crearLote: CasoUsoCrearLoteProducto,
+    private crearMovimiento: CasoUsoCrearMovimientoInventario,
+    private ventas: CasoUsoListarVentas,
+    private crearVenta: CasoUsoCrearVenta,
+    private crearPago: CasoUsoCrearPagoVenta,
+    private citas: CasoUsoListarCitas,
+    private crearCita: CasoUsoCrearCita,
+    private recordatorios: CasoUsoListarRecordatorios,
+    private crearRecordatorio: CasoUsoCrearRecordatorio,
+    private crearDocumento: CasoUsoCrearDocumentoMascota,
+    private resumen: CasoUsoObtenerResumenOperacion,
+    private tokens: ServicioTokenOpaco,
+  ) {}
+  @Get("pets/:id/profile") @Permisos("clinic.pets.read") fichaMascota(
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    return this.ficha.ejecutar(
+      id,
+      usuario.fid_organizaciones,
+      sedeActiva(usuario),
+      usuario.idioma,
+    );
+  }
+  @Get("catalogs")
+  @Permisos(
+    "operations.inventory.read",
+    "operations.sales.read",
+    "operations.appointments.read",
+    "operations.reminders.read",
+  )
+  listarCatalogos(@UsuarioActual() usuario: UsuarioAutenticado) {
+    return this.catalogos.ejecutar(
+      usuario.fid_organizaciones,
+      usuario.idioma,
+      sedeActiva(usuario),
+    );
+  }
+  @Get("products") @Permisos("operations.inventory.read") async listarProductos(
+    @Query() query: DtoListarCatalogoPaginado,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    const posicion = leerPosicionCatalogo(
+      this.tokens,
+      "operations-products.pagination",
+      query.p,
+      usuario.fid_organizaciones,
+      query.q,
+      "operations.invalidCursor",
+    );
+    const listado = await this.productos.ejecutar(
+      usuario.fid_organizaciones,
+      sedeActiva(usuario),
+      {
+        q: query.q,
+        despues_de:
+          posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+      },
+    );
+    return protegerPaginacionCatalogo(
+      this.tokens,
+      "operations-products.pagination",
+      listado,
+      usuario.fid_organizaciones,
+      query.q,
+    );
+  }
+  @Post("products")
+  @Permisos("operations.inventory.create")
+  @HttpCode(201)
+  guardarProducto(
+    @Body() dto: DtoCrearProducto,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearProducto.ejecutar(
+      {
+        ...dto,
+        fid_categorias_productos: dto.fid_categorias_productos ?? null,
+        descripcion: dto.descripcion || null,
+        sku: dto.sku || null,
+        codigo_barras: dto.codigo_barras || null,
+        costo_referencia: dto.costo_referencia || null,
+      },
+      actor(usuario, req),
+    );
+  }
+  @Post("product-batches")
+  @Permisos("operations.inventory.create")
+  @HttpCode(201)
+  guardarLote(
+    @Body() dto: DtoCrearLoteProducto,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearLote.ejecutar(
+      {
+        ...dto,
+        fecha_vencimiento: dto.fecha_vencimiento ?? null,
+        costo_unitario: dto.costo_unitario || null,
+      },
+      actor(usuario, req),
+    );
+  }
+  @Post("inventory-movements")
+  @Permisos("operations.inventory.update")
+  @HttpCode(201)
+  guardarMovimiento(
+    @Body() dto: DtoCrearMovimientoInventario,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearMovimiento.ejecutar(
+      {
+        ...dto,
+        fid_lotes_productos: dto.fid_lotes_productos ?? null,
+        costo_unitario: dto.costo_unitario || null,
+        observaciones: dto.observaciones || null,
+      },
+      actor(usuario, req),
+    );
+  }
+  @Get("sales") @Permisos("operations.sales.read") async listarVentas(
+    @Query() query: DtoListarCatalogoPaginado,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    const posicion = leerPosicionCatalogo(
+      this.tokens,
+      "operations-sales.pagination",
+      query.p,
+      usuario.fid_organizaciones,
+      query.q,
+      "operations.invalidCursor",
+    );
+    const listado = await this.ventas.ejecutar(
+      usuario.fid_organizaciones,
+      sedeActiva(usuario),
+      {
+        q: query.q,
+        despues_de:
+          posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+      },
+    );
+    return protegerPaginacionCatalogo(
+      this.tokens,
+      "operations-sales.pagination",
+      listado,
+      usuario.fid_organizaciones,
+      query.q,
+    );
+  }
+  @Post("sales")
+  @Permisos("operations.sales.create")
+  @HttpCode(201)
+  guardarVenta(
+    @Body() dto: DtoCrearVenta,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearVenta.ejecutar(
+      {
+        ...dto,
+        fid_propietarios: dto.fid_propietarios ?? null,
+        fid_mascotas: dto.fid_mascotas ?? null,
+        fid_atenciones: dto.fid_atenciones ?? null,
+        observaciones: dto.observaciones || null,
+        lineas: dto.lineas.map((l) => ({
+          ...l,
+          fid_productos: l.fid_productos ?? null,
+          fid_lotes_productos: l.fid_lotes_productos ?? null,
+          fid_servicios_veterinaria: l.fid_servicios_veterinaria ?? null,
+        })),
+      },
+      actor(usuario, req),
+    );
+  }
+  @Post("sales/payments")
+  @Permisos("operations.sales.update")
+  @HttpCode(201)
+  guardarPago(
+    @Body() dto: DtoCrearPagoVenta,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearPago.ejecutar(
+      { ...dto, referencia: dto.referencia || null },
+      actor(usuario, req),
+    );
+  }
+  @Get("appointments") @Permisos("operations.appointments.read") listarCitas(
+    @Query() dto: DtoRangoCitas,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    return this.citas.ejecutar(
+      usuario.fid_organizaciones,
+      sedeActiva(usuario),
+      dto.desde,
+      dto.hasta,
+    );
+  }
+  @Post("appointments")
+  @Permisos("operations.appointments.create")
+  @HttpCode(201)
+  guardarCita(
+    @Body() dto: DtoCrearCita,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearCita.ejecutar(
+      {
+        ...dto,
+        fid_propietarios: dto.fid_propietarios ?? null,
+        fid_mascotas: dto.fid_mascotas ?? null,
+        fid_usuarios_responsable: dto.fid_usuarios_responsable ?? null,
+        observaciones: dto.observaciones || null,
+      },
+      actor(usuario, req),
+    );
+  }
+  @Get("reminders") @Permisos("operations.reminders.read") listarRecordatorios(
+    @Query() dto: DtoFiltroRecordatorio,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    return this.recordatorios.ejecutar(
+      usuario.fid_organizaciones,
+      sedeActiva(usuario),
+      dto.mascota,
+    );
+  }
+  @Post("reminders")
+  @Permisos("operations.reminders.create")
+  @HttpCode(201)
+  guardarRecordatorio(
+    @Body() dto: DtoCrearRecordatorio,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearRecordatorio.ejecutar(
+      {
+        ...dto,
+        fid_propietarios: dto.fid_propietarios ?? null,
+        detalle: dto.detalle || null,
+      },
+      actor(usuario, req),
+    );
+  }
+  @Post("pet-documents")
+  @Permisos("clinic.pets.update")
+  @HttpCode(201)
+  guardarDocumento(
+    @Body() dto: DtoCrearDocumentoMascota,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearDocumento.ejecutar(
+      {
+        ...dto,
+        entidad_emisora: dto.entidad_emisora || null,
+        observaciones: dto.observaciones || null,
+      },
+      actor(usuario, req),
+    );
+  }
+  @Get("reports/summary") @Permisos("operations.reports.read") obtenerResumen(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    return this.resumen.ejecutar(
+      usuario.fid_organizaciones,
+      sedeActiva(usuario),
+    );
+  }
 }
 
 @Controller("billing/electronic-documents")
 @Throttle({ default: { limit: 40, ttl: 60_000 } })
 export class ControladorFacturacionElectronica {
-  constructor(private comprobantes: CasoUsoListarComprobantes, private crearSerie: CasoUsoCrearSerieComprobante, private preparar: CasoUsoPrepararComprobante, private tokens: ServicioTokenOpaco) {}
-  @Get() @Permisos("operations.billing.read") async listar(@Query() query: DtoListarCatalogoPaginado, @UsuarioActual() usuario: UsuarioAutenticado) { const posicion = leerPosicionCatalogo(this.tokens, "operations-billing.pagination", query.p, usuario.fid_organizaciones, query.q, "operations.invalidCursor"); const listado = await this.comprobantes.ejecutar(usuario.fid_organizaciones, { q: query.q, despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined, antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined }); return protegerPaginacionCatalogo(this.tokens, "operations-billing.pagination", listado, usuario.fid_organizaciones, query.q); }
-  @Post("series") @Permisos("operations.billing.create") @HttpCode(201) serie(@Body() dto: DtoCrearSerieComprobante, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.crearSerie.ejecutar(dto, actor(usuario, req)); }
-  @Post() @Permisos("operations.billing.create") @HttpCode(201) prepararComprobante(@Body() dto: DtoPrepararComprobante, @UsuarioActual() usuario: UsuarioAutenticado, @Req() req: Request) { return this.preparar.ejecutar({ ...dto, cliente_direccion: dto.cliente_direccion || null }, actor(usuario, req)); }
+  constructor(
+    private comprobantes: CasoUsoListarComprobantes,
+    private crearSerie: CasoUsoCrearSerieComprobante,
+    private preparar: CasoUsoPrepararComprobante,
+    private tokens: ServicioTokenOpaco,
+  ) {}
+  @Get() @Permisos("operations.billing.read") async listar(
+    @Query() query: DtoListarCatalogoPaginado,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+  ) {
+    const sede = sedeActiva(usuario);
+    const alcance = `operations-billing:${sede}`;
+    const posicion = leerPosicionCatalogo(
+      this.tokens,
+      alcance,
+      query.p,
+      usuario.fid_organizaciones,
+      query.q,
+      "operations.invalidCursor",
+    );
+    const listado = await this.comprobantes.ejecutar(
+      usuario.fid_organizaciones,
+      sede,
+      {
+        q: query.q,
+        despues_de:
+          posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+      },
+    );
+    return protegerPaginacionCatalogo(
+      this.tokens,
+      alcance,
+      listado,
+      usuario.fid_organizaciones,
+      query.q,
+    );
+  }
+  @Post("series") @Permisos("operations.billing.create") @HttpCode(201) serie(
+    @Body() dto: DtoCrearSerieComprobante,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.crearSerie.ejecutar(dto, actor(usuario, req));
+  }
+  @Post()
+  @Permisos("operations.billing.create")
+  @HttpCode(201)
+  prepararComprobante(
+    @Body() dto: DtoPrepararComprobante,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.preparar.ejecutar(
+      { ...dto, cliente_direccion: dto.cliente_direccion || null },
+      actor(usuario, req),
+    );
+  }
 }

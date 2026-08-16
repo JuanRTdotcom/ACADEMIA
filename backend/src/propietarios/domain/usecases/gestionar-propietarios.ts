@@ -10,26 +10,28 @@ import { RepositorioPropietarios } from "../repositories/repositorio-propietario
 @Injectable()
 export class CasoUsoGestionarPropietarios {
   constructor(private propietarios: RepositorioPropietarios) {}
-  listar(organizacion: string, filtros: FiltrosPropietarios) {
-    return this.propietarios.listar(organizacion, filtros);
+  listar(organizacion: string, sede: string, filtros: FiltrosPropietarios) {
+    return this.propietarios.listar(organizacion, sede, filtros);
   }
-  opciones(organizacion: string, idioma: string) {
-    return this.propietarios.opciones(organizacion, idioma);
+  opciones(organizacion: string, sede: string, idioma: string) {
+    return this.propietarios.opciones(organizacion, sede, idioma);
   }
   obtener(id: string, organizacion: string) {
     return this.propietarios.obtener(id, organizacion);
   }
   crear(
     organizacion: string,
+    sede: string,
     datos: DatosPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.propietarios.crear(organizacion, datos, usuario, contexto);
+    return this.propietarios.crear(organizacion, sede, datos, usuario, contexto);
   }
   actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -37,6 +39,7 @@ export class CasoUsoGestionarPropietarios {
     return this.propietarios.actualizar(
       id,
       organizacion,
+      sede,
       datos,
       usuario,
       contexto,
@@ -45,6 +48,7 @@ export class CasoUsoGestionarPropietarios {
   eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: EliminacionPropietario,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -52,6 +56,7 @@ export class CasoUsoGestionarPropietarios {
     return this.propietarios.eliminar(
       id,
       organizacion,
+      sede,
       datos,
       usuario,
       contexto,

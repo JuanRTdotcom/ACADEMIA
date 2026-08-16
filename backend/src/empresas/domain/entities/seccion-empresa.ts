@@ -21,6 +21,15 @@ export interface ResumenEmpresa {
   escudo_version: string | null;
   escudo_oscuro_version: string | null;
   url_publica: string;
+  sede_activa?: {
+    id_sedes: string;
+    codigo: string;
+    nombre: string;
+    sin_sede_fisica: boolean;
+    direccion: string | null;
+    telefono: string | null;
+    correo_contacto: string | null;
+  } | null;
 }
 
 export interface DatosGeneralesEmpresa {
@@ -103,7 +112,6 @@ export interface DatosComunicacionesEmpresa {
   soporte_correo: string;
   soporte_telefono: string;
   soporte_whatsapp: string;
-  horarios: HorarioAtencionEmpresa[];
 }
 
 export interface CatalogosUbicacionEmpresa {

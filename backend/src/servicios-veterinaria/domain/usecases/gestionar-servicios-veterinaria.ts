@@ -10,30 +10,36 @@ import { RepositorioServiciosVeterinaria } from "../repositories/repositorio-ser
 export class CasoUsoGestionarServiciosVeterinaria {
   constructor(private servicios: RepositorioServiciosVeterinaria) {}
 
-  listar(organizacion: string, filtros: FiltrosServiciosVeterinaria) {
-    return this.servicios.listar(organizacion, filtros);
+  listar(
+    organizacion: string,
+    sede: string,
+    filtros: FiltrosServiciosVeterinaria,
+  ) {
+    return this.servicios.listar(organizacion, sede, filtros);
   }
 
-  buscar(organizacion: string, consulta: string) {
-    return this.servicios.buscar(organizacion, consulta);
+  buscar(organizacion: string, sede: string, consulta: string) {
+    return this.servicios.buscar(organizacion, sede, consulta);
   }
 
-  obtener(id: string, organizacion: string) {
-    return this.servicios.obtener(id, organizacion);
+  obtener(id: string, organizacion: string, sede: string) {
+    return this.servicios.obtener(id, organizacion, sede);
   }
 
   crear(
     organizacion: string,
+    sede: string,
     datos: DatosServicioVeterinaria,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.servicios.crear(organizacion, datos, usuario, contexto);
+    return this.servicios.crear(organizacion, sede, datos, usuario, contexto);
   }
 
   actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosServicioVeterinaria,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -41,6 +47,7 @@ export class CasoUsoGestionarServiciosVeterinaria {
     return this.servicios.actualizar(
       id,
       organizacion,
+      sede,
       datos,
       usuario,
       contexto,
@@ -50,6 +57,7 @@ export class CasoUsoGestionarServiciosVeterinaria {
   cambiarEstado(
     id: string,
     organizacion: string,
+    sede: string,
     activo: boolean,
     usuario: string,
     contexto: ContextoSolicitud,
@@ -57,6 +65,7 @@ export class CasoUsoGestionarServiciosVeterinaria {
     return this.servicios.cambiarEstado(
       id,
       organizacion,
+      sede,
       activo,
       usuario,
       contexto,
@@ -66,9 +75,10 @@ export class CasoUsoGestionarServiciosVeterinaria {
   eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     usuario: string,
     contexto: ContextoSolicitud,
   ) {
-    return this.servicios.eliminar(id, organizacion, usuario, contexto);
+    return this.servicios.eliminar(id, organizacion, sede, usuario, contexto);
   }
 }

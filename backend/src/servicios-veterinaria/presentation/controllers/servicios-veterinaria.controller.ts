@@ -35,6 +35,7 @@ interface PosicionServicios {
   id: string;
   direccion: "anterior" | "siguiente";
   organizacion: string;
+  sede: string;
   consulta: string | null;
 }
 
@@ -45,6 +46,12 @@ export class ControladorServiciosVeterinaria {
     private tokens: ServicioTokenOpaco,
   ) {}
 
+  private sedeActiva(usuario: UsuarioAutenticado): string {
+    const sede = usuario.contexto.sede_activa?.id_sedes;
+    if (!sede) throw new BadRequestException("services.branchRequired");
+    return sede;
+  }
+
   @Get()
   @Permisos("administrator.services.read")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -52,6 +59,7 @@ export class ControladorServiciosVeterinaria {
     @Query() consulta: DtoListarServiciosVeterinaria,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
+    const sede = this.sedeActiva(usuario);
     const posicion = consulta.p
       ? this.tokens.descifrar<PosicionServicios>(AMBITO_PAGINACION, consulta.p)
       : null;
@@ -59,17 +67,23 @@ export class ControladorServiciosVeterinaria {
       consulta.p &&
       (!posicion ||
         posicion.organizacion !== usuario.fid_organizaciones ||
+        posicion.sede !== sede ||
         posicion.consulta !== (consulta.q ?? null) ||
         !isUUID(posicion.id, "4") ||
         !["anterior", "siguiente"].includes(posicion.direccion))
     ) {
       throw new BadRequestException("services.invalidCursor");
     }
-    const catalogo = await this.servicios.listar(usuario.fid_organizaciones, {
-      despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined,
-      antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
-      consulta: consulta.q,
-    });
+    const catalogo = await this.servicios.listar(
+      usuario.fid_organizaciones,
+      sede,
+      {
+        despues_de:
+          posicion?.direccion === "siguiente" ? posicion.id : undefined,
+        antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
+        consulta: consulta.q,
+      },
+    );
     const token = (
       id: string | null,
       direccion: PosicionServicios["direccion"],
@@ -79,6 +93,7 @@ export class ControladorServiciosVeterinaria {
             id,
             direccion,
             organizacion: usuario.fid_organizaciones,
+            sede,
             consulta: consulta.q ?? null,
           })
         : null;
@@ -98,9 +113,11 @@ export class ControladorServiciosVeterinaria {
     @Query() consulta: DtoBuscarServiciosVeterinaria,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
+    const sede = this.sedeActiva(usuario);
     return {
       servicios: await this.servicios.buscar(
         usuario.fid_organizaciones,
+        sede,
         consulta.q,
       ),
     };
@@ -113,7 +130,11 @@ export class ControladorServiciosVeterinaria {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
-    return this.servicios.obtener(id, usuario.fid_organizaciones);
+    return this.servicios.obtener(
+      id,
+      usuario.fid_organizaciones,
+      this.sedeActiva(usuario),
+    );
   }
 
   @Post()
@@ -125,8 +146,10 @@ export class ControladorServiciosVeterinaria {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() peticion: Request,
   ) {
+    const sede = this.sedeActiva(usuario);
     await this.servicios.crear(
       usuario.fid_organizaciones,
+      sede,
       {
         nombre: dto.nombre,
         descripcion: dto.descripcion || null,
@@ -148,9 +171,11 @@ export class ControladorServiciosVeterinaria {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() peticion: Request,
   ) {
+    const sede = this.sedeActiva(usuario);
     await this.servicios.actualizar(
       id,
       usuario.fid_organizaciones,
+      sede,
       {
         nombre: dto.nombre,
         descripcion: dto.descripcion || null,
@@ -172,9 +197,11 @@ export class ControladorServiciosVeterinaria {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() peticion: Request,
   ) {
+    const sede = this.sedeActiva(usuario);
     await this.servicios.cambiarEstado(
       id,
       usuario.fid_organizaciones,
+      sede,
       dto.activo,
       usuario.sub,
       crearContextoSolicitud(peticion),
@@ -191,9 +218,11 @@ export class ControladorServiciosVeterinaria {
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Req() peticion: Request,
   ) {
+    const sede = this.sedeActiva(usuario);
     await this.servicios.eliminar(
       id,
       usuario.fid_organizaciones,
+      sede,
       usuario.sub,
       crearContextoSolicitud(peticion),
     );

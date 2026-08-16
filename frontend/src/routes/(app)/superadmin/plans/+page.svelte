@@ -4,12 +4,13 @@
   import type { SubmitFunction } from '@sveltejs/kit';
   import { toast } from 'svelte-sonner';
   import type { PageProps } from './$types';
-  import { Badge, Breadcrumb, Button, Card, ConfirmationDialog, Icon, Input, Switch, i18n } from '$lib';
+  import { Badge, Breadcrumb, Button, Card, ConfirmationDialog, Icon, Input, Select, Switch, i18n } from '$lib';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   let { data }: PageProps = $props();
   type Plan = (typeof data.planes)[number];
-  let form = $state({ codigo: '', nombre: '', descripcion: '', almacenamiento_gb: '' });
+  type StorageUnit = { id_parametros: string; codigo: string; etiqueta: string; factor_bytes: number };
+  let form = $state({ codigo: '', nombre: '', descripcion: '', almacenamiento_valor: '', fid_parametros_unidad_almacenamiento: '', maximo_sedes: '', maximo_usuarios: '', maximo_mensajes_mensuales: '', maximo_uso_ia_mensual: '' });
   let target = $state<Plan | null>(null);
   let createOpen = $state(false);
   let editOpen = $state(false);
@@ -37,14 +38,23 @@
     const codigo = form.codigo.trim().toUpperCase();
     const nombre = form.nombre.trim().replace(/\s+/g, ' ');
     const txtDescripcion = form.descripcion.trim().replace(/\s+/g, ' ');
-    const almacenamiento = String(form.almacenamiento_gb ?? '').trim();
+    const almacenamiento = String(form.almacenamiento_valor ?? '').trim();
+    const sedes = String(form.maximo_sedes ?? '').trim();
+    const usuarios = String(form.maximo_usuarios ?? '').trim();
+    const mensajes = String(form.maximo_mensajes_mensuales ?? '').trim();
+    const usoIa = String(form.maximo_uso_ia_mensual ?? '').trim();
 
     if (!codigo) errors.codigo = 'plans.validation.requiredCode';
     else if (!/^[A-Z0-9_]{2,40}$/.test(codigo)) errors.codigo = 'plans.validation.code';
     if (!nombre) errors.nombre = 'plans.validation.requiredName';
     else if (nombre.length < 2 || nombre.length > 100) errors.nombre = 'plans.validation.name';
     if (txtDescripcion.length > 250) errors.descripcion = 'plans.validation.description';
-    if (almacenamiento && (!/^\d+$/.test(almacenamiento) || Number(almacenamiento) < 1 || Number(almacenamiento) > 8_388_607)) errors.almacenamiento_gb = 'plans.validation.storage';
+    const unidad = (data.unidades_almacenamiento as StorageUnit[]).find((item) => item.id_parametros === form.fid_parametros_unidad_almacenamiento);
+    if (almacenamiento && (!/^\d+$/.test(almacenamiento) || Number(almacenamiento) < 1 || !unidad || !Number.isSafeInteger(Number(almacenamiento) * unidad.factor_bytes))) errors.almacenamiento_valor = 'plans.validation.storage';
+    if (sedes && (!/^\d+$/.test(sedes) || Number(sedes) < 1 || Number(sedes) > 1_000_000)) errors.maximo_sedes = 'plans.validation.branches';
+    if (usuarios && (!/^\d+$/.test(usuarios) || Number(usuarios) < 1 || Number(usuarios) > 1_000_000)) errors.maximo_usuarios = 'plans.validation.users';
+    if (mensajes && (!/^\d+$/.test(mensajes) || Number(mensajes) < 1 || Number(mensajes) > 1_000_000_000)) errors.maximo_mensajes_mensuales = 'plans.validation.messages';
+    if (usoIa && (!/^\d+$/.test(usoIa) || Number(usoIa) < 1 || Number(usoIa) > 1_000_000_000)) errors.maximo_uso_ia_mensual = 'plans.validation.aiUsage';
     return errors;
   });
 
@@ -60,7 +70,7 @@
   }
 
   function reset() {
-    form = { codigo: '', nombre: '', descripcion: '', almacenamiento_gb: '' };
+    form = { codigo: '', nombre: '', descripcion: '', almacenamiento_valor: '', fid_parametros_unidad_almacenamiento: defaultStorageUnit()?.id_parametros ?? '', maximo_sedes: '', maximo_usuarios: '', maximo_mensajes_mensuales: '', maximo_uso_ia_mensual: '' };
     clearValidation();
   }
 
@@ -99,14 +109,37 @@
   function openEdit(plan: Plan) {
     target = plan;
     clearValidation();
+    const almacenamiento = storageValue(plan.almacenamiento_max_bytes);
     form = {
       codigo: plan.codigo,
       nombre: plan.nombre,
       descripcion: plan.descripcion ?? '',
-      almacenamiento_gb: plan.almacenamiento_max_bytes === null ? '' : String(Math.round(plan.almacenamiento_max_bytes / 1024 ** 3))
+      almacenamiento_valor: almacenamiento.value,
+      fid_parametros_unidad_almacenamiento: almacenamiento.unit?.id_parametros ?? '',
+      maximo_sedes: plan.maximo_sedes === null ? '' : String(plan.maximo_sedes),
+      maximo_usuarios: plan.maximo_usuarios === null ? '' : String(plan.maximo_usuarios),
+      maximo_mensajes_mensuales: plan.maximo_mensajes_mensuales === null ? '' : String(plan.maximo_mensajes_mensuales),
+      maximo_uso_ia_mensual: plan.maximo_uso_ia_mensual === null ? '' : String(plan.maximo_uso_ia_mensual)
     };
     editBaseline = JSON.stringify(form);
     editOpen = true;
+  }
+
+  function defaultStorageUnit(): StorageUnit | undefined {
+    return [...(data.unidades_almacenamiento as StorageUnit[])].sort((a, b) => b.factor_bytes - a.factor_bytes)[0];
+  }
+
+  function storageValue(bytes: number | null): { value: string; unit?: StorageUnit } {
+    if (bytes === null) return { value: '', unit: defaultStorageUnit() };
+    const units = [...(data.unidades_almacenamiento as StorageUnit[])].sort((a, b) => b.factor_bytes - a.factor_bytes);
+    const unit = units.find((item) => bytes % item.factor_bytes === 0) ?? units.at(-1);
+    return { value: unit ? String(bytes / unit.factor_bytes) : '', unit };
+  }
+
+  function formatStorage(bytes: number | null) {
+    if (bytes === null) return i18n.t('plans.unlimited');
+    const storage = storageValue(bytes);
+    return storage.unit ? `${storage.value} ${storage.unit.etiqueta}` : String(bytes);
   }
 
   $effect(() => {
@@ -196,15 +229,19 @@
       <div class="flex flex-col items-center px-4 py-16 text-center"><Icon name="package" size={32} class="mb-4 text-stone" /><h2 class="text-lg text-ink">{i18n.t('plans.emptyTitle')}</h2><p class="mt-1 text-sm text-steel">{i18n.t('plans.emptyDescription')}</p></div>
     {:else}
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[1100px] border-collapse text-left">
-          <thead class="bg-surface/70"><tr class="border-b border-hairline text-[11px] font-semibold uppercase tracking-[0.05em] text-stone"><th class="px-5 py-3.5">{i18n.t('plans.field.name')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.code')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.description')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.storage')}</th><th class="px-4 py-3.5 text-center">{i18n.t('plans.field.status')}</th><th class="px-5 py-3.5 text-right">{i18n.t('plans.actions')}</th></tr></thead>
+        <table class="w-full min-w-[1580px] border-collapse text-left">
+          <thead class="bg-surface/70"><tr class="border-b border-hairline text-[11px] font-semibold uppercase tracking-[0.05em] text-stone"><th class="px-5 py-3.5">{i18n.t('plans.field.name')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.code')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.description')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.storage')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.branches')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.users')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.messages')}</th><th class="px-4 py-3.5">{i18n.t('plans.field.aiUsage')}</th><th class="px-4 py-3.5 text-center">{i18n.t('plans.field.status')}</th><th class="px-5 py-3.5 text-right">{i18n.t('plans.actions')}</th></tr></thead>
           <tbody class="divide-y divide-hairline">
             {#each data.planes as plan (plan.id_planes)}
               <tr class="transition-colors hover:bg-surface/55">
                 <td class="px-5 py-4"><strong class="text-sm font-medium text-ink">{plan.nombre}</strong></td>
                 <td class="px-4 py-4"><code class="rounded bg-surface px-2 py-1 text-xs font-semibold text-slate">{plan.codigo}</code></td>
                 <td class="px-4 py-4 text-sm text-slate">{plan.descripcion || '—'}</td>
-                <td class="px-4 py-4 text-sm font-medium text-ink">{plan.almacenamiento_max_bytes === null ? i18n.t('plans.unlimited') : `${Math.round(plan.almacenamiento_max_bytes / 1024 ** 3)} GB`}</td>
+                <td class="px-4 py-4 text-sm font-medium text-ink">{formatStorage(plan.almacenamiento_max_bytes)}</td>
+                <td class="px-4 py-4 text-sm text-slate">{plan.maximo_sedes ?? i18n.t('plans.unlimited')}</td>
+                <td class="px-4 py-4 text-sm text-slate">{plan.maximo_usuarios ?? i18n.t('plans.unlimited')}</td>
+                <td class="px-4 py-4 text-sm text-slate">{plan.maximo_mensajes_mensuales ?? i18n.t('plans.unlimited')}</td>
+                <td class="px-4 py-4 text-sm text-slate">{plan.maximo_uso_ia_mensual ?? i18n.t('plans.unlimited')}</td>
                 <td class="px-4 py-4 text-center"><Switch checked={plan.estado === 1} disabled={processing} label={`${i18n.t('plans.field.status')}: ${plan.nombre}`} onchange={(active) => changeStatus(plan, active)} /></td>
                 <td class="px-5 py-4">
                   <div class="flex justify-end">
@@ -259,7 +296,12 @@
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.name')} icon="package" bind:value={form.nombre} error={fieldError('nombre')} maxlength={100} disabled={processing} required /></div>
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.code')} icon="hash" bind:value={form.codigo} error={fieldError('codigo')} oninput={() => (form.codigo = form.codigo.toUpperCase())} maxlength={40} disabled={processing} required /></div>
     <div class="col-span-12"><Input label={i18n.t('plans.field.description')} icon="file-text" bind:value={form.descripcion} error={fieldError('descripcion')} maxlength={250} disabled={processing} /></div>
-    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.storage')} bind:value={form.almacenamiento_gb} error={fieldError('almacenamiento_gb')} min="1" max="8388607" step="1" disabled={processing} /></div>
+    <div class="col-span-4 max-sm:col-span-8"><Input type="number" label={i18n.t('plans.field.storage')} bind:value={form.almacenamiento_valor} error={fieldError('almacenamiento_valor')} min="1" step="1" disabled={processing} /></div>
+    <div class="col-span-2 max-sm:col-span-4"><Select label={i18n.t('plans.field.storageUnit')} bind:value={form.fid_parametros_unidad_almacenamiento} disabled={processing}>{#each data.unidades_almacenamiento as unidad (unidad.id_parametros)}<option value={unidad.id_parametros}>{unidad.etiqueta}</option>{/each}</Select></div>
+    <div class="col-span-3 max-sm:col-span-6"><Input type="number" label={i18n.t('plans.field.branches')} bind:value={form.maximo_sedes} error={fieldError('maximo_sedes')} min="1" max="1000000" step="1" disabled={processing} /></div>
+    <div class="col-span-3 max-sm:col-span-6"><Input type="number" label={i18n.t('plans.field.users')} bind:value={form.maximo_usuarios} error={fieldError('maximo_usuarios')} min="1" max="1000000" step="1" disabled={processing} /></div>
+    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.messages')} bind:value={form.maximo_mensajes_mensuales} error={fieldError('maximo_mensajes_mensuales')} min="1" max="1000000000" step="1" disabled={processing} /></div>
+    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.aiUsage')} bind:value={form.maximo_uso_ia_mensual} error={fieldError('maximo_uso_ia_mensual')} min="1" max="1000000000" step="1" disabled={processing} /></div>
   </div>
 </ConfirmationDialog>
 
@@ -269,7 +311,12 @@
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.name')} icon="package" bind:value={form.nombre} error={fieldError('nombre')} maxlength={100} disabled={processing} required /></div>
     <div class="col-span-6 max-sm:col-span-12"><Input label={i18n.t('plans.field.code')} icon="hash" bind:value={form.codigo} error={fieldError('codigo')} oninput={() => (form.codigo = form.codigo.toUpperCase())} maxlength={40} disabled={processing} required /></div>
     <div class="col-span-12"><Input label={i18n.t('plans.field.description')} icon="file-text" bind:value={form.descripcion} error={fieldError('descripcion')} maxlength={250} disabled={processing} /></div>
-    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.storage')} bind:value={form.almacenamiento_gb} error={fieldError('almacenamiento_gb')} min="1" max="8388607" step="1" disabled={processing} /></div>
+    <div class="col-span-4 max-sm:col-span-8"><Input type="number" label={i18n.t('plans.field.storage')} bind:value={form.almacenamiento_valor} error={fieldError('almacenamiento_valor')} min="1" step="1" disabled={processing} /></div>
+    <div class="col-span-2 max-sm:col-span-4"><Select label={i18n.t('plans.field.storageUnit')} bind:value={form.fid_parametros_unidad_almacenamiento} disabled={processing}>{#each data.unidades_almacenamiento as unidad (unidad.id_parametros)}<option value={unidad.id_parametros}>{unidad.etiqueta}</option>{/each}</Select></div>
+    <div class="col-span-3 max-sm:col-span-6"><Input type="number" label={i18n.t('plans.field.branches')} bind:value={form.maximo_sedes} error={fieldError('maximo_sedes')} min="1" max="1000000" step="1" disabled={processing} /></div>
+    <div class="col-span-3 max-sm:col-span-6"><Input type="number" label={i18n.t('plans.field.users')} bind:value={form.maximo_usuarios} error={fieldError('maximo_usuarios')} min="1" max="1000000" step="1" disabled={processing} /></div>
+    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.messages')} bind:value={form.maximo_mensajes_mensuales} error={fieldError('maximo_mensajes_mensuales')} min="1" max="1000000000" step="1" disabled={processing} /></div>
+    <div class="col-span-6 max-sm:col-span-12"><Input type="number" label={i18n.t('plans.field.aiUsage')} bind:value={form.maximo_uso_ia_mensual} error={fieldError('maximo_uso_ia_mensual')} min="1" max="1000000000" step="1" disabled={processing} /></div>
   </div>
 </ConfirmationDialog>
 
@@ -281,7 +328,12 @@
   <input name="codigo" value={form.codigo} />
   <input name="nombre" value={form.nombre} />
   <input name="descripcion" value={form.descripcion} />
-  <input name="almacenamiento_gb" value={form.almacenamiento_gb} />
+  <input name="almacenamiento_valor" value={form.almacenamiento_valor} />
+  <input name="fid_parametros_unidad_almacenamiento" value={form.fid_parametros_unidad_almacenamiento} />
+  <input name="maximo_sedes" value={form.maximo_sedes} />
+  <input name="maximo_usuarios" value={form.maximo_usuarios} />
+  <input name="maximo_mensajes_mensuales" value={form.maximo_mensajes_mensuales} />
+  <input name="maximo_uso_ia_mensual" value={form.maximo_uso_ia_mensual} />
 </form>
 
 <form bind:this={editForm} method="POST" action="?/edit" use:enhance={edit} class="hidden">
@@ -289,7 +341,12 @@
   <input name="codigo" value={form.codigo} />
   <input name="nombre" value={form.nombre} />
   <input name="descripcion" value={form.descripcion} />
-  <input name="almacenamiento_gb" value={form.almacenamiento_gb} />
+  <input name="almacenamiento_valor" value={form.almacenamiento_valor} />
+  <input name="fid_parametros_unidad_almacenamiento" value={form.fid_parametros_unidad_almacenamiento} />
+  <input name="maximo_sedes" value={form.maximo_sedes} />
+  <input name="maximo_usuarios" value={form.maximo_usuarios} />
+  <input name="maximo_mensajes_mensuales" value={form.maximo_mensajes_mensuales} />
+  <input name="maximo_uso_ia_mensual" value={form.maximo_uso_ia_mensual} />
 </form>
 
 <form bind:this={statusForm} method="POST" action="?/status" use:enhance={status} class="hidden">

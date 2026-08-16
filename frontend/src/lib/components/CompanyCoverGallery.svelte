@@ -33,7 +33,7 @@
 		if (!operation) currentCovers = [...covers];
 	});
 
-	const coverUrl = (cover: Cover) => `/media/tenant/portada/${cover.version}`;
+	const coverUrl = (cover: Cover) => `/media/company/view/portada/${cover.version}?coverId=${encodeURIComponent(cover.id)}`;
 	const message = (body: unknown, fallback: string) =>
 		body && typeof body === 'object' && typeof (body as { message?: unknown }).message === 'string'
 			? i18n.t((body as { message: string }).message)

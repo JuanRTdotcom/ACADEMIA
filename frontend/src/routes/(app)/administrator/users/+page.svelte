@@ -19,6 +19,7 @@
   const canUpdate = $derived(tienePermiso(data.usuario.permisos, 'administrator.users.update'));
   const canDelete = $derived(tienePermiso(data.usuario.permisos, 'administrator.users.delete'));
   const canAny = $derived(canUpdate || canDelete);
+  const isCurrentUser = (user: User) => user.id_usuarios === data.usuario.id_usuarios;
 
   const reglasPassword = $derived([
     { clave: 'profile.password.rule.length', cumple: nuevaContrasenia.length >= 8 },
@@ -69,13 +70,14 @@
       </div>
     {:else}
       <div class="hidden overflow-x-auto md:block">
-        <table class="w-full min-w-[860px] table-fixed border-collapse text-left text-sm">
-          <colgroup>{#if canAny}<col class="w-[92px]" />{/if}<col /><col class="w-[28%]" /><col class="w-[16%]" /></colgroup>
+        <table class="w-full min-w-[980px] table-fixed border-collapse text-left text-sm">
+          <colgroup>{#if canAny}<col class="w-[92px]" />{/if}<col /><col class="w-[22%]" /><col class="w-[21%]" /><col class="w-[15%]" /></colgroup>
           <thead class="bg-canvas">
             <tr class="border-b border-hairline text-[11px] font-bold uppercase tracking-[0.04em] text-ink">
               {#if canAny}<th class="h-10 border-r border-hairline px-3 text-center">{i18n.t('users.actions')}</th>{/if}
               <th class="px-5 py-3.5">{i18n.t('users.user')}</th>
               <th class="px-4 py-3.5">{i18n.t('users.roles')}</th>
+              <th class="px-4 py-3.5">{i18n.t('users.branches')}</th>
               <th class="px-4 py-3.5 text-center">{i18n.t('users.status')}</th>
             </tr>
           </thead>
@@ -84,8 +86,10 @@
               <tr class="border-b border-hairline odd:bg-surface/55 even:bg-canvas hover:bg-primary-soft/35">
                 {#if canAny}
                   <td class="border-r border-hairline px-2 py-2.5"><div class="flex items-center justify-center gap-1">
-                    {#if canUpdate}<a href={`/administrator/users/${user.id_usuarios}/edit`} title={i18n.t('users.edit')} aria-label={`${i18n.t('users.edit')}: ${user.usuario}`} class="grid size-7 place-items-center rounded-md text-steel hover:bg-canvas hover:text-primary"><Icon name="pencil" size={15} /></a>{/if}
-                    <DropdownMenu.Root><DropdownMenu.Trigger disabled={processing} aria-label={`${i18n.t('users.actions')}: ${user.usuario}`} class="grid size-7 place-items-center rounded-md text-steel hover:bg-canvas"><Icon name="ellipsis" size={18} /></DropdownMenu.Trigger><DropdownMenu.Content align="start" class="min-w-[190px]">{#if canUpdate}<DropdownMenu.Item disabled={processing || user.estado !== 1} onSelect={() => { target = user; nuevaContrasenia = ''; resetPasswordOpen = true; }}><Icon name="lock-open" size={15} />{i18n.t('users.resetPassword')}</DropdownMenu.Item>{/if}{#if canDelete}<DropdownMenu.Item disabled={processing} class="text-error focus:bg-error/10 focus:text-error" onSelect={() => { target = user; deleteOpen = true; }}><Icon name="trash-2" size={15} />{i18n.t('users.delete')}</DropdownMenu.Item>{/if}</DropdownMenu.Content></DropdownMenu.Root>
+                    {#if !isCurrentUser(user)}
+                      {#if canUpdate}<a href={`/administrator/users/${user.id_usuarios}/edit`} title={i18n.t('users.edit')} aria-label={`${i18n.t('users.edit')}: ${user.usuario}`} class="grid size-7 place-items-center rounded-md text-steel hover:bg-canvas hover:text-primary"><Icon name="pencil" size={15} /></a>{/if}
+                      <DropdownMenu.Root><DropdownMenu.Trigger disabled={processing} aria-label={`${i18n.t('users.actions')}: ${user.usuario}`} class="grid size-7 place-items-center rounded-md text-steel hover:bg-canvas"><Icon name="ellipsis" size={18} /></DropdownMenu.Trigger><DropdownMenu.Content align="start" class="min-w-[190px]">{#if canUpdate}<DropdownMenu.Item disabled={processing || user.estado !== 1} onSelect={() => { target = user; nuevaContrasenia = ''; resetPasswordOpen = true; }}><Icon name="lock-open" size={15} />{i18n.t('users.resetPassword')}</DropdownMenu.Item>{/if}{#if canDelete}<DropdownMenu.Item disabled={processing} class="text-error focus:bg-error/10 focus:text-error" onSelect={() => { target = user; deleteOpen = true; }}><Icon name="trash-2" size={15} />{i18n.t('users.delete')}</DropdownMenu.Item>{/if}</DropdownMenu.Content></DropdownMenu.Root>
+                    {/if}
                   </div></td>
                 {/if}
                 <!-- Avatar + nombre -->
@@ -107,10 +111,17 @@
                     {#each user.roles as role (role.id_roles)}<Badge variant="outline-sky">{role.nombre}</Badge>{/each}
                   </div>
                 </td>
+                <td class="px-4 py-4">
+                  <ul class="flex flex-col gap-1 text-xs text-ink">
+                    {#each user.sedes ?? [] as sede (sede.id_sedes)}
+                      <li class="flex min-w-0 items-center gap-2"><span class="size-1.5 shrink-0 rounded-full bg-primary"></span><span class="truncate">{sede.nombre}</span></li>
+                    {/each}
+                  </ul>
+                </td>
                 <!-- Estado (switch) -->
                 <td class="px-4 py-4">
                   <div class="flex items-center justify-center gap-2">
-                    <Switch checked={user.estado === 1} disabled={processing || !canUpdate} label={`${i18n.t('users.status')}: ${user.usuario}`} onchange={(active) => status(user, active)} />
+                    <Switch checked={user.estado === 1} disabled={processing || !canUpdate || isCurrentUser(user)} label={`${i18n.t('users.status')}: ${user.usuario}`} onchange={(active) => status(user, active)} />
                     <span class="text-xs text-steel">{i18n.t(user.estado === 1 ? 'users.active' : 'users.inactive')}</span>
                   </div>
                 </td>
@@ -125,9 +136,9 @@
             <div class="flex items-center gap-3">
               <span class="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border border-hairline bg-primary-soft font-semibold text-primary">{user.nombres.slice(0, 1).toUpperCase()}{#if avatarSrc(user)}<img src={avatarSrc(user) ?? ''} alt="" class="absolute inset-0 size-full bg-canvas object-cover" loading="lazy" decoding="async" />{/if}</span>
               <div class="min-w-0 flex-1"><strong class="block truncate text-sm text-ink">{user.nombres} {user.apellido_paterno}</strong><p class="truncate text-xs text-steel">{user.usuario} · {user.correo ?? '—'}</p></div>
-              {#if canAny}<div class="flex gap-1">{#if canUpdate}<a href={`/administrator/users/${user.id_usuarios}/edit`} title={i18n.t('users.edit')} class="grid size-8 place-items-center rounded-md border border-hairline text-steel"><Icon name="pencil" size={16} /></a>{/if}<DropdownMenu.Root><DropdownMenu.Trigger class="grid size-8 place-items-center rounded-md border border-hairline text-steel"><Icon name="ellipsis" size={18} /></DropdownMenu.Trigger><DropdownMenu.Content align="end">{#if canUpdate}<DropdownMenu.Item disabled={processing || user.estado !== 1} onSelect={() => { target = user; nuevaContrasenia = ''; resetPasswordOpen = true; }}><Icon name="lock-open" size={15} />{i18n.t('users.resetPassword')}</DropdownMenu.Item>{/if}{#if canDelete}<DropdownMenu.Item class="text-error focus:bg-error/10 focus:text-error" onSelect={() => { target = user; deleteOpen = true; }}><Icon name="trash-2" size={15} />{i18n.t('users.delete')}</DropdownMenu.Item>{/if}</DropdownMenu.Content></DropdownMenu.Root></div>{/if}
+              {#if canAny && !isCurrentUser(user)}<div class="flex gap-1">{#if canUpdate}<a href={`/administrator/users/${user.id_usuarios}/edit`} title={i18n.t('users.edit')} class="grid size-8 place-items-center rounded-md border border-hairline text-steel"><Icon name="pencil" size={16} /></a>{/if}<DropdownMenu.Root><DropdownMenu.Trigger class="grid size-8 place-items-center rounded-md border border-hairline text-steel"><Icon name="ellipsis" size={18} /></DropdownMenu.Trigger><DropdownMenu.Content align="end">{#if canUpdate}<DropdownMenu.Item disabled={processing || user.estado !== 1} onSelect={() => { target = user; nuevaContrasenia = ''; resetPasswordOpen = true; }}><Icon name="lock-open" size={15} />{i18n.t('users.resetPassword')}</DropdownMenu.Item>{/if}{#if canDelete}<DropdownMenu.Item class="text-error focus:bg-error/10 focus:text-error" onSelect={() => { target = user; deleteOpen = true; }}><Icon name="trash-2" size={15} />{i18n.t('users.delete')}</DropdownMenu.Item>{/if}</DropdownMenu.Content></DropdownMenu.Root></div>{/if}
             </div>
-            <div class="mt-3 flex items-center justify-between gap-3 border-t border-hairline pt-3"><div class="flex min-w-0 flex-wrap gap-1">{#each user.roles as role (role.id_roles)}<Badge variant="outline-sky">{role.nombre}</Badge>{/each}</div><Switch checked={user.estado === 1} disabled={processing || !canUpdate} label={`${i18n.t('users.status')}: ${user.usuario}`} onchange={(active) => status(user, active)} /></div>
+            <div class="mt-3 grid gap-3 border-t border-hairline pt-3"><div class="flex items-start justify-between gap-3"><div class="flex min-w-0 flex-wrap items-center gap-1">{#each user.roles as role (role.id_roles)}<Badge variant="outline-sky">{role.nombre}</Badge>{/each}</div><Switch checked={user.estado === 1} disabled={processing || !canUpdate || isCurrentUser(user)} label={`${i18n.t('users.status')}: ${user.usuario}`} onchange={(active) => status(user, active)} /></div><div class="flex items-start gap-2 text-xs"><span class="shrink-0 text-steel">{i18n.t('users.branches')}:</span><ul class="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-ink">{#each user.sedes ?? [] as sede (sede.id_sedes)}<li class="flex min-w-0 items-center gap-1.5"><span class="size-1.5 shrink-0 rounded-full bg-primary"></span><span class="truncate">{sede.nombre}</span></li>{/each}</ul></div></div>
           </article>
         {/each}
       </div>

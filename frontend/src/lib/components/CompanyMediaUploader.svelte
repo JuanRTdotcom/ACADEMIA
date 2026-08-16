@@ -62,7 +62,7 @@
 			if (xhr.status >= 200 && xhr.status < 300) {
 				const branding = body as Record<string, unknown>;
 				const version = branding[`${type}_version`];
-				currentSrc = typeof version === 'string' ? `/media/tenant/${type}/${version}` : null;
+				currentSrc = typeof version === 'string' ? `/media/company/view/${type}/${version}` : null;
 				toast.success(i18n.t('notifications.type.success'), { description: i18n.t('companies.media.updated') });
 				await invalidateAll();
 			} else toast.error(i18n.t('notifications.type.error'), { description: message(body, 'companies.media.saveError') });

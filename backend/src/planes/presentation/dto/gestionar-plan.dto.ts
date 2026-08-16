@@ -12,6 +12,7 @@ import {
   IsInt,
   Min,
   Max,
+  ValidateIf,
 } from "class-validator";
 
 const texto = ({ value }: { value: unknown }) =>
@@ -43,11 +44,47 @@ export class DtoGestionarPlan {
   @Transform(texto)
   descripcion?: string;
 
+  @ValidateIf(
+    (dto: DtoGestionarPlan) =>
+      dto.fid_parametros_unidad_almacenamiento !== null &&
+      dto.fid_parametros_unidad_almacenamiento !== undefined,
+  )
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  almacenamiento_valor?: number | null;
+
+  @ValidateIf(
+    (dto: DtoGestionarPlan) =>
+      dto.almacenamiento_valor !== null &&
+      dto.almacenamiento_valor !== undefined,
+  )
+  @IsUUID("4")
+  fid_parametros_unidad_almacenamiento?: string | null;
+
   @IsOptional()
   @IsInt()
-  @Min(1024 * 1024)
-  @Max(Number.MAX_SAFE_INTEGER)
-  almacenamiento_max_bytes?: number | null;
+  @Min(1)
+  @Max(1_000_000)
+  maximo_sedes?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000)
+  maximo_usuarios?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000_000)
+  maximo_mensajes_mensuales?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000_000)
+  maximo_uso_ia_mensual?: number | null;
 }
 
 export class DtoActualizarModulosPlan {

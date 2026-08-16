@@ -7,6 +7,11 @@ export class RepositorioAtencionesDatos extends RepositorioAtenciones {
   constructor(private fuente: FuenteDatosAtencionesPrisma) {
     super();
   }
+  validarAccesoSede(
+    ...args: Parameters<RepositorioAtenciones["validarAccesoSede"]>
+  ) {
+    return this.fuente.validarAccesoSede(...args);
+  }
   listarHoy(...args: Parameters<RepositorioAtenciones["listarHoy"]>) {
     return this.fuente.listarHoy(...args);
   }

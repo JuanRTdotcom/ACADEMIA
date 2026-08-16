@@ -11,6 +11,9 @@ interface General {
 	plan_nombre: string;
 }
 export const load: PageServerLoad = async (event) => {
-	await event.parent();
-	return { section: await loadCompanySection<General>(event, 'general') };
+	const parentData = await event.parent();
+	return {
+		section: await loadCompanySection<General>(event, 'general'),
+		sede: parentData.empresa.sede_activa
+	};
 };

@@ -10,12 +10,14 @@ import type {
 export abstract class RepositorioMascotas {
   abstract listar(
     organizacion: string,
+    sede: string,
     filtros: FiltrosMascotas,
     idioma: string,
   ): Promise<ResultadoCatalogoPaginado>;
   abstract opciones(idioma: string): Promise<unknown>;
   abstract buscarPropietarios(
     organizacion: string,
+    sede: string,
     q: string,
   ): Promise<unknown>;
   abstract obtener(id: string, organizacion: string): Promise<unknown>;
@@ -26,6 +28,7 @@ export abstract class RepositorioMascotas {
   ): Promise<{ contenido: Buffer; tipo_mime: "image/jpeg" }>;
   abstract crear(
     organizacion: string,
+    sede: string,
     datos: DatosMascota,
     foto: ArchivoMascota | null,
     usuario: string,
@@ -34,6 +37,7 @@ export abstract class RepositorioMascotas {
   abstract actualizar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: DatosMascota,
     foto: ArchivoMascota | null,
     eliminarFoto: boolean,
@@ -43,6 +47,7 @@ export abstract class RepositorioMascotas {
   abstract eliminar(
     id: string,
     organizacion: string,
+    sede: string,
     datos: EliminacionMascota,
     usuario: string,
     contexto: ContextoSolicitud,

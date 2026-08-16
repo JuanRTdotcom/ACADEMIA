@@ -7,6 +7,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -48,6 +49,7 @@ import {
 import { InterceptorErroresMediosEmpresa } from "../interceptors/interceptor-errores-medios-empresa";
 import { DtoGuardarMedioEmpresa } from "../dto/guardar-medio-empresa.dto";
 import { DtoCompartirMedioEmpresa } from "../dto/compartir-medio-empresa.dto";
+import { DtoGuardarSede, DtoSeleccionarSede } from "../dto/guardar-sede.dto";
 
 const LIMITE_MUTACIONES = 20;
 const SECCIONES: Readonly<Record<string, SeccionEmpresa>> = {
@@ -80,10 +82,102 @@ const PERMISOS_LECTURA_SECCION: Readonly<Record<SeccionEmpresa, string>> = {
 export class ControladorEmpresaActual {
   constructor(private empresa: CasoUsoGestionarEmpresaActual) {}
 
+  private sedeActiva(usuario: UsuarioAutenticado) {
+    const sede = usuario.contexto.sede_activa?.id_sedes;
+    if (!sede) throw new BadRequestException("companies.branches.unavailable");
+    return sede;
+  }
+
+  @Get("branches")
+  @Permisos("administrator.company.branches.read")
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  sedes(@UsuarioActual() usuario: UsuarioAutenticado) {
+    return this.empresa.sedes(usuario.fid_organizaciones, usuario.idioma);
+  }
+
+  @Post("branches")
+  @Permisos("administrator.company.branches.create")
+  @HttpCode(201)
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  crearSede(
+    @Body() dto: DtoGuardarSede,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.empresa.crearSede(
+      usuario.fid_organizaciones,
+      dto,
+      this.sedeActiva(usuario),
+      usuario.sub,
+      crearContextoSolicitud(req),
+    );
+  }
+
+  @Patch("branches/:id")
+  @Permisos("administrator.company.branches.update")
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  actualizarSede(
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() dto: DtoGuardarSede,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    return this.empresa.actualizarSede(
+      id,
+      usuario.fid_organizaciones,
+      dto,
+      this.sedeActiva(usuario),
+      usuario.sub,
+      crearContextoSolicitud(req),
+    );
+  }
+
+  @Delete("branches/:id")
+  @Permisos("administrator.company.branches.delete")
+  @HttpCode(200)
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  async eliminarSede(
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    await this.empresa.eliminarSede(
+      id,
+      usuario.fid_organizaciones,
+      usuario.sub,
+      crearContextoSolicitud(req),
+    );
+    return { ok: true };
+  }
+
+  @Patch("active-branch")
+  @HttpCode(200)
+  @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
+  async seleccionarSede(
+    @Body() dto: DtoSeleccionarSede,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Req() req: Request,
+  ) {
+    await this.empresa.seleccionarSede(
+      dto.fid_sedes,
+      usuario.fid_organizaciones,
+      usuario.sub,
+      crearContextoSolicitud(req),
+    );
+    return { ok: true };
+  }
+
   private exigirPermiso(usuario: UsuarioAutenticado, permiso: string) {
     if (!usuario.permisos.includes(permiso)) {
       throw new ForbiddenException("auth.noPermission");
     }
+  }
+
+  private exigirSedePrincipal(usuario: UsuarioAutenticado) {
+    if (!usuario.contexto.sede_activa?.es_principal)
+      throw new ForbiddenException(
+        "companies.branches.mainOnlyConfiguration",
+      );
   }
 
   private tipoMedio(tipo: string): TipoMedioEmpresa {
@@ -124,10 +218,14 @@ export class ControladorEmpresaActual {
     "administrator.company.communications.read",
     "administrator.company.region.read",
     "administrator.company.subscription.read",
+    "administrator.company.branches.read",
   )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   resumen(@UsuarioActual() usuario: UsuarioAutenticado) {
-    return this.empresa.resumen(usuario.fid_organizaciones);
+    return this.empresa.resumen(
+      usuario.fid_organizaciones,
+      usuario.contexto.sede_activa?.id_sedes ?? null,
+    );
   }
 
   @Get("sections/:section")
@@ -139,7 +237,13 @@ export class ControladorEmpresaActual {
     const seccion = SECCIONES[section];
     if (!seccion) throw new BadRequestException("companies.invalidSection");
     this.exigirPermiso(usuario, PERMISOS_LECTURA_SECCION[seccion]);
-    return this.empresa.seccion(usuario.fid_organizaciones, seccion);
+    if (seccion === "identidad" || seccion === "login")
+      this.exigirSedePrincipal(usuario);
+    return this.empresa.seccion(
+      usuario.fid_organizaciones,
+      seccion,
+      usuario.contexto.sede_activa?.id_sedes ?? null,
+    );
   }
 
   @Get("branding")
@@ -149,7 +253,11 @@ export class ControladorEmpresaActual {
   )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async marca(@UsuarioActual() usuario: UsuarioAutenticado) {
-    const marca = await this.empresa.marca(usuario.fid_organizaciones);
+    this.exigirSedePrincipal(usuario);
+    const marca = await this.empresa.marca(
+      usuario.fid_organizaciones,
+      this.sedeActiva(usuario),
+    );
     if (!usuario.permisos.includes("administrator.company.identity.read")) {
       marca.escudo_version = null;
       marca.escudo_oscuro_version = null;
@@ -157,7 +265,9 @@ export class ControladorEmpresaActual {
       marca.imagotipo_oscuro_version = null;
       marca.portadas = [];
     }
-    if (!usuario.permisos.includes("administrator.company.login_branding.read")) {
+    if (
+      !usuario.permisos.includes("administrator.company.login_branding.read")
+    ) {
       marca.login_escudo_version = null;
       marca.login_escudo_oscuro_version = null;
     }
@@ -169,6 +279,7 @@ export class ControladorEmpresaActual {
     "administrator.company.contact.read",
     "administrator.company.services.read",
     "administrator.company.fiscal.read",
+    "administrator.company.branches.read",
   )
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   catalogosUbicacion(@UsuarioActual() usuario: UsuarioAutenticado) {
@@ -185,23 +296,21 @@ export class ControladorEmpresaActual {
     @Res({ passthrough: true }) respuesta: Response,
   ) {
     const medioTipo = this.tipoMedio(tipo);
-    this.exigirPermiso(
-      usuario,
-      medioTipo.startsWith("login_")
-        ? "administrator.company.login_branding.read"
-        : "administrator.company.identity.read",
-    );
     const uuid =
       "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
     const extensiones = medioTipo === "portada" ? "webp" : "(?:png|jpg|webp)";
     if (!new RegExp(`^${uuid}\\.${extensiones}$`, "i").test(version)) {
       throw new BadRequestException("companies.media.invalidRequest");
     }
-    const medio = await this.empresa.leerMedio(usuario.fid_organizaciones, {
-      tipo: medioTipo,
-      version,
-      id_portada: portada,
-    });
+    const medio = await this.empresa.leerMedio(
+      usuario.fid_organizaciones,
+      this.sedeActiva(usuario),
+      {
+        tipo: medioTipo,
+        version,
+        id_portada: portada,
+      },
+    );
     respuesta.setHeader("content-type", medio.tipo_mime);
     respuesta.setHeader(
       "cache-control",
@@ -230,6 +339,7 @@ export class ControladorEmpresaActual {
     );
     return this.empresa.compartirMedio(
       usuario.fid_organizaciones,
+      this.sedeActiva(usuario),
       {
         tipo: this.tipoMarca(tipo),
         usar_misma_imagen: dto.usar_misma_imagen,
@@ -261,6 +371,7 @@ export class ControladorEmpresaActual {
     );
     return this.empresa.guardarMedio(
       usuario.fid_organizaciones,
+      this.sedeActiva(usuario),
       {
         tipo: this.tipoMedio(tipo),
         archivo: {
@@ -300,6 +411,7 @@ export class ControladorEmpresaActual {
     );
     return this.empresa.eliminarMedio(
       usuario.fid_organizaciones,
+      this.sedeActiva(usuario),
       { tipo: this.tipoMedio(tipo), id_portada: portada },
       usuario.sub,
       crearContextoSolicitud(peticion),
@@ -316,6 +428,7 @@ export class ControladorEmpresaActual {
       usuario.fid_organizaciones,
       seccion,
       datos,
+      usuario.contexto.sede_activa?.id_sedes ?? null,
       usuario.sub,
       crearContextoSolicitud(peticion),
     );
@@ -390,21 +503,33 @@ export class ControladorEmpresaActual {
   @Patch("sections/services")
   @Permisos("administrator.company.services.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
-  actualizarServicios(@Body() dto: DtoGuardarServiciosVeterinaria, @UsuarioActual() u: UsuarioAutenticado, @Req() r: Request) {
+  actualizarServicios(
+    @Body() dto: DtoGuardarServiciosVeterinaria,
+    @UsuarioActual() u: UsuarioAutenticado,
+    @Req() r: Request,
+  ) {
     return this.actualizar(u, "servicios", dto, r);
   }
 
   @Patch("sections/agenda")
   @Permisos("administrator.company.agenda.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
-  actualizarAgenda(@Body() dto: DtoGuardarAgendaVeterinaria, @UsuarioActual() u: UsuarioAutenticado, @Req() r: Request) {
+  actualizarAgenda(
+    @Body() dto: DtoGuardarAgendaVeterinaria,
+    @UsuarioActual() u: UsuarioAutenticado,
+    @Req() r: Request,
+  ) {
     return this.actualizar(u, "agenda", dto, r);
   }
 
   @Patch("sections/fiscal")
   @Permisos("administrator.company.fiscal.update")
   @Throttle({ default: { limit: LIMITE_MUTACIONES, ttl: 60_000 } })
-  actualizarFiscal(@Body() dto: DtoGuardarFiscalVeterinaria, @UsuarioActual() u: UsuarioAutenticado, @Req() r: Request) {
+  actualizarFiscal(
+    @Body() dto: DtoGuardarFiscalVeterinaria,
+    @UsuarioActual() u: UsuarioAutenticado,
+    @Req() r: Request,
+  ) {
     return this.actualizar(u, "fiscal", dto, r);
   }
 
@@ -430,6 +555,7 @@ export class ControladorEmpresaActual {
   ) {
     await this.empresa.actualizarFiltroColorLogin(
       usuario.fid_organizaciones,
+      this.sedeActiva(usuario),
       dto.login_usar_filtro_color,
       usuario.sub,
       crearContextoSolicitud(peticion),

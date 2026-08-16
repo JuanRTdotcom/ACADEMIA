@@ -14,8 +14,24 @@ import type {
   MarcaEmpresa,
   MedioEmpresa,
 } from "../entities/marca-empresa";
+import type { ActorSede, DatosBasicosSede } from "../entities/sede";
 
 export abstract class RepositorioEmpresas {
+  abstract listarSedesActual(
+    organizacion: string,
+    idioma: string,
+  ): Promise<unknown>;
+  abstract crearSedeActual(
+    datos: DatosBasicosSede,
+    actor: ActorSede,
+  ): Promise<unknown>;
+  abstract actualizarSedeActual(
+    id: string,
+    datos: DatosBasicosSede,
+    actor: ActorSede,
+  ): Promise<unknown>;
+  abstract eliminarSedeActual(id: string, actor: ActorSede): Promise<void>;
+  abstract seleccionarSedeActual(id: string, actor: ActorSede): Promise<void>;
   abstract listar(
     idOrganizacionActual: string,
     busqueda?: string,
@@ -90,10 +106,12 @@ export abstract class RepositorioEmpresas {
 
   abstract obtenerResumenActual(
     idOrganizacion: string,
+    idSedeActual: string | null,
   ): Promise<ResumenEmpresa>;
   abstract obtenerSeccionActual<S extends SeccionEmpresa>(
     idOrganizacion: string,
     seccion: S,
+    idSedeActual: string | null,
   ): Promise<SeccionesEmpresa[S]>;
   abstract obtenerCatalogosUbicacionActual(
     idOrganizacion: string,
@@ -102,11 +120,13 @@ export abstract class RepositorioEmpresas {
     idOrganizacion: string,
     seccion: S,
     datos: SeccionesEmpresa[S],
+    idSedeActual: string | null,
     idUsuarioActual: string,
     contexto: ContextoSolicitud,
   ): Promise<void>;
   abstract actualizarFiltroColorLoginActual(
     idOrganizacion: string,
+    idSedeActual: string,
     activo: boolean,
     idUsuarioActual: string,
     contexto: ContextoSolicitud,
@@ -116,7 +136,10 @@ export abstract class RepositorioEmpresas {
     idOrganizacion: string,
     idOrganizacionActual: string,
   ): Promise<MarcaEmpresa>;
-  abstract obtenerMarcaActual(idOrganizacion: string): Promise<MarcaEmpresa>;
+  abstract obtenerMarcaActual(
+    idOrganizacion: string,
+    idSedeActual: string,
+  ): Promise<MarcaEmpresa>;
   abstract guardarMedio(
     idOrganizacion: string,
     comando: ComandoGuardarMedioEmpresa,
@@ -126,6 +149,7 @@ export abstract class RepositorioEmpresas {
   ): Promise<MarcaEmpresa>;
   abstract guardarMedioActual(
     idOrganizacion: string,
+    idSedeActual: string,
     comando: ComandoGuardarMedioEmpresa,
     idUsuarioActual: string,
     contexto: ContextoSolicitud,
@@ -139,12 +163,14 @@ export abstract class RepositorioEmpresas {
   ): Promise<MarcaEmpresa>;
   abstract eliminarMedioActual(
     idOrganizacion: string,
+    idSedeActual: string,
     comando: ComandoEliminarMedioEmpresa,
     idUsuarioActual: string,
     contexto: ContextoSolicitud,
   ): Promise<MarcaEmpresa>;
   abstract compartirMedioActual(
     idOrganizacion: string,
+    idSedeActual: string,
     comando: ComandoCompartirMedioEmpresa,
     idUsuarioActual: string,
     contexto: ContextoSolicitud,
@@ -156,6 +182,7 @@ export abstract class RepositorioEmpresas {
   ): Promise<MedioEmpresa>;
   abstract obtenerMedioActual(
     idOrganizacion: string,
+    idSedeActual: string,
     consulta: ConsultaMedioEmpresa,
   ): Promise<MedioEmpresa>;
   abstract listarRenovaciones(

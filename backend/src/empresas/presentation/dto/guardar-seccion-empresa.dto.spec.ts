@@ -22,13 +22,6 @@ describe("DTO de configuración de empresa actual", () => {
     correo_contacto_secundario: "alternativo@institucion.edu.pe",
   };
 
-  const horarios = Array.from({ length: 7 }, (_, indice) => ({
-    dia_semana: indice + 1,
-    cerrado: indice === 6,
-    hora_apertura: indice === 6 ? null : "08:00",
-    hora_cierre: indice === 6 ? null : "18:00",
-  }));
-
   it("acepta una ubicación jerárquica completa", async () => {
     const errores = await validate(
       plainToInstance(DtoGuardarContactoEmpresa, contacto),
@@ -54,7 +47,6 @@ describe("DTO de configuración de empresa actual", () => {
         soporte_correo: "soporte@institucion.edu.pe",
         soporte_telefono: "+51 1 555 5555",
         soporte_whatsapp: "+51 999 999 999",
-        horarios,
       }),
     );
     expect(errores).toHaveLength(0);
@@ -66,10 +58,9 @@ describe("DTO de configuración de empresa actual", () => {
         soporte_correo: "correo-invalido",
         soporte_telefono: "teléfono",
         soporte_whatsapp: "javascript:alert(1)",
-        horarios: [{ ...horarios[0], hora_apertura: "25:00" }],
       }),
     );
-    expect(errores.length).toBeGreaterThanOrEqual(4);
+    expect(errores.length).toBeGreaterThanOrEqual(3);
   });
 
   it("acepta los seis colores de interfaz y el indicador del escudo", async () => {

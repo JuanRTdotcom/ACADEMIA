@@ -80,6 +80,12 @@ export const navGroups: NavGroup[] = [
         ],
       },
       {
+        label: "nav.branches",
+        icon: "map-pin",
+        href: "/administrator/branches",
+        permissions: ["administrator.company.branches.read"],
+      },
+      {
         label: "nav.services",
         icon: "clipboard-check",
         href: "/administrator/services",
@@ -161,22 +167,52 @@ export const navGroups: NavGroup[] = [
   {
     title: "nav.group.commercial",
     items: [
-      { label: "nav.sales", icon: "shopping-cart", href: "/operations/sales", permissions: ["operations.sales.read"] },
-      { label: "nav.inventory", icon: "package-search", href: "/operations/inventory", permissions: ["operations.inventory.read"] },
-      { label: "nav.electronicBilling", icon: "receipt-text", href: "/operations/billing", permissions: ["operations.billing.read"] },
+      {
+        label: "nav.sales",
+        icon: "shopping-cart",
+        href: "/operations/sales",
+        permissions: ["operations.sales.read"],
+      },
+      {
+        label: "nav.inventory",
+        icon: "package-search",
+        href: "/operations/inventory",
+        permissions: ["operations.inventory.read"],
+      },
+      {
+        label: "nav.electronicBilling",
+        icon: "receipt-text",
+        href: "/operations/billing",
+        permissions: ["operations.billing.read"],
+      },
     ],
   },
   {
     title: "nav.group.scheduling",
     items: [
-      { label: "nav.appointments", icon: "calendar-days", href: "/operations/appointments", permissions: ["operations.appointments.read"] },
-      { label: "nav.reminders", icon: "bell-ring", href: "/operations/reminders", permissions: ["operations.reminders.read"] },
+      {
+        label: "nav.appointments",
+        icon: "calendar-days",
+        href: "/operations/appointments",
+        permissions: ["operations.appointments.read"],
+      },
+      {
+        label: "nav.reminders",
+        icon: "bell-ring",
+        href: "/operations/reminders",
+        permissions: ["operations.reminders.read"],
+      },
     ],
   },
   {
     title: "nav.group.reports",
     items: [
-      { label: "nav.reports", icon: "chart-no-axes-combined", href: "/operations/reports", permissions: ["operations.reports.read"] },
+      {
+        label: "nav.reports",
+        icon: "chart-no-axes-combined",
+        href: "/operations/reports",
+        permissions: ["operations.reports.read"],
+      },
     ],
   },
 ];

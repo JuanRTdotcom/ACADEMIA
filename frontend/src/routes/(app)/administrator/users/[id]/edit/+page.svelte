@@ -27,7 +27,8 @@
       apellido_materno: data.usuarioEditado.apellido_materno,
       correoPrefix: extractCorreoPrefix(data.usuarioEditado.correo),
       fid_roles: data.usuarioEditado.roles.map((role: RoleOption) => role.id_roles),
-      fid_permisos: data.usuarioEditado.permisos as string[]
+      fid_permisos: data.usuarioEditado.permisos as string[],
+      fid_sedes: (data.usuarioEditado.sedes ?? []).map((sede: any) => sede.id_sedes) as string[]
     };
   }
 
@@ -70,6 +71,7 @@
     if (!validName(form.apellido_materno, 30)) e.apellido_materno = 'users.validation.name';
     if (!fullCorreo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fullCorreo) || fullCorreo.length > 254) e.correo = 'users.validation.email';
     if (form.fid_roles.length === 0) e.roles = 'users.validation.roles';
+    if (form.fid_sedes.length === 0) e.sedes = 'users.validation.branches';
     return e;
   });
   const valid = $derived(Object.keys(errors).length === 0);
@@ -128,6 +130,7 @@
     {#if selectedRoles.length > 0}
       <UserPermissionsCard modules={visibleModules} bind:selected={form.fid_permisos} disabled={saving} />
     {/if}
+    <Card><div class="mb-4"><h2 class="text-base font-semibold text-ink">{i18n.t('users.branches')}</h2><p class="mt-1 text-sm text-steel">{i18n.t('users.branchesHelp')}</p></div><div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{#each data.opciones.sedes ?? [] as sede (sede.id_sedes)}<label class="flex items-center gap-3 rounded-md border border-hairline px-3 py-2.5 text-sm text-ink"><input type="checkbox" name="fid_sedes" value={sede.id_sedes} checked={form.fid_sedes.includes(sede.id_sedes)} onchange={(event) => form.fid_sedes = event.currentTarget.checked ? [...form.fid_sedes, sede.id_sedes] : form.fid_sedes.filter((id: string) => id !== sede.id_sedes)} /> <Icon name="map-pin" size={16} class="text-primary" /><span>{sede.nombre}</span>{#if sede.es_principal}<span class="ml-auto text-xs text-stone">{i18n.t('companies.branches.main')}</span>{/if}</label>{/each}</div>{#if attempted && errors.sedes}<p class="mt-2 text-xs text-danger">{i18n.t(errors.sedes)}</p>{/if}</Card>
     <Card>
       <div class="mb-5"><h2 class="text-base font-semibold text-ink">{i18n.t('users.title')}</h2><p class="mt-1 text-sm text-steel">Datos básicos que identifican la cuenta dentro de la institución.</p></div>
       <div class="grid gap-4 lg:grid-cols-3">

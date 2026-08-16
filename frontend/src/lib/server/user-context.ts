@@ -30,9 +30,46 @@ export interface UserContext {
   };
   avatar: { disponible: boolean; version: string | null };
   organizacion: { slug: string; nombre: string };
+  sedes: {
+    id_sedes: string;
+    codigo: string;
+    nombre: string;
+    es_principal: boolean;
+  }[];
+  sede_activa: {
+    id_sedes: string;
+    codigo: string;
+    nombre: string;
+    es_principal: boolean;
+    apariencia: {
+      color_primario: string | null;
+      cabecera_claro: string | null;
+      cabecera_oscuro: string | null;
+      esquinero_claro: string | null;
+      esquinero_oscuro: string | null;
+      menu_claro: string | null;
+      menu_oscuro: string | null;
+      mostrar_escudo_menu: boolean;
+      mostrar_nombre_empresa_menu: boolean;
+      ocultar_esquinero_expandido: boolean;
+      esquinero_fondo_activo: boolean;
+      cabecera_ocultar_borde: boolean;
+      menu_ocultar_borde: boolean;
+      tamano_escudo_menu: number;
+      escudo_version: string | null;
+      escudo_oscuro_version: string | null;
+      imagotipo_version: string | null;
+      imagotipo_oscuro_version: string | null;
+    };
+  } | null;
   roles: { codigo: string; nombre: string }[];
   permisos: string[];
-  modulos: { codigo: string; nombre: string; icono: string | null; ruta: string | null }[];
+  modulos: {
+    codigo: string;
+    nombre: string;
+    icono: string | null;
+    ruta: string | null;
+  }[];
   preferencias: UserPreferences;
   seguridad: { segundo_factor_habilitado: boolean };
   acciones_requeridas: ResumenAccionesRequeridas;
@@ -56,6 +93,10 @@ export function parseUserContext(value: unknown): UserContext {
   const roles = data?.roles;
   const permissions = data?.permisos;
   const modules = data?.modulos;
+  const branches = data?.sedes;
+  const activeBranch =
+    data?.sede_activa === null ? null : asRecord(data?.sede_activa);
+  const branchAppearance = asRecord(activeBranch?.apariencia);
   const valid =
     data !== null &&
     typeof data.id_usuarios === "string" &&
@@ -87,6 +128,48 @@ export function parseUserContext(value: unknown): UserContext {
     (avatar.version === null || typeof avatar.version === "string") &&
     typeof organization?.slug === "string" &&
     typeof organization.nombre === "string" &&
+    Array.isArray(branches) &&
+    branches.every((branch: unknown) => {
+      const item = asRecord(branch);
+      return (
+        typeof item?.id_sedes === "string" &&
+        typeof item.codigo === "string" &&
+        typeof item.nombre === "string" &&
+        typeof item.es_principal === "boolean"
+      );
+    }) &&
+    (activeBranch === null ||
+      (typeof activeBranch.id_sedes === "string" &&
+        typeof activeBranch.codigo === "string" &&
+        typeof activeBranch.nombre === "string" &&
+        typeof activeBranch.es_principal === "boolean" &&
+        branchAppearance !== null &&
+        [
+          "color_primario",
+          "cabecera_claro",
+          "cabecera_oscuro",
+          "esquinero_claro",
+          "esquinero_oscuro",
+          "menu_claro",
+          "menu_oscuro",
+          "escudo_version",
+          "escudo_oscuro_version",
+          "imagotipo_version",
+          "imagotipo_oscuro_version",
+        ].every(
+          (campo) =>
+            branchAppearance[campo] === null ||
+            typeof branchAppearance[campo] === "string",
+        ) &&
+        [
+          "mostrar_escudo_menu",
+          "mostrar_nombre_empresa_menu",
+          "ocultar_esquinero_expandido",
+          "esquinero_fondo_activo",
+          "cabecera_ocultar_borde",
+          "menu_ocultar_borde",
+        ].every((campo) => typeof branchAppearance[campo] === "boolean") &&
+        typeof branchAppearance.tamano_escudo_menu === "number")) &&
     Array.isArray(roles) &&
     roles.every((role: unknown) => {
       const item = asRecord(role);
@@ -101,9 +184,12 @@ export function parseUserContext(value: unknown): UserContext {
     Array.isArray(modules) &&
     modules.every((module: unknown) => {
       const item = asRecord(module);
-      return typeof item?.codigo === "string" && typeof item.nombre === "string" &&
+      return (
+        typeof item?.codigo === "string" &&
+        typeof item.nombre === "string" &&
         (item.icono === null || typeof item.icono === "string") &&
-        (item.ruta === null || typeof item.ruta === "string");
+        (item.ruta === null || typeof item.ruta === "string")
+      );
     }) &&
     (preferences?.tema === null || isTheme(preferences?.tema)) &&
     (preferences?.idioma === null || isLocale(preferences?.idioma)) &&

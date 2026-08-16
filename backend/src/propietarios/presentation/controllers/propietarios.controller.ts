@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -31,6 +32,12 @@ export class ControladorPropietarios {
     private tokens: ServicioTokenOpaco,
   ) {}
 
+  private sede(usuario: UsuarioAutenticado) {
+    const sede = usuario.contexto.sede_activa?.id_sedes;
+    if (!sede) throw new BadRequestException("owners.branchRequired");
+    return sede;
+  }
+
   @Get()
   @Permisos("clinic.owners.read")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -38,13 +45,15 @@ export class ControladorPropietarios {
     @Query() filtros: DtoListarPropietarios,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
-    const posicion = leerPosicionCatalogo(this.tokens, "clinic-owners", filtros.p, usuario.fid_organizaciones, filtros.q, "owners.invalidCursor");
-    const listado = await this.propietarios.listar(usuario.fid_organizaciones, {
+    const sede = this.sede(usuario);
+    const ambito = `clinic-owners:${sede}`;
+    const posicion = leerPosicionCatalogo(this.tokens, ambito, filtros.p, usuario.fid_organizaciones, filtros.q, "owners.invalidCursor");
+    const listado = await this.propietarios.listar(usuario.fid_organizaciones, sede, {
       q: filtros.q,
       despues_de: posicion?.direccion === "siguiente" ? posicion.id : undefined,
       antes_de: posicion?.direccion === "anterior" ? posicion.id : undefined,
     });
-    return protegerPaginacionCatalogo(this.tokens, "clinic-owners", listado, usuario.fid_organizaciones, filtros.q);
+    return protegerPaginacionCatalogo(this.tokens, ambito, listado, usuario.fid_organizaciones, filtros.q);
   }
 
   @Get("options")
@@ -53,6 +62,7 @@ export class ControladorPropietarios {
   opciones(@UsuarioActual() usuario: UsuarioAutenticado) {
     return this.propietarios.opciones(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       usuario.idioma,
     );
   }
@@ -78,6 +88,7 @@ export class ControladorPropietarios {
   ) {
     const resultado = await this.propietarios.crear(
       usuario.fid_organizaciones,
+      this.sede(usuario),
       this.datos(dto),
       usuario.sub,
       crearContextoSolicitud(req),
@@ -98,6 +109,7 @@ export class ControladorPropietarios {
     await this.propietarios.actualizar(
       id,
       usuario.fid_organizaciones,
+      this.sede(usuario),
       this.datos(dto),
       usuario.sub,
       crearContextoSolicitud(req),
@@ -118,6 +130,7 @@ export class ControladorPropietarios {
     await this.propietarios.eliminar(
       id,
       usuario.fid_organizaciones,
+      this.sede(usuario),
       dto,
       usuario.sub,
       crearContextoSolicitud(req),
